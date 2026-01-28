@@ -1,3 +1,15 @@
 sidecar_md/*
+sidecar_cross_md/*
+bench_cross_csv/*
 sidecar_bench_two_phase/*
+sidecar_bench_two_phase_csv/*
+bench_two_phase_csv/*
+bench_csv/*
+lmstudio_inventory.csv
+lmstudio_inventory_base.csv
+lmstudio_inventory_base_2.csv
+lmstudio_inventory_small.csv
+lmstudio_inventory_tiny.csv
+sidecar_bench/*
+
 lmstudio_inventory.sqlite

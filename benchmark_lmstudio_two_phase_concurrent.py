@@ -1196,8 +1196,8 @@ if __name__ == "__main__":
 
 # python3 benchmark_lmstudio_two_phase_concurrent.py
 #   --db lmstudio_inventory.sqlite
-#   --workers 6
-#   --repeats 1
+#   --workers 1
+#   --repeats 0
 #   --timeout 600
 #   --stream
 #   --out-dir sidecar_bench_two_phase
