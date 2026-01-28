@@ -407,11 +407,22 @@ def write_run_index_md(
     lines.append("|---|---|---|---:|---:|---:|---:|---|")
 
     for r in summary_rows:
-        status = "✅" if r["ok_rate"] >= 0.8 else "⚠️" if r["ok_rate"] > 0 else "❌"
+        ok_rate_val = r.get("ok_rate")
+        if isinstance(ok_rate_val, str):
+            try:
+                ok_rate_val = float(ok_rate_val)
+            except ValueError:
+                ok_rate_val = None
+        if ok_rate_val is None:
+            ok_rate_display = ""
+            status = "❌"
+        else:
+            ok_rate_display = f"{ok_rate_val:.2f}"
+            status = "✅" if ok_rate_val >= 0.8 else "⚠️" if ok_rate_val > 0 else "❌"
         lines.append(
             f"| `{r['host_name']}` | `{r['base_url']}` | `{r['model_key']}` | "
             f"{r.get('load_s','')} | {r.get('ttft_med','')} | {r.get('tps_med','')} | "
-            f"{r.get('ok_rate','')} | {status} |"
+            f"{ok_rate_display} | {status} |"
         )
 
     lines.append("")
@@ -790,7 +801,7 @@ def main() -> int:
                 "load_s": mean_or_blank(load_vals),
                 "ttft_med": median_or_blank(ttft_vals),
                 "tps_med": median_or_blank(tps_vals),
-                "ok_rate": f"{ok_rate_val:.2f}",
+                "ok_rate": ok_rate_val,
             }
         )
 
