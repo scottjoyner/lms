@@ -16,14 +16,14 @@ Install:
   pip install requests
 
 Run:
-  python3 benchmark_lmstudio_inventory.py \
-    --inventory-db lmstudio_inventory.sqlite \
-    --out-db lmstudio_inventory.sqlite \
-    --sidecar-dir sidecar_bench \
-    --max-models-per-endpoint 0 \
-    --timeout 900 \
-    --repeats 2 \
-    --stream \
+  python3 benchmark_lmstudio_inventory.py
+    --inventory-db lmstudio_inventory.sqlite
+    --out-db lmstudio_inventory.sqlite
+    --sidecar-dir sidecar_bench
+    --max-models-per-endpoint 0
+    --timeout 900
+    --repeats 2
+    --stream
     --context-probe 4096
 
 Optional judge (LLM-as-judge):
@@ -986,8 +986,8 @@ def main() -> int:
 
     api_key = args.api_key or os.environ.get("LMSTUDIO_API_KEY") or None
 
-    judge_base = os.environ.get("JUDGE_BASE_URL") or ""
-    judge_model = os.environ.get("JUDGE_MODEL") or ""
+    judge_base = os.environ.get("JUDGE_BASE_URL") or "http://100.105.87.118:1234/v1"
+    judge_model = os.environ.get("JUDGE_MODEL") or "openai/gpt-oss-120b"
     judge_api_key = os.environ.get("JUDGE_API_KEY") or None
     use_judge = bool(judge_base.strip() and judge_model.strip())
 
