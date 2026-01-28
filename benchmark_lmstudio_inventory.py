@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Benchmark LM Studio OpenAI-compatible endpoints/models discovered in an inventory SQLite DB.
+Benchmark LM Studio OpenAI-compatible endpoints/models discovered in an inventory CSV.
 
-Reads tables created by the inventory script:
-  - hosts, endpoints, host_endpoints, models, endpoint_models
+Reads rows created by the inventory export:
+  - host_name, host_ip, endpoint_id, base_url, reachable, model_id, model_key
 
-Writes new benchmark tables:
-  - bench_runs
-  - bench_cases
-  - bench_results
+Writes benchmark artifacts:
+  - run_results.csv
+  - run_summary.csv
+  - config.json
 
 Emits Markdown sidecars per run.
 
@@ -17,14 +17,33 @@ Install:
 
 Run:
   python3 benchmark_lmstudio_inventory.py \
-    --inventory-db lmstudio_inventory.sqlite \
-    --out-db lmstudio_inventory.sqlite \
+    --inventory-csv lmstudio_inventory.csv \
+    --output-dir bench_csv \
     --sidecar-dir sidecar_bench \
     --max-models-per-endpoint 0 \
     --timeout 900 \
     --repeats 2 \
     --stream \
     --context-probe 4096
+
+Filter endpoints/models:
+  python3 benchmark_lmstudio_inventory.py \
+    --inventory-csv lmstudio_inventory.csv \
+    --include-endpoints http://10.0.0.5:1234/v1,http://10.0.0.6:1234/v1 \
+    --exclude-models openai/gpt-oss-20b \
+    --endpoint-models-file endpoint_models.json
+
+Export inventory CSV from SQLite:
+  python3 benchmark_lmstudio_inventory.py \
+    --inventory-db lmstudio_inventory.sqlite \
+    --export-inventory-csv lmstudio_inventory.csv \
+    --output-dir bench_csv
+
+Example endpoint_models.json:
+  {
+    "http://10.0.0.5:1234/v1": ["model-a", "model-b"],
+    "12": ["openai/gpt-4.1-mini"]
+  }
 
 Optional judge (LLM-as-judge):
   export JUDGE_BASE_URL="http://100.105.87.118:1234/v1"
@@ -35,18 +54,20 @@ Notes:
 - "Load time" is approximated by a minimal completion that forces model load.
   True unload/load control isn't part of OpenAI API; this measures practical first-use latency.
 - Tokens/sec uses OpenAI-style usage when present; otherwise uses a character-based estimate.
+- Inventory CSV rows can be exported from the SQLite inventory using --inventory-db and --export-inventory-csv.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import json
 import os
 import re
-import sqlite3
 import statistics
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -67,15 +88,6 @@ def slugify_filename(s: str) -> str:
     s = re.sub(r"[^a-z0-9._-]+", "_", s)
     s = re.sub(r"_+", "_", s).strip("_")
     return s or "unnamed"
-
-
-def db_connect(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys=ON;")
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("PRAGMA synchronous=NORMAL;")
-    return conn
 
 
 def safe_json(resp: requests.Response) -> Optional[Dict[str, Any]]:
@@ -610,223 +622,191 @@ def judge_score(
 
 
 # ----------------------------
-# SQLite Bench Schema
+# CSV Output
 # ----------------------------
-BENCH_SCHEMA_SQL = """
-CREATE TABLE IF NOT EXISTS bench_runs (
-  run_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  started_at_utc TEXT NOT NULL,
-  finished_at_utc TEXT,
-  inventory_db_path TEXT,
-  notes TEXT,
-  config_json TEXT
-);
+RESULTS_COLUMNS = [
+    "run_id",
+    "created_at_utc",
+    "host_name",
+    "host_ip",
+    "endpoint_id",
+    "base_url",
+    "model_id",
+    "model_key",
+    "case_key",
+    "repeat_index",
+    "phase",
+    "ok",
+    "http_status",
+    "error",
+    "wall_s",
+    "ttft_s",
+    "tokens_per_sec",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+    "finish_reason",
+    "auto_quality",
+    "auto_quality_details_json",
+    "judge_quality",
+    "judge_error",
+    "output_text",
+    "raw_json",
+]
 
-CREATE TABLE IF NOT EXISTS bench_cases (
-  case_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  case_key TEXT NOT NULL UNIQUE,
-  task_type TEXT NOT NULL,
-  system TEXT NOT NULL,
-  prompt TEXT NOT NULL,
-  max_output_tokens INTEGER NOT NULL,
-  temperature REAL NOT NULL,
-  expected_json TEXT,
-  notes TEXT
-);
-
-CREATE TABLE IF NOT EXISTS bench_results (
-  result_id INTEGER PRIMARY KEY AUTOINCREMENT,
-  run_id INTEGER NOT NULL,
-  endpoint_id INTEGER NOT NULL,
-  model_id INTEGER NOT NULL,
-  case_id INTEGER NOT NULL,
-
-  repeat_index INTEGER NOT NULL,
-  phase TEXT NOT NULL,  -- "load" | "run" | "warmup" | "context_probe"
-
-  ok INTEGER NOT NULL,
-  http_status INTEGER,
-  error TEXT,
-
-  wall_s REAL,
-  ttft_s REAL,
-  tokens_per_sec REAL,
-
-  prompt_tokens INTEGER,
-  completion_tokens INTEGER,
-  total_tokens INTEGER,
-
-  finish_reason TEXT,
-
-  auto_quality REAL,
-  auto_quality_details_json TEXT,
-
-  judge_quality REAL,
-  judge_error TEXT,
-
-  output_text TEXT,
-  raw_json TEXT,
-
-  created_at_utc TEXT NOT NULL,
-
-  FOREIGN KEY (run_id) REFERENCES bench_runs(run_id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_bench_results_run ON bench_results(run_id);
-CREATE INDEX IF NOT EXISTS idx_bench_results_endpoint_model ON bench_results(endpoint_id, model_id);
-"""
+SUMMARY_COLUMNS = [
+    "run_id",
+    "host_name",
+    "host_ip",
+    "endpoint_id",
+    "base_url",
+    "model_id",
+    "model_key",
+    "load_s",
+    "ttft_med",
+    "tps_med",
+    "auto_q",
+    "judge_q",
+    "ok_rate",
+]
 
 
-def ensure_bench_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(BENCH_SCHEMA_SQL)
-    conn.commit()
+def write_csv(path: Path, rows: List[Dict[str, Any]], columns: List[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in columns})
 
 
-def upsert_cases(conn: sqlite3.Connection, cases: List[BenchCase]) -> None:
-    for c in cases:
-        conn.execute(
-            """
-            INSERT INTO bench_cases (case_key, task_type, system, prompt, max_output_tokens, temperature, expected_json, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(case_key) DO UPDATE SET
-              task_type=excluded.task_type,
-              system=excluded.system,
-              prompt=excluded.prompt,
-              max_output_tokens=excluded.max_output_tokens,
-              temperature=excluded.temperature,
-              expected_json=excluded.expected_json,
-              notes=excluded.notes
-            """,
-            (
-                c.case_key,
-                c.task_type,
-                c.system,
-                c.prompt,
-                c.max_output_tokens,
-                c.temperature,
-                json.dumps(c.expected) if c.expected is not None else None,
-                c.notes,
-            ),
-        )
-    conn.commit()
-
-
-def create_run(conn: sqlite3.Connection, inventory_db_path: str, notes: str, config: Dict[str, Any]) -> int:
-    started = utc_now_iso()
-    conn.execute(
-        "INSERT INTO bench_runs (started_at_utc, inventory_db_path, notes, config_json) VALUES (?, ?, ?, ?)",
-        (started, inventory_db_path, notes, json.dumps(config)),
-    )
-    conn.commit()
-    row = conn.execute("SELECT last_insert_rowid() AS id").fetchone()
-    return int(row["id"])
-
-
-def finish_run(conn: sqlite3.Connection, run_id: int) -> None:
-    conn.execute("UPDATE bench_runs SET finished_at_utc=? WHERE run_id=?", (utc_now_iso(), run_id))
-    conn.commit()
-
-
-def insert_result(
-    conn: sqlite3.Connection,
-    run_id: int,
-    endpoint_id: int,
-    model_id: int,
-    case_id: int,
-    repeat_index: int,
-    phase: str,
-    metrics: CompletionMetrics,
-    auto_quality: Optional[float],
-    auto_details: Optional[Dict[str, Any]],
-    judge_quality: Optional[float],
-    judge_error: Optional[str],
-    created_at_utc: str,
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO bench_results (
-          run_id, endpoint_id, model_id, case_id,
-          repeat_index, phase,
-          ok, http_status, error,
-          wall_s, ttft_s, tokens_per_sec,
-          prompt_tokens, completion_tokens, total_tokens,
-          finish_reason,
-          auto_quality, auto_quality_details_json,
-          judge_quality, judge_error,
-          output_text, raw_json,
-          created_at_utc
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            run_id,
-            endpoint_id,
-            model_id,
-            case_id,
-            repeat_index,
-            phase,
-            1 if metrics.ok else 0,
-            metrics.http_status,
-            metrics.error,
-            metrics.wall_s,
-            metrics.ttft_s,
-            metrics.tokens_per_sec,
-            metrics.prompt_tokens,
-            metrics.completion_tokens,
-            metrics.total_tokens,
-            metrics.finish_reason,
-            auto_quality,
-            json.dumps(auto_details) if auto_details is not None else None,
-            judge_quality,
-            judge_error,
-            (metrics.output_text or "")[:20000],  # keep db lean-ish
-            json.dumps(metrics.raw_last_chunk_json)[:20000] if metrics.raw_last_chunk_json is not None else None,
-            created_at_utc,
-        ),
-    )
+def write_run_config(run_dir: Path, config: Dict[str, Any]) -> None:
+    (run_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
 
 # ----------------------------
 # Inventory selection
 # ----------------------------
-def load_inventory_pairs(
-    conn: sqlite3.Connection,
+def load_inventory_from_csv(path: str) -> List[Dict[str, Any]]:
+    required_fields = {
+        "host_name",
+        "host_ip",
+        "endpoint_id",
+        "base_url",
+        "reachable",
+        "model_id",
+        "model_key",
+    }
+    rows: List[Dict[str, Any]] = []
+    with Path(path).open("r", encoding="utf-8", newline="") as f:
+        reader = csv.DictReader(f)
+        missing = required_fields.difference(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"inventory CSV missing columns: {sorted(missing)}")
+        for row in reader:
+            parsed = dict(row)
+            for key in ("endpoint_id", "model_id"):
+                try:
+                    parsed[key] = int(parsed[key])
+                except Exception:
+                    pass
+            try:
+                parsed["reachable"] = int(parsed.get("reachable", 0))
+            except Exception:
+                parsed["reachable"] = 0
+            rows.append(parsed)
+    return rows
+
+
+def load_inventory_from_db(path: str, export_csv_path: Optional[str]) -> List[Dict[str, Any]]:
+    import sqlite3
+
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        where = "WHERE e.kind='lmstudio-openai-compatible'"
+        q = f"""
+        SELECT
+          h.ts_name AS host_name,
+          h.ts_ip AS host_ip,
+          e.endpoint_id,
+          e.base_url,
+          e.reachable,
+          m.model_id,
+          m.model_key
+        FROM endpoints e
+        JOIN host_endpoints he ON he.endpoint_id=e.endpoint_id
+        JOIN hosts h ON h.host_id=he.host_id
+        JOIN endpoint_models em ON em.endpoint_id=e.endpoint_id
+        JOIN models m ON m.model_id=em.model_id
+        {where}
+        ORDER BY e.endpoint_id, m.model_key
+        """
+        rows = [dict(r) for r in conn.execute(q).fetchall()]
+    finally:
+        conn.close()
+
+    if export_csv_path:
+        write_csv(Path(export_csv_path), rows, list(rows[0].keys()) if rows else list(sorted({
+            "host_name",
+            "host_ip",
+            "endpoint_id",
+            "base_url",
+            "reachable",
+            "model_id",
+            "model_key",
+        })))
+    return rows
+
+
+def filter_inventory_pairs(
+    rows: List[Dict[str, Any]],
     only_reachable_endpoints: bool,
     max_models_per_endpoint: int,
+    include_endpoints: Optional[set[str]],
+    exclude_endpoints: Optional[set[str]],
+    include_models: Optional[set[str]],
+    exclude_models: Optional[set[str]],
+    endpoint_model_map: Optional[Dict[str, set[str]]],
 ) -> List[Dict[str, Any]]:
-    """
-    Returns rows with:
-      endpoint_id, base_url, reachable, host ts_name, ts_ip,
-      model_id, model_key
-    """
-    where = "WHERE e.kind='lmstudio-openai-compatible'"
-    if only_reachable_endpoints:
-        where += " AND e.reachable=1"
+    def endpoint_matches(token_set: Optional[set[str]], row: Dict[str, Any]) -> bool:
+        if not token_set:
+            return True
+        endpoint_id = str(row["endpoint_id"])
+        base_url = row["base_url"]
+        host_name = row["host_name"]
+        return any(tok in (endpoint_id, base_url, host_name) for tok in token_set)
 
-    q = f"""
-    SELECT
-      h.ts_name AS host_name,
-      h.ts_ip AS host_ip,
-      e.endpoint_id,
-      e.base_url,
-      e.reachable,
-      m.model_id,
-      m.model_key
-    FROM endpoints e
-    JOIN host_endpoints he ON he.endpoint_id=e.endpoint_id
-    JOIN hosts h ON h.host_id=he.host_id
-    JOIN endpoint_models em ON em.endpoint_id=e.endpoint_id
-    JOIN models m ON m.model_id=em.model_id
-    {where}
-    ORDER BY e.endpoint_id, m.model_key
-    """
-    rows = [dict(r) for r in conn.execute(q).fetchall()]
+    def endpoint_key_matches(token: str, row: Dict[str, Any]) -> bool:
+        return token in (str(row["endpoint_id"]), row["base_url"], row["host_name"])
+
+    filtered_rows = []
+    for r in rows:
+        if only_reachable_endpoints and not r.get("reachable"):
+            continue
+        if include_endpoints and not endpoint_matches(include_endpoints, r):
+            continue
+        if exclude_endpoints and endpoint_matches(exclude_endpoints, r):
+            continue
+        if include_models and r["model_key"] not in include_models:
+            continue
+        if exclude_models and r["model_key"] in exclude_models:
+            continue
+        if endpoint_model_map:
+            matched_models = None
+            for key, models in endpoint_model_map.items():
+                if endpoint_key_matches(key, r):
+                    matched_models = models
+                    break
+            if matched_models is not None and r["model_key"] not in matched_models:
+                continue
+        filtered_rows.append(r)
 
     if max_models_per_endpoint and max_models_per_endpoint > 0:
         # keep first N per endpoint
         filtered = []
         counts: Dict[int, int] = {}
-        for r in rows:
+        for r in filtered_rows:
             eid = r["endpoint_id"]
             counts.setdefault(eid, 0)
             if counts[eid] < max_models_per_endpoint:
@@ -834,12 +814,33 @@ def load_inventory_pairs(
                 counts[eid] += 1
         return filtered
 
-    return rows
+    return filtered_rows
 
 
-def get_case_id(conn: sqlite3.Connection, case_key: str) -> int:
-    row = conn.execute("SELECT case_id FROM bench_cases WHERE case_key=?", (case_key,)).fetchone()
-    return int(row["case_id"])
+def parse_csv_set(raw: Optional[str]) -> Optional[set[str]]:
+    if not raw:
+        return None
+    items = [x.strip() for x in raw.split(",") if x.strip()]
+    return set(items) if items else None
+
+
+def load_endpoint_model_map(path: Optional[str]) -> Optional[Dict[str, set[str]]]:
+    if not path:
+        return None
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"endpoint models file not found: {path}")
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("endpoint models file must be a JSON object mapping endpoints to model lists")
+    mapped: Dict[str, set[str]] = {}
+    for key, models in data.items():
+        if not isinstance(key, str):
+            raise ValueError("endpoint models file keys must be strings (endpoint base_url, host name, or id)")
+        if not isinstance(models, list) or not all(isinstance(m, str) for m in models):
+            raise ValueError(f"endpoint models for '{key}' must be a list of strings")
+        mapped[key] = set(models)
+    return mapped
 
 
 # ----------------------------
@@ -962,11 +963,14 @@ def ok_rate(items: List[Dict[str, Any]]) -> float:
 # ----------------------------
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--inventory-db", required=True, help="Inventory SQLite produced by discovery script")
-    ap.add_argument("--out-db", default=None, help="Where to write benchmark tables (default: same as inventory-db)")
+    inventory_group = ap.add_mutually_exclusive_group(required=True)
+    inventory_group.add_argument("--inventory-csv", help="Inventory CSV with endpoints/models")
+    inventory_group.add_argument("--inventory-db", help="Inventory SQLite (optional, used for export)")
+    ap.add_argument("--export-inventory-csv", default=None, help="When using --inventory-db, export rows to this CSV")
+    ap.add_argument("--output-dir", default="bench_csv", help="Directory for CSV outputs")
     ap.add_argument("--sidecar-dir", default="sidecar_bench")
 
-    ap.add_argument("--only-reachable-endpoints", action="store_true", default=True)
+    ap.add_argument("--only-reachable-endpoints", action="store_true", default=False)
     ap.add_argument("--max-models-per-endpoint", type=int, default=0, help="0 = no limit")
     ap.add_argument("--repeats", type=int, default=2)
     ap.add_argument("--timeout", type=float, default=900.0)
@@ -978,11 +982,28 @@ def main() -> int:
     ap.add_argument("--context-probe", type=int, default=0, help="If >0, do a coarse context probe with ~this many characters")
     ap.add_argument("--api-key", default=None, help="Bearer token for endpoints, if needed")
     ap.add_argument("--notes", default="")
+    ap.add_argument(
+        "--include-endpoints",
+        default=None,
+        help="Comma-separated list of endpoint base_url, host name, or endpoint_id to include",
+    )
+    ap.add_argument(
+        "--exclude-endpoints",
+        default=None,
+        help="Comma-separated list of endpoint base_url, host name, or endpoint_id to exclude",
+    )
+    ap.add_argument("--include-models", default=None, help="Comma-separated list of model keys to include")
+    ap.add_argument("--exclude-models", default=None, help="Comma-separated list of model keys to exclude")
+    ap.add_argument(
+        "--endpoint-models-file",
+        default=None,
+        help="JSON file mapping endpoint base_url/host name/endpoint_id to list of model keys to include",
+    )
 
     args = ap.parse_args()
 
+    inventory_csv = args.inventory_csv
     inventory_db = args.inventory_db
-    out_db = args.out_db or inventory_db
 
     api_key = args.api_key or os.environ.get("LMSTUDIO_API_KEY") or None
 
@@ -1000,342 +1021,397 @@ def main() -> int:
         "context_probe_chars": args.context_probe,
         "only_reachable_endpoints": args.only_reachable_endpoints,
         "max_models_per_endpoint": args.max_models_per_endpoint,
+        "inventory_csv": inventory_csv,
+        "inventory_db": inventory_db,
+        "export_inventory_csv": args.export_inventory_csv,
+        "output_dir": args.output_dir,
+        "include_endpoints": args.include_endpoints,
+        "exclude_endpoints": args.exclude_endpoints,
+        "include_models": args.include_models,
+        "exclude_models": args.exclude_models,
+        "endpoint_models_file": args.endpoint_models_file,
         "use_judge": use_judge,
         "judge_base_url": judge_base if use_judge else None,
         "judge_model": judge_model if use_judge else None,
     }
 
-    conn = db_connect(out_db)
-    try:
-        ensure_bench_schema(conn)
-        upsert_cases(conn, DEFAULT_CASES)
+    include_endpoints = parse_csv_set(args.include_endpoints)
+    exclude_endpoints = parse_csv_set(args.exclude_endpoints)
+    include_models = parse_csv_set(args.include_models)
+    exclude_models = parse_csv_set(args.exclude_models)
+    endpoint_model_map = load_endpoint_model_map(args.endpoint_models_file)
 
-        run_id = create_run(conn, inventory_db_path=inventory_db, notes=args.notes, config=config)
-        started_at = conn.execute("SELECT started_at_utc FROM bench_runs WHERE run_id=?", (run_id,)).fetchone()["started_at_utc"]
+    started_at = utc_now_iso()
+    run_id = f"{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{uuid.uuid4().hex[:8]}"
 
-        inv_conn = conn if out_db == inventory_db else db_connect(inventory_db)
-        try:
-            pairs = load_inventory_pairs(
-                inv_conn,
-                only_reachable_endpoints=args.only_reachable_endpoints,
-                max_models_per_endpoint=args.max_models_per_endpoint,
+    if inventory_csv:
+        inventory_rows = load_inventory_from_csv(inventory_csv)
+    else:
+        inventory_rows = load_inventory_from_db(inventory_db, args.export_inventory_csv)
+
+    pairs = filter_inventory_pairs(
+        inventory_rows,
+        only_reachable_endpoints=args.only_reachable_endpoints,
+        max_models_per_endpoint=args.max_models_per_endpoint,
+        include_endpoints=include_endpoints,
+        exclude_endpoints=exclude_endpoints,
+        include_models=include_models,
+        exclude_models=exclude_models,
+        endpoint_model_map=endpoint_model_map,
+    )
+
+    if not pairs:
+        print("No endpoint/model pairs found. Did you run the inventory export first?", flush=True)
+        return 2
+
+    run_dir = Path(args.output_dir) / f"RUN__{run_id}__{slugify_filename(started_at)}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    write_run_config(run_dir, config)
+
+    sidecar_dir = Path(args.sidecar_dir) / f"RUN__{run_id}__{slugify_filename(started_at)}"
+    sidecar_dir.mkdir(parents=True, exist_ok=True)
+
+    # Group by endpoint/model so we can do warmup/load + then cases
+    groups: Dict[Tuple[int, int], Dict[str, Any]] = {}
+    for r in pairs:
+        key = (r["endpoint_id"], r["model_id"])
+        groups.setdefault(key, r)
+
+    summary_rows: List[Dict[str, Any]] = []
+    results_rows: List[Dict[str, Any]] = []
+
+    for (endpoint_id, model_id), r in groups.items():
+        host_name = r["host_name"]
+        host_ip = r["host_ip"]
+        base_url = r["base_url"]
+        model_key = r["model_key"]
+
+        print(f"\n=== {host_name} | {base_url} | {model_key} ===", flush=True)
+
+        # 1) Load probe (approx)
+        ok_load, load_s, load_err, load_http = probe_model_load_time(
+            base_url=base_url, model=model_key, timeout_s=args.timeout, api_key=api_key
+        )
+        load_metrics = CompletionMetrics(
+            ok=ok_load,
+            http_status=load_http,
+            error=load_err,
+            output_text="",
+            wall_s=load_s,
+            ttft_s=None,
+            load_s=load_s,
+            prompt_tokens=None,
+            completion_tokens=None,
+            total_tokens=None,
+            tokens_per_sec=None,
+            finish_reason=None,
+            raw_last_chunk_json=None,
+        )
+        created_at = utc_now_iso()
+        results_rows.append({
+            "run_id": run_id,
+            "created_at_utc": created_at,
+            "host_name": host_name,
+            "host_ip": host_ip,
+            "endpoint_id": endpoint_id,
+            "base_url": base_url,
+            "model_id": model_id,
+            "model_key": model_key,
+            "case_key": DEFAULT_CASES[0].case_key,
+            "repeat_index": 0,
+            "phase": "load",
+            "ok": int(load_metrics.ok),
+            "http_status": load_metrics.http_status or "",
+            "error": load_metrics.error or "",
+            "wall_s": load_metrics.wall_s,
+            "ttft_s": load_metrics.ttft_s or "",
+            "tokens_per_sec": load_metrics.tokens_per_sec or "",
+            "prompt_tokens": load_metrics.prompt_tokens or "",
+            "completion_tokens": load_metrics.completion_tokens or "",
+            "total_tokens": load_metrics.total_tokens or "",
+            "finish_reason": load_metrics.finish_reason or "",
+            "auto_quality": "",
+            "auto_quality_details_json": json.dumps({"note": "load probe"}),
+            "judge_quality": "",
+            "judge_error": "",
+            "output_text": "",
+            "raw_json": "",
+        })
+
+        if not ok_load:
+            # if it can't even load, we still proceed to record errors for the run phases, but likely will fail
+            print(f"  [LOAD FAIL] {load_err}", flush=True)
+        else:
+            print(f"  [LOAD OK] {load_s:.3f}s", flush=True)
+
+        # 2) Optional warmup
+        if args.warmup:
+            warm = call_chat_completions_once(
+                base_url=base_url,
+                model=model_key,
+                messages=[{"role": "system", "content": "You are a warmup."}, {"role": "user", "content": "Respond with OK."}],
+                max_tokens=16,
+                temperature=0.0,
+                timeout_s=args.timeout,
+                api_key=api_key,
             )
-        finally:
-            if inv_conn is not conn:
-                inv_conn.close()
-
-        if not pairs:
-            print("No endpoint/model pairs found. Did you run the inventory script first?", flush=True)
-            finish_run(conn, run_id)
-            return 2
-
-        run_dir = Path(args.sidecar_dir) / f"RUN__{run_id}__{slugify_filename(started_at)}"
-        run_dir.mkdir(parents=True, exist_ok=True)
-
-        # Group by endpoint/model so we can do warmup/load + then cases
-        groups: Dict[Tuple[int, int], Dict[str, Any]] = {}
-        for r in pairs:
-            key = (r["endpoint_id"], r["model_id"])
-            groups.setdefault(key, r)
-
-        summary_rows: List[Dict[str, Any]] = []
-
-        for (endpoint_id, model_id), r in groups.items():
-            host_name = r["host_name"]
-            host_ip = r["host_ip"]
-            base_url = r["base_url"]
-            model_key = r["model_key"]
-
-            print(f"\n=== {host_name} | {base_url} | {model_key} ===", flush=True)
-
-            # 1) Load probe (approx)
-            ok_load, load_s, load_err, load_http = probe_model_load_time(
-                base_url=base_url, model=model_key, timeout_s=args.timeout, api_key=api_key
-            )
-            load_metrics = CompletionMetrics(
-                ok=ok_load,
-                http_status=load_http,
-                error=load_err,
-                output_text="",
-                wall_s=load_s,
-                ttft_s=None,
-                load_s=load_s,
-                prompt_tokens=None,
-                completion_tokens=None,
-                total_tokens=None,
-                tokens_per_sec=None,
-                finish_reason=None,
-                raw_last_chunk_json=None,
-            )
-
-            # store "load" as a bench_result row using first case id (or a synthetic one)
-            first_case_id = get_case_id(conn, DEFAULT_CASES[0].case_key)
-            insert_result(
-                conn=conn,
-                run_id=run_id,
-                endpoint_id=endpoint_id,
-                model_id=model_id,
-                case_id=first_case_id,
-                repeat_index=0,
-                phase="load",
-                metrics=load_metrics,
-                auto_quality=None,
-                auto_details={"note": "load probe"},
-                judge_quality=None,
-                judge_error=None,
-                created_at_utc=utc_now_iso(),
-            )
-            conn.commit()
-
-            if not ok_load:
-                # if it can't even load, we still proceed to record errors for the run phases, but likely will fail
-                print(f"  [LOAD FAIL] {load_err}", flush=True)
-            else:
-                print(f"  [LOAD OK] {load_s:.3f}s", flush=True)
-
-            # 2) Optional warmup
-            if args.warmup:
-                warm = call_chat_completions_once(
-                    base_url=base_url,
-                    model=model_key,
-                    messages=[{"role": "system", "content": "You are a warmup."}, {"role": "user", "content": "Respond with OK."}],
-                    max_tokens=16,
-                    temperature=0.0,
-                    timeout_s=args.timeout,
-                    api_key=api_key,
-                )
-                insert_result(
-                    conn=conn,
-                    run_id=run_id,
-                    endpoint_id=endpoint_id,
-                    model_id=model_id,
-                    case_id=first_case_id,
-                    repeat_index=0,
-                    phase="warmup",
-                    metrics=warm,
-                    auto_quality=None,
-                    auto_details={"note": "warmup call"},
-                    judge_quality=None,
-                    judge_error=None,
-                    created_at_utc=utc_now_iso(),
-                )
-                conn.commit()
-                print(f"  [WARMUP] ok={warm.ok} wall={warm.wall_s:.3f}s", flush=True)
-
-            # 3) Optional context probe
-            if args.context_probe and args.context_probe > 0:
-                ok_ctx, ctx_err = context_limit_probe(
-                    base_url=base_url,
-                    model=model_key,
-                    target_chars=args.context_probe,
-                    timeout_s=args.timeout,
-                    api_key=api_key,
-                )
-                ctx_metrics = CompletionMetrics(
-                    ok=ok_ctx,
-                    http_status=None,
-                    error=ctx_err if not ok_ctx else None,
-                    output_text="",
-                    wall_s=0.0,
-                    ttft_s=None,
-                    load_s=None,
-                    prompt_tokens=None,
-                    completion_tokens=None,
-                    total_tokens=None,
-                    tokens_per_sec=None,
-                    finish_reason=None,
-                    raw_last_chunk_json=None,
-                )
-                insert_result(
-                    conn=conn,
-                    run_id=run_id,
-                    endpoint_id=endpoint_id,
-                    model_id=model_id,
-                    case_id=first_case_id,
-                    repeat_index=0,
-                    phase="context_probe",
-                    metrics=ctx_metrics,
-                    auto_quality=None,
-                    auto_details={"probe_chars": args.context_probe},
-                    judge_quality=None,
-                    judge_error=None,
-                    created_at_utc=utc_now_iso(),
-                )
-                conn.commit()
-                print(f"  [CTX] ok={ok_ctx} err={(ctx_err or '')[:120]}", flush=True)
-
-            # 4) Run cases x repeats
-            model_items_for_md: List[Dict[str, Any]] = []
-            per_model_run_rows: List[Dict[str, Any]] = []
-
-            for case in DEFAULT_CASES:
-                case_id = get_case_id(conn, case.case_key)
-                messages = [{"role": "system", "content": case.system}, {"role": "user", "content": case.prompt}]
-
-                for rep in range(args.repeats):
-                    if args.stream:
-                        met = call_chat_completions_stream(
-                            base_url=base_url,
-                            model=model_key,
-                            messages=messages,
-                            max_tokens=case.max_output_tokens,
-                            temperature=case.temperature,
-                            timeout_s=args.timeout,
-                            api_key=api_key,
-                        )
-                        # If streaming didn't provide usage, add a cheap non-stream pass for usage (optional).
-                        # To avoid doubling cost by default, only do it if completion_tokens is missing.
-                        if met.ok and (met.completion_tokens is None):
-                            met2 = call_chat_completions_once(
-                                base_url=base_url,
-                                model=model_key,
-                                messages=messages,
-                                max_tokens=case.max_output_tokens,
-                                temperature=case.temperature,
-                                timeout_s=args.timeout,
-                                api_key=api_key,
-                            )
-                            # Merge usage from met2 into met when possible
-                            if met2.ok and met2.completion_tokens is not None:
-                                met.completion_tokens = met2.completion_tokens
-                                met.prompt_tokens = met2.prompt_tokens
-                                met.total_tokens = met2.total_tokens
-                                if met.wall_s > 0:
-                                    met.tokens_per_sec = float(met.completion_tokens) / met.wall_s
-                    else:
-                        met = call_chat_completions_once(
-                            base_url=base_url,
-                            model=model_key,
-                            messages=messages,
-                            max_tokens=case.max_output_tokens,
-                            temperature=case.temperature,
-                            timeout_s=args.timeout,
-                            api_key=api_key,
-                        )
-
-                    auto_q = None
-                    auto_details = None
-                    judge_q = None
-                    judge_err = None
-
-                    if met.ok:
-                        auto_q, auto_details = score_response(case, met.output_text)
-                        if use_judge:
-                            judge_q, judge_err = judge_score(
-                                judge_base_url=judge_base,
-                                judge_model=judge_model,
-                                judge_api_key=judge_api_key,
-                                case=case,
-                                response_text=met.output_text,
-                                timeout_s=args.timeout,
-                            )
-
-                    insert_result(
-                        conn=conn,
-                        run_id=run_id,
-                        endpoint_id=endpoint_id,
-                        model_id=model_id,
-                        case_id=case_id,
-                        repeat_index=rep,
-                        phase="run",
-                        metrics=met,
-                        auto_quality=auto_q,
-                        auto_details=auto_details,
-                        judge_quality=judge_q,
-                        judge_error=judge_err,
-                        created_at_utc=utc_now_iso(),
-                    )
-                    conn.commit()
-
-                    model_items_for_md.append({
-                        "case_key": case.case_key,
-                        "phase": "run",
-                        "repeat_index": rep,
-                        "ok": met.ok,
-                        "wall_s": f"{met.wall_s:.3f}" if met.wall_s is not None else "",
-                        "ttft_s": f"{met.ttft_s:.3f}" if met.ttft_s is not None else "",
-                        "tokens_per_sec": f"{met.tokens_per_sec:.2f}" if met.tokens_per_sec is not None else "",
-                        "auto_quality": f"{auto_q:.2f}" if auto_q is not None else "",
-                        "judge_quality": f"{judge_q:.2f}" if judge_q is not None else "",
-                        "error": met.error,
-                        "output_text": met.output_text,
-                    })
-
-                    per_model_run_rows.append({
-                        "ok": met.ok,
-                        "ttft_s": met.ttft_s,
-                        "tps": met.tokens_per_sec,
-                        "auto_q": auto_q,
-                        "judge_q": judge_q,
-                    })
-
-                    status = "OK" if met.ok else "FAIL"
-                    print(
-                        f"  [{status}] {case.case_key} rep={rep} wall={met.wall_s:.3f}s "
-                        f"ttft={(met.ttft_s if met.ttft_s is not None else '')} "
-                        f"tps={(met.tokens_per_sec if met.tokens_per_sec is not None else '')} "
-                        f"autoQ={(auto_q if auto_q is not None else '')} "
-                        f"judgeQ={(judge_q if judge_q is not None else '')}",
-                        flush=True
-                    )
-
-            # Sidecar per model
-            # Also include load/warmup/context rows in MD table
-            model_items_for_md.insert(0, {
-                "case_key": DEFAULT_CASES[0].case_key,
-                "phase": "load",
-                "repeat_index": 0,
-                "ok": ok_load,
-                "wall_s": f"{load_s:.3f}",
-                "ttft_s": "",
-                "tokens_per_sec": "",
-                "auto_quality": "",
-                "judge_quality": "",
-                "error": load_err,
-                "output_text": "",
-            })
-
-            # Aggregate summary
-            ttfts = [x["ttft_s"] for x in per_model_run_rows if x["ok"] and x["ttft_s"] is not None]
-            tpss = [x["tps"] for x in per_model_run_rows if x["ok"] and x["tps"] is not None]
-            autoqs = [x["auto_q"] for x in per_model_run_rows if x["ok"] and x["auto_q"] is not None]
-            judgeqs = [x["judge_q"] for x in per_model_run_rows if x["ok"] and x["judge_q"] is not None]
-
-            srow = {
+            results_rows.append({
+                "run_id": run_id,
+                "created_at_utc": utc_now_iso(),
                 "host_name": host_name,
                 "host_ip": host_ip,
+                "endpoint_id": endpoint_id,
                 "base_url": base_url,
+                "model_id": model_id,
                 "model_key": model_key,
-                "load_s": f"{load_s:.3f}" if ok_load else "",
-                "ttft_med": median_or_blank(ttfts),
-                "tps_med": median_or_blank(tpss),
-                "auto_q": mean_or_blank(autoqs),
-                "judge_q": mean_or_blank(judgeqs),
-                "ok_rate": ok_rate(per_model_run_rows),
-            }
-            summary_rows.append(srow)
+                "case_key": DEFAULT_CASES[0].case_key,
+                "repeat_index": 0,
+                "phase": "warmup",
+                "ok": int(warm.ok),
+                "http_status": warm.http_status or "",
+                "error": warm.error or "",
+                "wall_s": warm.wall_s,
+                "ttft_s": warm.ttft_s or "",
+                "tokens_per_sec": warm.tokens_per_sec or "",
+                "prompt_tokens": warm.prompt_tokens or "",
+                "completion_tokens": warm.completion_tokens or "",
+                "total_tokens": warm.total_tokens or "",
+                "finish_reason": warm.finish_reason or "",
+                "auto_quality": "",
+                "auto_quality_details_json": json.dumps({"note": "warmup call"}),
+                "judge_quality": "",
+                "judge_error": "",
+                "output_text": warm.output_text or "",
+                "raw_json": json.dumps(warm.raw_last_chunk_json) if warm.raw_last_chunk_json else "",
+            })
+            print(f"  [WARMUP] ok={warm.ok} wall={warm.wall_s:.3f}s", flush=True)
 
-            write_model_report_md(
-                run_dir=run_dir,
-                host_name=host_name,
-                host_ip=host_ip,
+        # 3) Optional context probe
+        if args.context_probe and args.context_probe > 0:
+            ok_ctx, ctx_err = context_limit_probe(
                 base_url=base_url,
-                model_key=model_key,
-                items=model_items_for_md,
+                model=model_key,
+                target_chars=args.context_probe,
+                timeout_s=args.timeout,
+                api_key=api_key,
             )
+            results_rows.append({
+                "run_id": run_id,
+                "created_at_utc": utc_now_iso(),
+                "host_name": host_name,
+                "host_ip": host_ip,
+                "endpoint_id": endpoint_id,
+                "base_url": base_url,
+                "model_id": model_id,
+                "model_key": model_key,
+                "case_key": DEFAULT_CASES[0].case_key,
+                "repeat_index": 0,
+                "phase": "context_probe",
+                "ok": int(ok_ctx),
+                "http_status": "",
+                "error": ctx_err or "",
+                "wall_s": "",
+                "ttft_s": "",
+                "tokens_per_sec": "",
+                "prompt_tokens": "",
+                "completion_tokens": "",
+                "total_tokens": "",
+                "finish_reason": "",
+                "auto_quality": "",
+                "auto_quality_details_json": json.dumps({"probe_chars": args.context_probe}),
+                "judge_quality": "",
+                "judge_error": "",
+                "output_text": "",
+                "raw_json": "",
+            })
+            print(f"  [CTX] ok={ok_ctx} err={(ctx_err or '')[:120]}", flush=True)
 
-            if args.cooldown_secs and args.cooldown_secs > 0:
-                time.sleep(args.cooldown_secs)
+        # 4) Run cases x repeats
+        model_items_for_md: List[Dict[str, Any]] = []
+        per_model_run_rows: List[Dict[str, Any]] = []
 
-        write_run_index_md(run_dir, run_id, started_at, config, summary_rows)
+        for case in DEFAULT_CASES:
+            messages = [{"role": "system", "content": case.system}, {"role": "user", "content": case.prompt}]
 
-        finish_run(conn, run_id)
-        print(f"\nRun complete: {run_id}")
-        print(f"Sidecars: {run_dir.resolve()}")
-        return 0
+            for rep in range(args.repeats):
+                if args.stream:
+                    met = call_chat_completions_stream(
+                        base_url=base_url,
+                        model=model_key,
+                        messages=messages,
+                        max_tokens=case.max_output_tokens,
+                        temperature=case.temperature,
+                        timeout_s=args.timeout,
+                        api_key=api_key,
+                    )
+                    # If streaming didn't provide usage, add a cheap non-stream pass for usage (optional).
+                    # To avoid doubling cost by default, only do it if completion_tokens is missing.
+                    if met.ok and (met.completion_tokens is None):
+                        met2 = call_chat_completions_once(
+                            base_url=base_url,
+                            model=model_key,
+                            messages=messages,
+                            max_tokens=case.max_output_tokens,
+                            temperature=case.temperature,
+                            timeout_s=args.timeout,
+                            api_key=api_key,
+                        )
+                        # Merge usage from met2 into met when possible
+                        if met2.ok and met2.completion_tokens is not None:
+                            met.completion_tokens = met2.completion_tokens
+                            met.prompt_tokens = met2.prompt_tokens
+                            met.total_tokens = met2.total_tokens
+                            if met.wall_s > 0:
+                                met.tokens_per_sec = float(met.completion_tokens) / met.wall_s
+                else:
+                    met = call_chat_completions_once(
+                        base_url=base_url,
+                        model=model_key,
+                        messages=messages,
+                        max_tokens=case.max_output_tokens,
+                        temperature=case.temperature,
+                        timeout_s=args.timeout,
+                        api_key=api_key,
+                    )
 
-    finally:
-        conn.close()
+                auto_q = None
+                auto_details = None
+                judge_q = None
+                judge_err = None
+
+                if met.ok:
+                    auto_q, auto_details = score_response(case, met.output_text)
+                    if use_judge:
+                        judge_q, judge_err = judge_score(
+                            judge_base_url=judge_base,
+                            judge_model=judge_model,
+                            judge_api_key=judge_api_key,
+                            case=case,
+                            response_text=met.output_text,
+                            timeout_s=args.timeout,
+                        )
+
+                results_rows.append({
+                    "run_id": run_id,
+                    "created_at_utc": utc_now_iso(),
+                    "host_name": host_name,
+                    "host_ip": host_ip,
+                    "endpoint_id": endpoint_id,
+                    "base_url": base_url,
+                    "model_id": model_id,
+                    "model_key": model_key,
+                    "case_key": case.case_key,
+                    "repeat_index": rep,
+                    "phase": "run",
+                    "ok": int(met.ok),
+                    "http_status": met.http_status or "",
+                    "error": met.error or "",
+                    "wall_s": met.wall_s,
+                    "ttft_s": met.ttft_s or "",
+                    "tokens_per_sec": met.tokens_per_sec or "",
+                    "prompt_tokens": met.prompt_tokens or "",
+                    "completion_tokens": met.completion_tokens or "",
+                    "total_tokens": met.total_tokens or "",
+                    "finish_reason": met.finish_reason or "",
+                    "auto_quality": f"{auto_q:.2f}" if auto_q is not None else "",
+                    "auto_quality_details_json": json.dumps(auto_details) if auto_details is not None else "",
+                    "judge_quality": f"{judge_q:.2f}" if judge_q is not None else "",
+                    "judge_error": judge_err or "",
+                    "output_text": (met.output_text or "")[:20000],
+                    "raw_json": json.dumps(met.raw_last_chunk_json)[:20000] if met.raw_last_chunk_json is not None else "",
+                })
+
+                model_items_for_md.append({
+                    "case_key": case.case_key,
+                    "phase": "run",
+                    "repeat_index": rep,
+                    "ok": met.ok,
+                    "wall_s": f"{met.wall_s:.3f}" if met.wall_s is not None else "",
+                    "ttft_s": f"{met.ttft_s:.3f}" if met.ttft_s is not None else "",
+                    "tokens_per_sec": f"{met.tokens_per_sec:.2f}" if met.tokens_per_sec is not None else "",
+                    "auto_quality": f"{auto_q:.2f}" if auto_q is not None else "",
+                    "judge_quality": f"{judge_q:.2f}" if judge_q is not None else "",
+                    "error": met.error,
+                    "output_text": met.output_text,
+                })
+
+                per_model_run_rows.append({
+                    "ok": met.ok,
+                    "ttft_s": met.ttft_s,
+                    "tps": met.tokens_per_sec,
+                    "auto_q": auto_q,
+                    "judge_q": judge_q,
+                })
+
+                status = "OK" if met.ok else "FAIL"
+                print(
+                    f"  [{status}] {case.case_key} rep={rep} wall={met.wall_s:.3f}s "
+                    f"ttft={(met.ttft_s if met.ttft_s is not None else '')} "
+                    f"tps={(met.tokens_per_sec if met.tokens_per_sec is not None else '')} "
+                    f"autoQ={(auto_q if auto_q is not None else '')} "
+                    f"judgeQ={(judge_q if judge_q is not None else '')}",
+                    flush=True
+                )
+
+        # Sidecar per model
+        # Also include load/warmup/context rows in MD table
+        model_items_for_md.insert(0, {
+            "case_key": DEFAULT_CASES[0].case_key,
+            "phase": "load",
+            "repeat_index": 0,
+            "ok": ok_load,
+            "wall_s": f"{load_s:.3f}",
+            "ttft_s": "",
+            "tokens_per_sec": "",
+            "auto_quality": "",
+            "judge_quality": "",
+            "error": load_err,
+            "output_text": "",
+        })
+
+        # Aggregate summary
+        ttfts = [x["ttft_s"] for x in per_model_run_rows if x["ok"] and x["ttft_s"] is not None]
+        tpss = [x["tps"] for x in per_model_run_rows if x["ok"] and x["tps"] is not None]
+        autoqs = [x["auto_q"] for x in per_model_run_rows if x["ok"] and x["auto_q"] is not None]
+        judgeqs = [x["judge_q"] for x in per_model_run_rows if x["ok"] and x["judge_q"] is not None]
+
+        srow = {
+            "run_id": run_id,
+            "host_name": host_name,
+            "host_ip": host_ip,
+            "endpoint_id": endpoint_id,
+            "base_url": base_url,
+            "model_id": model_id,
+            "model_key": model_key,
+            "load_s": f"{load_s:.3f}" if ok_load else "",
+            "ttft_med": median_or_blank(ttfts),
+            "tps_med": median_or_blank(tpss),
+            "auto_q": mean_or_blank(autoqs),
+            "judge_q": mean_or_blank(judgeqs),
+            "ok_rate": ok_rate(per_model_run_rows),
+        }
+        summary_rows.append(srow)
+
+        write_model_report_md(
+            run_dir=sidecar_dir,
+            host_name=host_name,
+            host_ip=host_ip,
+            base_url=base_url,
+            model_key=model_key,
+            items=model_items_for_md,
+        )
+
+        if args.cooldown_secs and args.cooldown_secs > 0:
+            time.sleep(args.cooldown_secs)
+
+    write_run_index_md(sidecar_dir, run_id, started_at, config, summary_rows)
+    write_csv(run_dir / "run_results.csv", results_rows, RESULTS_COLUMNS)
+    write_csv(run_dir / "run_summary.csv", summary_rows, SUMMARY_COLUMNS)
+
+    print(f"\nRun complete: {run_id}")
+    print(f"CSV output: {run_dir.resolve()}")
+    print(f"Sidecars: {sidecar_dir.resolve()}")
+    return 0
 
 
 if __name__ == "__main__":
@@ -1344,7 +1420,7 @@ if __name__ == "__main__":
 
 
 # python3 benchmark_lmstudio_inventory.py \
-#   --inventory-db lmstudio_inventory.sqlite \
+#   --inventory-csv lmstudio_inventory.csv \
 #   --sidecar-dir sidecar_bench \
 #   --repeats 2 \
 #   --timeout 900 \
@@ -1352,7 +1428,7 @@ if __name__ == "__main__":
 #   --context-probe 4096
 
 # python3 benchmark_lmstudio_inventory.py \
-#   --inventory-db lmstudio_inventory.sqlite \
+#   --inventory-csv lmstudio_inventory.csv \
 #   --sidecar-dir sidecar_bench \
 #   --max-models-per-endpoint 3 \
 #   --repeats 1 \
@@ -1361,4 +1437,4 @@ if __name__ == "__main__":
 
 # export JUDGE_BASE_URL="http://100.105.87.118:1234/v1"
 # export JUDGE_MODEL="openai/gpt-oss-20b"
-# python3 benchmark_lmstudio_inventory.py --inventory-db lmstudio_inventory.sqlite
+# python3 benchmark_lmstudio_inventory.py --inventory-csv lmstudio_inventory.csv
