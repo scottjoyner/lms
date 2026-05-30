@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/routing_rules.schema.json",
+  "title": "LMS Routing Rules",
+  "type": "object",
+  "required": ["routing"],
+  "properties": {
+    "routing": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "preferred": {"type": "object"},
+          "fallback": {"type": ["object", "null"]},
+          "task_family": {"type": "string"},
+          "min_score": {"type": ["number", "string"]}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
