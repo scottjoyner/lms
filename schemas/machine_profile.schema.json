@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/machine_profile.schema.json",
+  "title": "LMS Machine Profile",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "created_at_utc",
+    "host",
+    "cpu",
+    "memory",
+    "storage",
+    "gpu",
+    "lmstudio",
+    "recommendations",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "const": "machine_profile.v1"},
+    "created_at_utc": {"type": "string"},
+    "host": {
+      "type": "object",
+      "required": ["hostname", "platform", "system", "release", "machine", "python_version"],
+      "properties": {
+        "hostname": {"type": ["string", "null"]},
+        "fqdn": {"type": ["string", "null"]},
+        "platform": {"type": ["string", "null"]},
+        "system": {"type": ["string", "null"]},
+        "release": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]},
+        "machine": {"type": ["string", "null"]},
+        "python_version": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "os_release": {"type": "object", "additionalProperties": {"type": "string"}},
+    "cpu": {
+      "type": "object",
+      "properties": {
+        "source": {"type": ["string", "null"]},
+        "model_name": {"type": ["string", "null"]},
+        "architecture": {"type": ["string", "null"]},
+        "logical_processors": {"type": ["integer", "null"]},
+        "cores_per_socket": {"type": ["string", "integer", "null"]},
+        "threads_per_core": {"type": ["string", "integer", "null"]},
+        "flags": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "memory": {
+      "type": "object",
+      "required": ["mem_total_bytes", "mem_available_bytes", "swap_total_bytes", "swap_free_bytes"],
+      "properties": {
+        "mem_total_bytes": {"type": ["integer", "null"]},
+        "mem_available_bytes": {"type": ["integer", "null"]},
+        "mem_used_estimate_bytes": {"type": ["integer", "null"]},
+        "swap_total_bytes": {"type": ["integer", "null"]},
+        "swap_free_bytes": {"type": ["integer", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "root_total_bytes": {"type": ["integer", "null"]},
+        "root_used_bytes": {"type": ["integer", "null"]},
+        "root_free_bytes": {"type": ["integer", "null"]},
+        "mounts": {"type": "array", "items": {"type": "object"}},
+        "lsblk": {"type": ["object", "array", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "gpu": {
+      "type": "object",
+      "properties": {
+        "lspci_gpus": {"type": "array", "items": {"type": "object"}},
+        "nvidia": {"type": "object"},
+        "rocm": {"type": "object"},
+        "vulkan_summary": {"type": "string"},
+        "vainfo_summary": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "lmstudio": {
+      "type": "object",
+      "required": ["inventory_row_count", "unique_endpoint_count", "endpoint_probes"],
+      "properties": {
+        "inventory_csv": {"type": ["string", "null"]},
+        "inventory_row_count": {"type": "integer"},
+        "unique_endpoint_count": {"type": "integer"},
+        "endpoint_probes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["base_url", "reachable", "models"],
+            "properties": {
+              "base_url": {"type": "string"},
+              "models_url": {"type": "string"},
+              "reachable": {"type": "boolean"},
+              "status": {"type": ["integer", "null"]},
+              "elapsed_s": {"type": ["number", "null"]},
+              "model_count": {"type": ["integer", "null"]},
+              "models": {"type": "array", "items": {"type": "string"}},
+              "error": {"type": ["string", "null"]}
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "recommendations": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}
