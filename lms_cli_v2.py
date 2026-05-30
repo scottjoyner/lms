@@ -6,6 +6,7 @@ agent-facing command layer:
 
   lms-bench fit latest
   lms-bench validate-suite
+  lms-bench validate-run latest
   lms-bench brief latest
   lms-bench audit latest
   lms-bench export-skill latest
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import lms_agent_brief
+import lms_artifact_validate
 import lms_cli
 import lms_endpoint_registry
 import lms_manifest_validate
@@ -31,7 +33,7 @@ import lms_run_audit
 import lms_skill_export
 
 
-VERSION = "lms-agent-cli 0.11.0"
+VERSION = "lms-agent-cli 0.12.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
@@ -40,6 +42,7 @@ MODULE_FILES = [
     "lms_skill_export.py",
     "lms_run_audit.py",
     "lms_manifest_validate.py",
+    "lms_artifact_validate.py",
     "lms_agent_brief.py",
     "lms_model_fit.py",
     "lms_machine_profile.py",
@@ -91,6 +94,14 @@ def build_validate_suite_parser() -> argparse.ArgumentParser:
     parser.add_argument("suite_file", nargs="?", default=None, help="Defaults to the bundled agent suite")
     parser.add_argument("--json-out", default=None)
     parser.add_argument("--md-out", default=None)
+    parser.add_argument("--pretty", action="store_true")
+    return parser
+
+
+def build_validate_run_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lms-bench validate-run", description="Validate generated run artifacts against JSON schemas.")
+    parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--pretty", action="store_true")
     return parser
 
@@ -152,6 +163,15 @@ def run_validate_suite(argv: List[str]) -> int:
     return int(lms_manifest_validate.main(cmd))
 
 
+def run_validate_run(argv: List[str]) -> int:
+    args = build_validate_run_parser().parse_args(argv)
+    run_dir = lms_cli.resolve_run_dir(args.run_dir, args.runs_dir)
+    cmd = ["run", str(run_dir)]
+    if args.pretty:
+        cmd.append("--pretty")
+    return int(lms_artifact_validate.main(cmd))
+
+
 def parse_quick_output_dir(argv: List[str]) -> str:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--output-dir", default=lms_cli.DEFAULT_RUNS_DIR)
@@ -206,6 +226,10 @@ def postprocess_latest_run(runs_dir: str) -> None:
         print("run audit reported critical issues")
     print("\nExporting agent skill contract...")
     lms_skill_export.main([str(run_dir)])
+    print("\nValidating generated JSON artifacts...")
+    validation_rc = int(lms_artifact_validate.main(["run", str(run_dir)]))
+    if validation_rc != 0:
+        print("artifact validation reported schema issues")
 
 
 def run_selftest() -> int:
@@ -245,6 +269,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_audit(args[1:])
     if args[0] in {"export-skill", "skill"}:
         return run_export_skill(args[1:])
+    if args[0] in {"validate-run", "validate-artifacts"}:
+        return run_validate_run(args[1:])
     if args[0] in {"validate-suite", "validate"}:
         return run_validate_suite(args[1:])
     if args[0] == "selftest":
