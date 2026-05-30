@@ -4,36 +4,52 @@
 This wrapper keeps the existing manifest-aware CLI intact while adding the next
 agent-facing command layer:
 
-  lms fit latest
-  lms validate-suite
-  lms brief latest
-  lms audit latest
-  lms export-skill latest
-  lms quick ...   # also emits model_fit + AGENT_BRIEF + RUN_AUDIT + skill export
+  lms-bench fit latest
+  lms-bench validate-suite
+  lms-bench brief latest
+  lms-bench audit latest
+  lms-bench export-skill latest
+  lms-bench quick --from-registry --tags gpu
 
-The wrapper delegates all existing commands to `lms_cli.main`.
+The wrapper delegates most existing commands to `lms_cli.main`.
 """
 
 from __future__ import annotations
 
 import argparse
+import py_compile
 import sys
 from pathlib import Path
 from typing import List, Optional
 
 import lms_agent_brief
 import lms_cli
+import lms_endpoint_registry
 import lms_manifest_validate
 import lms_model_fit
 import lms_run_audit
 import lms_skill_export
 
 
-VERSION = "lms-agent-cli 0.8.0"
+VERSION = "lms-agent-cli 0.11.0"
+MODULE_FILES = [
+    "lms_cli_v2.py",
+    "lms_cli.py",
+    "lms_endpoint_registry.py",
+    "lmstudio_cli_bridge.py",
+    "lms_skill_export.py",
+    "lms_run_audit.py",
+    "lms_manifest_validate.py",
+    "lms_agent_brief.py",
+    "lms_model_fit.py",
+    "lms_machine_profile.py",
+    "lms_eval.py",
+    "benchmark_lmstudio_cross_machine_models.py",
+]
 
 
 def build_fit_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lms fit", description="Estimate model-to-hardware fit for an LMS run directory.")
+    parser = argparse.ArgumentParser(prog="lms-bench fit", description="Estimate model-to-hardware fit for an LMS run directory.")
     parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--csv-out", default=None)
@@ -42,7 +58,7 @@ def build_fit_parser() -> argparse.ArgumentParser:
 
 
 def build_brief_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lms brief", description="Generate a single agent-facing LMS run brief.")
+    parser = argparse.ArgumentParser(prog="lms-bench brief", description="Generate a single agent-facing LMS run brief.")
     parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--out", default=None)
@@ -50,7 +66,7 @@ def build_brief_parser() -> argparse.ArgumentParser:
 
 
 def build_audit_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lms audit", description="Audit an LMS run directory for completeness and route-readiness.")
+    parser = argparse.ArgumentParser(prog="lms-bench audit", description="Audit an LMS run directory for completeness and route-readiness.")
     parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--min-score", type=float, default=0.55)
@@ -61,7 +77,7 @@ def build_audit_parser() -> argparse.ArgumentParser:
 
 
 def build_export_skill_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lms export-skill", description="Export an LMS run as an agent-readable skill contract.")
+    parser = argparse.ArgumentParser(prog="lms-bench export-skill", description="Export an LMS run as an agent-readable skill contract.")
     parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--json-out", default=None)
@@ -71,7 +87,7 @@ def build_export_skill_parser() -> argparse.ArgumentParser:
 
 
 def build_validate_suite_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="lms validate-suite", description="Validate an LMS benchmark suite manifest.")
+    parser = argparse.ArgumentParser(prog="lms-bench validate-suite", description="Validate an LMS benchmark suite manifest.")
     parser.add_argument("suite_file", nargs="?", default=None, help="Defaults to the bundled agent suite")
     parser.add_argument("--json-out", default=None)
     parser.add_argument("--md-out", default=None)
@@ -150,6 +166,32 @@ def quick_is_profile_only(argv: List[str]) -> bool:
     return "--profile-only" in argv
 
 
+def registry_quick_args(argv: List[str]) -> Optional[List[str]]:
+    if "--from-registry" not in argv:
+        return None
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--from-registry", action="store_true")
+    parser.add_argument("--registry", default=None)
+    parser.add_argument("--registry-name", action="append", default=[])
+    parser.add_argument("--tags", default=None)
+    parser.add_argument("--all-endpoints", action="store_true")
+    parsed, remainder = parser.parse_known_args(argv)
+    registry = lms_endpoint_registry.load_registry(lms_endpoint_registry.registry_path(parsed.registry))
+    endpoints = lms_endpoint_registry.select_endpoints(
+        registry,
+        parsed.registry_name,
+        lms_endpoint_registry.split_tags(parsed.tags),
+        enabled_only=not parsed.all_endpoints,
+    )
+    if not endpoints:
+        raise SystemExit("no registry endpoints selected; add endpoints with lms-bench-endpoints add")
+    translated = ["quick"]
+    for endpoint in endpoints:
+        translated += ["--endpoint", endpoint["base_url"]]
+    translated += [arg for arg in remainder if arg != "--from-registry"]
+    return translated
+
+
 def postprocess_latest_run(runs_dir: str) -> None:
     run_dir = lms_cli.resolve_run_dir("latest", runs_dir)
     print("\nRunning model-fit analysis for latest run...")
@@ -164,6 +206,28 @@ def postprocess_latest_run(runs_dir: str) -> None:
         print("run audit reported critical issues")
     print("\nExporting agent skill contract...")
     lms_skill_export.main([str(run_dir)])
+
+
+def run_selftest() -> int:
+    failures = []
+    for rel in MODULE_FILES:
+        path = lms_cli.resolve_asset(Path(rel))
+        if not path.exists():
+            failures.append(f"missing module: {rel}")
+            continue
+        try:
+            py_compile.compile(str(path), doraise=True)
+        except Exception as exc:
+            failures.append(f"compile failed for {rel}: {exc}")
+    suite_rc = run_validate_suite(["--pretty"])
+    if suite_rc != 0:
+        failures.append("suite validation failed")
+    if failures:
+        for failure in failures:
+            print(f"FAIL: {failure}")
+        return 1
+    print("selftest passed: modules compile, suite manifest is valid, evaluator registry is loadable")
+    return 0
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -184,15 +248,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args[0] in {"validate-suite", "validate"}:
         return run_validate_suite(args[1:])
     if args[0] == "selftest":
-        rc = run_validate_suite(["--pretty"])
-        if rc != 0:
-            return rc
-        print("selftest passed: suite manifest is valid and evaluator registry is loadable")
-        return 0
+        return run_selftest()
 
-    rc = int(lms_cli.main(args))
-    if args[0] == "quick" and rc == 0 and not quick_is_profile_only(args[1:]):
-        runs_dir = parse_quick_output_dir(args[1:])
+    delegated_args = args
+    if args[0] == "quick":
+        registry_args = registry_quick_args(args[1:])
+        if registry_args:
+            delegated_args = registry_args
+
+    rc = int(lms_cli.main(delegated_args))
+    if delegated_args[0] == "quick" and rc == 0 and not quick_is_profile_only(delegated_args[1:]):
+        runs_dir = parse_quick_output_dir(delegated_args[1:])
         try:
             postprocess_latest_run(runs_dir)
         except Exception as exc:
