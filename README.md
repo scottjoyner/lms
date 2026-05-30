@@ -1,18 +1,161 @@
 # LMS Agent Benchmarking Toolkit
 
-This repository is being refined from a local LM Studio benchmarking script collection into an **agent self-evaluation skill**. The goal is to let an agent inspect a machine, discover local or Tailscale-reachable LM Studio nodes, run repeatable benchmark tasks, evaluate output quality, and produce a practical synopsis of what the machine and model should or should not be trusted to do.
+LMS is an agent-facing command line toolkit for profiling and benchmarking local or Tailscale-reachable LM Studio nodes. The goal is to let an agent test the machine it is running on, discover available models, run repeatable benchmark tasks, and produce a practical synopsis of what each model should or should not be trusted to do.
 
-## Current baseline
+## Fast start for agents
 
-The current repo direction already includes:
+Install locally from the repository:
 
-- LM Studio OpenAI-compatible endpoint benchmarking.
-- Inventory-driven runs using CSV rows with host, endpoint, and model metadata.
-- Cross-machine model comparison.
-- Benchmark output as CSV, JSON config, Markdown sidecars, and captured full outputs.
-- Basic operational metrics such as load time, TTFT, tokens/sec, OK rate, and optional quality scoring.
+```bash
+python3 -m pip install -e .
+```
 
-This README defines the next implementation cycle to turn those primitives into a full agent benchmarking product.
+Then use the simple CLI:
+
+```bash
+# Check local scripts and the default LM Studio endpoint.
+lms doctor
+
+# List models from local LM Studio server mode.
+lms probe
+
+# Run the default profile + quick benchmark workflow.
+lms quick
+
+# Benchmark a Tailscale or LAN LM Studio node.
+lms quick --endpoint http://100.64.0.10:1234/v1
+
+# Limit a quick run to one or more known model IDs.
+lms quick --models "qwen/qwen3-coder-30b,openai/gpt-oss-20b"
+
+# Generate or regenerate recommendations from an existing run directory.
+lms recommend runs/<run_id>
+```
+
+No config file is required. By default the CLI uses `http://127.0.0.1:1234/v1`, or `LMS_BASE_URL` / `LMSTUDIO_BASE_URL` when set.
+
+## CLI commands
+
+### `lms doctor`
+
+Checks that the local LMS scripts exist and probes endpoint reachability.
+
+```bash
+lms doctor
+lms doctor --endpoint http://127.0.0.1:1234/v1
+```
+
+### `lms probe`
+
+Lists models available from one or more LM Studio OpenAI-compatible endpoints.
+
+```bash
+lms probe
+lms probe --endpoint http://100.64.0.10:1234/v1 --endpoint http://100.64.0.11:1234/v1
+lms probe --json
+```
+
+### `lms inventory`
+
+Creates the inventory CSV expected by the benchmark runner.
+
+```bash
+lms inventory --out lmstudio_inventory.csv
+lms inventory --endpoint http://100.64.0.10:1234/v1 --max-models 3
+```
+
+The CSV columns are:
+
+```csv
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+```
+
+### `lms profile`
+
+Collects machine and endpoint information without running a full benchmark.
+
+```bash
+lms profile --output-dir runs/profile-local
+lms profile --endpoint http://100.64.0.10:1234/v1 --output-dir runs/profile-xwing
+```
+
+Outputs:
+
+```text
+machine_profile.json
+machine_synopsis.md
+```
+
+### `lms quick`
+
+Runs the default agent workflow:
+
+1. Probe LM Studio endpoint(s).
+2. Write `lmstudio_inventory.csv`.
+3. Collect `machine_profile.json` and `machine_synopsis.md`.
+4. Run the current benchmark runner.
+5. Generate `capability_matrix.csv` and `agent_recommendations.md`.
+
+```bash
+lms quick
+lms quick --endpoint http://100.64.0.10:1234/v1 --max-models 2 --repeats 1
+lms quick --profile-only
+```
+
+### `lms eval`
+
+Runs deterministic evaluators against a model output file or stdin.
+
+```bash
+echo '{"status":"ok"}' | lms eval --evaluators-json '[{"type":"json_parse"}]' --pretty
+lms eval --output-file raw.txt --evaluators-file evals.json
+```
+
+## Output contract
+
+Every `lms quick` run creates a self-contained run directory:
+
+```text
+runs/<run_id>/
+  lms_run_config.json
+  machine_profile.json
+  machine_synopsis.md
+  lmstudio_inventory.csv
+  run_results.csv
+  run_summary.csv
+  capability_matrix.csv
+  agent_recommendations.md
+  agent_skill_suite.v1.json
+  sidecars/
+```
+
+### `machine_synopsis.md`
+
+Human-friendly report:
+
+- Machine identity and OS.
+- CPU, RAM, GPU, VRAM, storage, network details.
+- LM Studio endpoints discovered.
+- Practical model recommendations.
+- Known limitations and hardware warnings.
+
+### `agent_recommendations.md`
+
+Agent-facing operating guide:
+
+- Default model candidate.
+- Expected TTFT and tokens/sec.
+- OK-rate evidence.
+- Suggested routing behavior.
+- Warnings for complex, long-context, or high-risk work.
+
+### `capability_matrix.csv`
+
+Normalized model recommendation rows:
+
+```csv
+run_id,host_name,host_ip,base_url,model_key,context_tokens,task_family,score,grade,latency_grade,throughput_grade,reliability_grade,recommended_use,avoid_use,evidence,notes
+```
 
 ## Product objective
 
@@ -56,60 +199,9 @@ The tool should answer these questions for every reachable LM Studio node:
                                                         +----------------------+
 ```
 
-## Output contract
-
-Every run should produce a stable run directory:
-
-```text
-runs/<run_id>/
-  config.json
-  machine_profile.json
-  lmstudio_inventory.csv
-  benchmark_results.csv
-  benchmark_summary.csv
-  capability_matrix.csv
-  agent_recommendations.md
-  machine_synopsis.md
-  raw_outputs/
-  sidecars/
-```
-
-### `machine_synopsis.md`
-
-Human-friendly report:
-
-- Machine identity and OS.
-- CPU, RAM, GPU, VRAM, storage, network details.
-- LM Studio endpoints discovered.
-- Model loadability and throughput summary.
-- Practical model recommendations.
-- Known limitations and unsafe task classes.
-
-### `agent_recommendations.md`
-
-Agent-facing operating guide:
-
-- Default model for coding.
-- Default model for planning.
-- Default model for summarization.
-- Maximum recommended context window by model.
-- Expected tokens/sec ranges.
-- When to ask for clarification vs proceed.
-- When to split tasks.
-- When to route to another endpoint.
-- When to refuse/flag low confidence.
-
-### `capability_matrix.csv`
-
-Suggested columns:
-
-```csv
-run_id,host_name,base_url,model_key,context_tokens,task_family,score,latency_grade,throughput_grade,reliability_grade,recommended_use,avoid_use,notes
-```
-
 ## Benchmark suite v1
 
-The first agent-centered suite should include these families:
+The first agent-centered suite includes these families:
 
 ### P0: Operational health
 
@@ -169,24 +261,6 @@ Track quality degradation, latency, missed instructions, and recall accuracy.
 - Summarize risk.
 - Generate next Codex prompt.
 
-### P2: Machine-specific routing recommendations
-
-Convert benchmark results into routing rules:
-
-```yaml
-routing:
-  code_review:
-    preferred_model: <model_key>
-    max_context_tokens: 16000
-    fallback_model: <model_key>
-  quick_shell_help:
-    preferred_model: <small_fast_model>
-    max_context_tokens: 4000
-  long_repo_planning:
-    preferred_model: <large_context_model>
-    min_quality_score: 0.80
-```
-
 ## Scoring model
 
 Use layered scoring instead of a single score:
@@ -218,56 +292,17 @@ Recommended grades:
 
 Create a `runs/<run_id>/` layout and write all benchmark outputs under that directory. Keep CSV as the primary interchange format, but add machine and recommendation Markdown reports.
 
-Deliverables:
-
-- `machine_profile.json`
-- `benchmark_results.csv`
-- `benchmark_summary.csv`
-- `capability_matrix.csv`
-- `machine_synopsis.md`
-- `agent_recommendations.md`
-
 ### P0.2 Add machine profiling
 
-Add a standalone profiler script that runs before benchmarks.
-
-Linux commands/data sources:
-
-- `/etc/os-release`
-- `uname -a`
-- `lscpu --json`
-- `free -b`
-- `lsblk --json`
-- `df -B1`
-- `lspci`
-- `nvidia-smi --query-gpu=... --format=csv,json` when available
-- `rocm-smi --showall --json` when available
-- `vainfo` or Vulkan info when useful
-
-The profiler must degrade gracefully if a command is unavailable.
+Implemented in `lms_machine_profile.py` and exposed through `lms profile` / `lms quick`.
 
 ### P0.3 Add benchmark case manifest support
 
-Move hard-coded cases into a versioned JSON/YAML manifest. The script should support:
-
-```bash
-python3 benchmark_lmstudio_cross_machine_models.py \
-  --inventory-csv lmstudio_inventory.csv \
-  --cases-file benchmarks/agent_skill_suite.v1.json \
-  --output-dir runs
-```
+Benchmark cases are defined in `benchmarks/agent_skill_suite.v1.json`. The next implementation step is wiring this manifest directly into `benchmark_lmstudio_cross_machine_models.py`; the CLI already copies the manifest into each run directory.
 
 ### P0.4 Add deterministic auto-evaluators
 
-Before using LLM-as-judge, implement deterministic checks:
-
-- JSON parse success.
-- Schema validation.
-- Required keyword/section presence.
-- Code block detection.
-- Command safety flags.
-- Output length/truncation checks.
-- Exact-answer checks for small retrieval tasks.
+Implemented in `lms_eval.py`. The next implementation step is applying these evaluators during benchmark execution and writing task-family scores into `capability_matrix.csv`.
 
 ### P1.1 Add context sweep mode
 
@@ -275,29 +310,11 @@ Each benchmark case should be runnable at multiple context lengths. The report s
 
 ### P1.2 Add agent recommendation synthesis
 
-Generate practical routing recommendations from measured results:
-
-- Fast local draft model.
-- Best coding model.
-- Best long-context model.
-- Best JSON/tool model.
-- Models to avoid.
-- Hardware bottlenecks.
+Initial implementation is exposed through `lms recommend` and automatically called by `lms quick`.
 
 ### P1.3 Add comparison reports
 
-Support compare runs:
-
-```bash
-python3 compare_benchmark_runs.py runs/2026-05-30T... runs/2026-05-31T...
-```
-
-Outputs:
-
-- Regression/improvement table.
-- Hardware differences.
-- Model upgrades/downgrades.
-- Routing rule changes.
+Add `compare_benchmark_runs.py` to compare two run directories and show routing changes, regressions, and improvements.
 
 ### P2 Add lightweight dashboard
 
@@ -308,18 +325,6 @@ A small static dashboard or FastAPI page can read the run artifacts and show:
 - Context degradation curves.
 - Hardware fit warnings.
 - Agent routing recommendations.
-
-## Recommended next files to add
-
-```text
-benchmarks/agent_skill_suite.v1.json
-schemas/capability_matrix.schema.json
-schemas/machine_profile.schema.json
-lms_machine_profile.py
-lms_agent_benchmark.py
-lms_report_writer.py
-compare_benchmark_runs.py
-```
 
 ## Design rules
 
