@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/capability_matrix.schema.json",
+  "title": "LMS Capability Matrix Row",
+  "description": "Schema for a normalized capability_matrix.csv row represented as JSON.",
+  "type": "object",
+  "required": [
+    "run_id",
+    "host_name",
+    "base_url",
+    "model_key",
+    "task_family",
+    "score",
+    "latency_grade",
+    "throughput_grade",
+    "reliability_grade",
+    "recommended_use",
+    "avoid_use",
+    "notes"
+  ],
+  "properties": {
+    "run_id": {"type": "string"},
+    "host_name": {"type": "string"},
+    "host_ip": {"type": ["string", "null"]},
+    "base_url": {"type": "string"},
+    "model_key": {"type": "string"},
+    "context_tokens": {"type": ["integer", "null"]},
+    "task_family": {
+      "type": "string",
+      "enum": [
+        "operational_health",
+        "structured_output",
+        "coding",
+        "debugging",
+        "agent_planning",
+        "long_context",
+        "repo_work",
+        "summarization",
+        "extraction",
+        "tool_use",
+        "general"
+      ]
+    },
+    "score": {"type": ["number", "string"], "description": "Normalized score from 0.0 to 1.0; CSV may serialize as a string."},
+    "grade": {"type": ["string", "null"], "enum": ["A", "B", "C", "D", "F", null]},
+    "latency_grade": {"type": "string", "enum": ["A", "B", "C", "D", "F", "unknown"]},
+    "throughput_grade": {"type": "string", "enum": ["A", "B", "C", "D", "F", "unknown"]},
+    "reliability_grade": {"type": "string", "enum": ["A", "B", "C", "D", "F", "unknown"]},
+    "recommended_use": {"type": "string"},
+    "avoid_use": {"type": "string"},
+    "evidence": {"type": ["string", "null"]},
+    "notes": {"type": "string"}
+  },
+  "additionalProperties": true
+}
