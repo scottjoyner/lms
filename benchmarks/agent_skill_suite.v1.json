@@ -1,0 +1,129 @@
+{
+  "suite_id": "agent_skill_suite.v1",
+  "version": 1,
+  "description": "Agent-centered benchmark suite for LM Studio nodes. Measures operational health, structured output, coding, planning, long-context retention, and repository-work simulation.",
+  "default_context_sweep_tokens": [2048, 4096, 8192, 16384, 32768],
+  "scoring": {
+    "grades": {
+      "A": "safe default for this task family",
+      "B": "usable with review",
+      "C": "draft-only unless externally checked",
+      "D": "only for small/simple tasks",
+      "F": "do not route this task family here"
+    },
+    "dimensions": [
+      "correctness",
+      "instruction_following",
+      "structured_output_validity",
+      "completeness",
+      "latency_fit",
+      "throughput_fit",
+      "stability",
+      "context_retention"
+    ]
+  },
+  "cases": [
+    {
+      "case_key": "health_minimal_chat",
+      "priority": "P0",
+      "task_family": "operational_health",
+      "system": "You are a concise local model health check assistant.",
+      "prompt": "Reply with exactly: LMS_HEALTH_OK",
+      "temperature": 0.0,
+      "max_output_tokens": 32,
+      "evaluators": [
+        {"type": "exact_contains", "value": "LMS_HEALTH_OK"},
+        {"type": "max_chars", "value": 64}
+      ],
+      "recommendation_signal": "endpoint_can_complete_basic_chat"
+    },
+    {
+      "case_key": "structured_json_capability_card",
+      "priority": "P0",
+      "task_family": "structured_output",
+      "system": "You produce strict JSON only. Do not use markdown.",
+      "prompt": "Return a JSON object with keys: task_fit, confidence, limitations, recommended_max_context_tokens. task_fit must be an array of strings. confidence must be a number from 0 to 1. limitations must be an array of strings. recommended_max_context_tokens must be an integer. Do not include extra keys.",
+      "temperature": 0.0,
+      "max_output_tokens": 256,
+      "evaluators": [
+        {"type": "json_parse"},
+        {"type": "json_required_keys", "value": ["task_fit", "confidence", "limitations", "recommended_max_context_tokens"]},
+        {"type": "json_forbidden_extra_keys", "value": ["task_fit", "confidence", "limitations", "recommended_max_context_tokens"]}
+      ],
+      "recommendation_signal": "json_tool_call_reliability"
+    },
+    {
+      "case_key": "coding_small_function_python",
+      "priority": "P1",
+      "task_family": "coding",
+      "system": "You are a senior Python engineer. Return code only, no markdown.",
+      "prompt": "Write a Python function named normalize_phone_number(value: str) -> str that strips non-digits, supports 10-digit US numbers and 11-digit numbers beginning with 1, and raises ValueError for anything else. Include a small if __name__ == '__main__' test block with at least five asserts.",
+      "temperature": 0.0,
+      "max_output_tokens": 900,
+      "evaluators": [
+        {"type": "contains_all", "value": ["def normalize_phone_number", "ValueError", "assert"]},
+        {"type": "no_markdown_fence"}
+      ],
+      "recommendation_signal": "small_code_generation"
+    },
+    {
+      "case_key": "debug_traceback_reasoning",
+      "priority": "P1",
+      "task_family": "debugging",
+      "system": "You are a debugging assistant. Be concise and actionable.",
+      "prompt": "A Python script raises: TypeError: 'NoneType' object is not subscriptable at line 42: user_id = payload['user']['id']. Explain the likely root cause, show a safe fix, and provide two regression tests. Use headings: Root Cause, Safe Fix, Regression Tests.",
+      "temperature": 0.1,
+      "max_output_tokens": 900,
+      "evaluators": [
+        {"type": "contains_all", "value": ["Root Cause", "Safe Fix", "Regression Tests", "None", "payload"]}
+      ],
+      "recommendation_signal": "debugging_quality"
+    },
+    {
+      "case_key": "agent_plan_p0_p1_p2",
+      "priority": "P1",
+      "task_family": "agent_planning",
+      "system": "You are a delivery-focused software architecture agent. Do not ask clarifying questions unless absolutely blocked.",
+      "prompt": "Create an implementation plan for adding user authentication, API key rotation, audit logging, and admin dashboards to an existing FastAPI service. Organize the plan as P0, P1, and P2 tasks. Each task must include acceptance criteria and test expectations.",
+      "temperature": 0.2,
+      "max_output_tokens": 1400,
+      "evaluators": [
+        {"type": "contains_all", "value": ["P0", "P1", "P2", "Acceptance", "Tests"]}
+      ],
+      "recommendation_signal": "project_planning"
+    },
+    {
+      "case_key": "long_context_recall_synthetic",
+      "priority": "P1",
+      "task_family": "long_context",
+      "context_sweep_tokens": [2048, 4096, 8192, 16384, 32768, 65536],
+      "system": "You are a careful long-context retrieval assistant. Answer only from the provided context.",
+      "prompt_template": "Read the synthetic context below. It contains many filler facts and one control code. Return JSON only with keys control_code and evidence_quote.\n\n<context>\n{{synthetic_context}}\n</context>\n\nQuestion: What is the control code and what exact sentence proves it?",
+      "synthetic_context": {
+        "filler_style": "technical_project_notes",
+        "needle_sentence": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.",
+        "needle_position": "middle"
+      },
+      "temperature": 0.0,
+      "max_output_tokens": 256,
+      "evaluators": [
+        {"type": "json_parse"},
+        {"type": "exact_contains", "value": "ORION-7429"}
+      ],
+      "recommendation_signal": "max_reliable_context"
+    },
+    {
+      "case_key": "repo_gap_analysis_simulation",
+      "priority": "P2",
+      "task_family": "repo_work",
+      "system": "You are a codebase review agent. Identify implementation gaps, security gaps, and next deliverables.",
+      "prompt": "You are reviewing a repository summary: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.",
+      "temperature": 0.2,
+      "max_output_tokens": 1600,
+      "evaluators": [
+        {"type": "contains_all", "value": ["P0", "P1.1", "P1.2", "P2", "security", "tests"]}
+      ],
+      "recommendation_signal": "repo_review_planning"
+    }
+  ]
+}
