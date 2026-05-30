@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/lms_agent_skill.schema.json",
+  "title": "LMS Agent Skill Export",
+  "type": "object",
+  "required": ["schema_version", "generated_at_utc", "run_dir", "run_id", "machine", "audit", "routes", "operating_rules", "commands", "artifact_paths"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "lms_agent_skill.v1"},
+    "generated_at_utc": {"type": "string"},
+    "run_dir": {"type": "string"},
+    "run_id": {"type": "string"},
+    "machine": {"type": "object"},
+    "audit": {
+      "type": "object",
+      "required": ["status", "ok", "critical", "warnings"],
+      "properties": {
+        "status": {"type": "string"},
+        "ok": {"type": "boolean"},
+        "critical": {"type": "array", "items": {"type": "string"}},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "routes": {"type": "object"},
+    "fit_warnings": {"type": "array"},
+    "operating_rules": {"type": "array", "items": {"type": "string"}},
+    "commands": {"type": "object", "additionalProperties": {"type": "string"}},
+    "artifact_paths": {"type": "object", "additionalProperties": {"type": "string"}}
+  },
+  "additionalProperties": true
+}
