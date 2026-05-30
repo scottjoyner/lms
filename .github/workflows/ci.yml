@@ -34,6 +34,7 @@ jobs:
             lms_skill_export.py \
             lms_run_audit.py \
             lms_manifest_validate.py \
+            lms_artifact_validate.py \
             lms_agent_brief.py \
             lms_model_fit.py \
             lms_machine_profile.py \
