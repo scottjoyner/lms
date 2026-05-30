@@ -12,6 +12,7 @@ agent-facing command layer:
   lms-bench audit latest
   lms-bench export-skill latest
   lms-bench bundle latest
+  lms-bench decide latest --task coding
   lms-bench history best --task coding
   lms-bench quick --from-registry --tags gpu
 
@@ -30,6 +31,7 @@ import lms_agent_brief
 import lms_artifact_validate
 import lms_cli
 import lms_config
+import lms_decide
 import lms_endpoint_registry
 import lms_history
 import lms_manifest_validate
@@ -39,7 +41,7 @@ import lms_skill_export
 import lms_support_bundle
 
 
-VERSION = "lms-agent-cli 0.15.0"
+VERSION = "lms-agent-cli 0.16.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
@@ -54,6 +56,7 @@ MODULE_FILES = [
     "lms_model_fit.py",
     "lms_support_bundle.py",
     "lms_history.py",
+    "lms_decide.py",
     "lms_machine_profile.py",
     "lms_eval.py",
     "benchmark_lmstudio_cross_machine_models.py",
@@ -84,6 +87,21 @@ def build_audit_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-score", type=float, default=0.55)
     parser.add_argument("--min-eval-ok", type=float, default=0.60)
     parser.add_argument("--no-require-safety", action="store_true")
+    parser.add_argument("--pretty", action="store_true")
+    return parser
+
+
+def build_decide_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lms-bench decide", description="Return allow/fallback/block decision for an agent task.")
+    parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
+    parser.add_argument("--task", default="general")
+    parser.add_argument("--context-tokens", type=int, default=None)
+    parser.add_argument("--min-score", type=float, default=0.55)
+    parser.add_argument("--no-require-audit-pass", action="store_true")
+    parser.add_argument("--no-allow-warn-audit", action="store_true")
+    parser.add_argument("--json-out", default=None)
+    parser.add_argument("--md-out", default=None)
     parser.add_argument("--pretty", action="store_true")
     return parser
 
@@ -154,6 +172,25 @@ def run_audit(argv: List[str]) -> int:
     if args.pretty:
         cmd.append("--pretty")
     return int(lms_run_audit.main(cmd))
+
+
+def run_decide(argv: List[str]) -> int:
+    args = build_decide_parser().parse_args(argv)
+    run_dir = lms_cli.resolve_run_dir(args.run_dir, args.runs_dir)
+    cmd = [str(run_dir), "--task", args.task, "--min-score", str(args.min_score)]
+    if args.context_tokens is not None:
+        cmd += ["--context-tokens", str(args.context_tokens)]
+    if args.no_require_audit_pass:
+        cmd.append("--no-require-audit-pass")
+    if args.no_allow_warn_audit:
+        cmd.append("--no-allow-warn-audit")
+    if args.json_out:
+        cmd += ["--json-out", args.json_out]
+    if args.md_out:
+        cmd += ["--md-out", args.md_out]
+    if args.pretty:
+        cmd.append("--pretty")
+    return int(lms_decide.main(cmd))
 
 
 def run_export_skill(argv: List[str]) -> int:
@@ -308,6 +345,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_brief(args[1:])
     if args[0] == "audit":
         return run_audit(args[1:])
+    if args[0] == "decide":
+        return run_decide(args[1:])
     if args[0] in {"export-skill", "skill"}:
         return run_export_skill(args[1:])
     if args[0] == "bundle":
