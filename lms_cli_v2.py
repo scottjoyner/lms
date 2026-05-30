@@ -13,6 +13,7 @@ agent-facing command layer:
   lms-bench export-skill latest
   lms-bench bundle latest
   lms-bench decide latest --task coding
+  lms-bench history-decide --task coding
   lms-bench history best --task coding
   lms-bench quick --from-registry --tags gpu
 
@@ -34,6 +35,7 @@ import lms_config
 import lms_decide
 import lms_endpoint_registry
 import lms_history
+import lms_history_decide
 import lms_manifest_validate
 import lms_model_fit
 import lms_run_audit
@@ -41,7 +43,7 @@ import lms_skill_export
 import lms_support_bundle
 
 
-VERSION = "lms-agent-cli 0.16.0"
+VERSION = "lms-agent-cli 0.17.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
@@ -57,6 +59,7 @@ MODULE_FILES = [
     "lms_support_bundle.py",
     "lms_history.py",
     "lms_decide.py",
+    "lms_history_decide.py",
     "lms_machine_profile.py",
     "lms_eval.py",
     "benchmark_lmstudio_cross_machine_models.py",
@@ -347,6 +350,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_audit(args[1:])
     if args[0] == "decide":
         return run_decide(args[1:])
+    if args[0] in {"history-decide", "decide-history"}:
+        return int(lms_history_decide.main(args[1:]))
     if args[0] in {"export-skill", "skill"}:
         return run_export_skill(args[1:])
     if args[0] == "bundle":
