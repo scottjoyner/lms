@@ -4,6 +4,7 @@
 This wrapper keeps the existing manifest-aware CLI intact while adding the next
 agent-facing command layer:
 
+  lms-bench config show
   lms-bench fit latest
   lms-bench validate-suite
   lms-bench validate-run latest
@@ -26,6 +27,7 @@ from typing import List, Optional
 import lms_agent_brief
 import lms_artifact_validate
 import lms_cli
+import lms_config
 import lms_endpoint_registry
 import lms_manifest_validate
 import lms_model_fit
@@ -33,10 +35,11 @@ import lms_run_audit
 import lms_skill_export
 
 
-VERSION = "lms-agent-cli 0.12.0"
+VERSION = "lms-agent-cli 0.13.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
+    "lms_config.py",
     "lms_endpoint_registry.py",
     "lmstudio_cli_bridge.py",
     "lms_skill_export.py",
@@ -246,11 +249,14 @@ def run_selftest() -> int:
     suite_rc = run_validate_suite(["--pretty"])
     if suite_rc != 0:
         failures.append("suite validation failed")
+    config_validation = lms_config.validate_config(lms_config.effective_config())
+    if not config_validation.get("ok"):
+        failures.append("config validation failed: " + "; ".join(config_validation.get("errors", [])))
     if failures:
         for failure in failures:
             print(f"FAIL: {failure}")
         return 1
-    print("selftest passed: modules compile, suite manifest is valid, evaluator registry is loadable")
+    print("selftest passed: modules compile, suite manifest/config are valid, evaluator registry is loadable")
     return 0
 
 
@@ -261,6 +267,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args[0] in {"--version", "-V"}:
         print(VERSION)
         return 0
+    if args[0] == "config":
+        return int(lms_config.main(args[1:]))
     if args[0] == "fit":
         return run_fit(args[1:])
     if args[0] == "brief":
