@@ -29,6 +29,7 @@ jobs:
           python -m py_compile \
             lms_cli_v2.py \
             lms_cli.py \
+            lms_config.py \
             lms_endpoint_registry.py \
             lmstudio_cli_bridge.py \
             lms_skill_export.py \
@@ -44,6 +45,8 @@ jobs:
       - name: Validate CLI commands
         run: |
           lms-bench --version
+          lms-bench config show --pretty
+          lms-bench config validate --pretty
           lms-bench validate-suite --pretty
           lms-bench selftest
           lms-bench-endpoints --help
@@ -66,3 +69,7 @@ jobs:
       - name: Run unit tests
         run: |
           pytest -q
+
+      - name: Build package artifacts
+        run: |
+          python -m build
