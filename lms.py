@@ -6,12 +6,16 @@ A small, dependency-light command line wrapper that lets agents use the LMS
 benchmarking toolkit without hand-editing configs.
 
 Common usage:
-  python3 lms.py doctor
-  python3 lms.py quick
-  python3 lms.py quick --endpoint http://100.64.0.10:1234/v1 --repeats 1
-  python3 lms.py inventory --endpoint http://127.0.0.1:1234/v1 --out lmstudio_inventory.csv
-  python3 lms.py profile --endpoint http://127.0.0.1:1234/v1
-  python3 lms.py recommend runs/<run_id>
+  lms doctor
+  lms probe
+  lms quick
+  lms quick --endpoint http://100.64.0.10:1234/v1 --repeats 1
+  lms inventory --endpoint http://127.0.0.1:1234/v1 --out lmstudio_inventory.csv
+  lms profile --endpoint http://127.0.0.1:1234/v1
+  lms runs
+  lms show runs/<run_id>
+  lms route runs/<run_id> --task coding
+  lms recommend runs/<run_id>
 """
 
 from __future__ import annotations
@@ -30,15 +34,17 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parent
+CWD = Path.cwd()
 DEFAULT_ENDPOINT = "http://127.0.0.1:1234/v1"
-DEFAULT_SUITE = REPO_ROOT / "benchmarks" / "agent_skill_suite.v1.json"
-BENCHMARK_SCRIPT = REPO_ROOT / "benchmark_lmstudio_cross_machine_models.py"
-PROFILE_SCRIPT = REPO_ROOT / "lms_machine_profile.py"
-EVAL_SCRIPT = REPO_ROOT / "lms_eval.py"
+DEFAULT_RUNS_DIR = "runs"
+DEFAULT_SUITE_REL = Path("benchmarks") / "agent_skill_suite.v1.json"
+BENCHMARK_SCRIPT_REL = Path("benchmark_lmstudio_cross_machine_models.py")
+PROFILE_SCRIPT_REL = Path("lms_machine_profile.py")
+EVAL_SCRIPT_REL = Path("lms_eval.py")
 
 
 # ----------------------------
@@ -79,6 +85,43 @@ def ensure_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
 
 
+def resolve_path(path: Path, required: bool = True) -> Path:
+    """Resolve a repo asset for both editable and script-local installs."""
+    candidates = [
+        REPO_ROOT / path,
+        CWD / path,
+        CWD.parent / path,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    if required:
+        # Return the primary candidate so error messages point to the intended path.
+        return candidates[0]
+    return candidates[0]
+
+
+def suite_path(explicit: Optional[str] = None) -> Path:
+    if explicit:
+        return Path(explicit)
+    env_suite = os.environ.get("LMS_SUITE_FILE")
+    if env_suite:
+        return Path(env_suite)
+    return resolve_path(DEFAULT_SUITE_REL, required=False)
+
+
+def benchmark_script_path() -> Path:
+    return resolve_path(BENCHMARK_SCRIPT_REL, required=False)
+
+
+def profile_script_path() -> Path:
+    return resolve_path(PROFILE_SCRIPT_REL, required=False)
+
+
+def eval_script_path() -> Path:
+    return resolve_path(EVAL_SCRIPT_REL, required=False)
+
+
 def run_subprocess(cmd: Sequence[str], *, check: bool = False) -> int:
     print("$ " + " ".join(str(c) for c in cmd))
     proc = subprocess.run(list(cmd), check=False)
@@ -96,6 +139,26 @@ def http_get_json(url: str, timeout_s: int = 8) -> Tuple[Optional[Any], Optional
             return json.loads(raw), None, getattr(resp, "status", None), time.perf_counter() - started
     except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         return None, repr(exc), None, time.perf_counter() - started
+
+
+def read_json(path: Path) -> Optional[Dict[str, Any]]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def print_table(rows: List[List[str]], headers: List[str]) -> None:
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, value in enumerate(row):
+            widths[i] = max(widths[i], len(str(value)))
+    fmt = "  ".join("{:<" + str(w) + "}" for w in widths)
+    print(fmt.format(*headers))
+    print(fmt.format(*["-" * w for w in widths]))
+    for row in rows:
+        print(fmt.format(*row))
 
 
 # ----------------------------
@@ -127,8 +190,8 @@ def probe_endpoints(endpoints: Sequence[str], timeout_s: int = 8) -> List[Dict[s
 
 
 def local_host_ip() -> str:
-    # Best effort only. This avoids network calls; it asks the local socket stack
-    # which address would be used for outbound traffic.
+    # Best effort only. This does not send packets; UDP connect asks the local
+    # routing table which source address would be used.
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
             sock.connect(("8.8.8.8", 80))
@@ -191,7 +254,65 @@ def write_inventory_csv(
 
 
 # ----------------------------
-# Recommendations
+# Run discovery / summaries
+# ----------------------------
+def discover_runs(runs_dir: Path) -> List[Path]:
+    if not runs_dir.exists():
+        return []
+    candidates = []
+    for path in runs_dir.iterdir():
+        if path.is_dir() and any((path / marker).exists() for marker in ["lms_run_config.json", "machine_profile.json", "run_summary.csv", "agent_recommendations.md"]):
+            candidates.append(path)
+    return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def latest_run(runs_dir: Path) -> Optional[Path]:
+    runs = discover_runs(runs_dir)
+    return runs[0] if runs else None
+
+
+def load_summary_rows(run_dir: Path) -> List[Dict[str, str]]:
+    candidates = [run_dir / "run_summary.csv", run_dir / "benchmark_summary.csv", run_dir / "bench" / "run_summary.csv"]
+    for path in candidates:
+        if path.exists():
+            with path.open("r", encoding="utf-8", newline="") as f:
+                return list(csv.DictReader(f))
+    return []
+
+
+def load_capability_rows(run_dir: Path) -> List[Dict[str, str]]:
+    path = run_dir / "capability_matrix.csv"
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def load_profile(run_dir: Path) -> Optional[Dict[str, Any]]:
+    return read_json(run_dir / "machine_profile.json")
+
+
+def run_status(run_dir: Path) -> str:
+    if (run_dir / "agent_recommendations.md").exists() and (run_dir / "capability_matrix.csv").exists():
+        return "recommended"
+    if (run_dir / "run_summary.csv").exists():
+        return "benchmarked"
+    if (run_dir / "machine_profile.json").exists():
+        return "profiled"
+    return "created"
+
+
+def resolve_run_dir(value: str, runs_dir: str = DEFAULT_RUNS_DIR) -> Path:
+    if value == "latest":
+        latest = latest_run(Path(runs_dir))
+        if not latest:
+            raise SystemExit(f"no runs found under {runs_dir}")
+        return latest
+    return Path(value)
+
+
+# ----------------------------
+# Recommendations / routing
 # ----------------------------
 def float_or_none(value: Any) -> Optional[float]:
     if value in (None, ""):
@@ -244,23 +365,35 @@ def grade_throughput(tps: Optional[float]) -> str:
     return "F"
 
 
-def load_summary_rows(run_dir: Path) -> List[Dict[str, str]]:
-    candidates = [run_dir / "run_summary.csv", run_dir / "benchmark_summary.csv", run_dir / "bench" / "run_summary.csv"]
-    for path in candidates:
-        if path.exists():
-            with path.open("r", encoding="utf-8", newline="") as f:
-                return list(csv.DictReader(f))
-    return []
+def recommended_use_for(row: Dict[str, str], score: float) -> str:
+    ok_rate = float_or_none(row.get("ok_rate")) or 0.0
+    tps = float_or_none(row.get("tps_med")) or 0.0
+    if score >= 0.85 and tps >= 20:
+        return "default local agent model for routine coding, planning, and summaries"
+    if ok_rate >= 0.8:
+        return "reliable draft/review model; use with normal verification"
+    if ok_rate > 0:
+        return "limited use for drafts only; require review or fallback"
+    return "not recommended"
 
 
-def load_profile(run_dir: Path) -> Optional[Dict[str, Any]]:
-    path = run_dir / "machine_profile.json"
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+def avoid_use_for(row: Dict[str, str], score: float) -> str:
+    ok_rate = float_or_none(row.get("ok_rate")) or 0.0
+    tps = float_or_none(row.get("tps_med"))
+    if ok_rate <= 0:
+        return "avoid all autonomous work until endpoint/model errors are resolved"
+    if tps is not None and tps < 4:
+        return "avoid interactive workflows and large outputs"
+    if score < 0.55:
+        return "avoid complex coding, long-context, and tool-call tasks"
+    return "avoid only high-risk work until task-family benchmarks pass"
+
+
+def score_summary_row(row: Dict[str, str]) -> float:
+    ok_rate = float_or_none(row.get("ok_rate"))
+    tps = float_or_none(row.get("tps_med"))
+    ttft = float_or_none(row.get("ttft_med"))
+    return (ok_rate or 0.0) * 0.75 + min((tps or 0.0) / 40.0, 1.0) * 0.20 + (0.05 if ttft is not None and ttft <= 8 else 0.0)
 
 
 def synthesize_recommendations(run_dir: Path) -> None:
@@ -270,11 +403,11 @@ def synthesize_recommendations(run_dir: Path) -> None:
     capability_rows: List[Dict[str, Any]] = []
     ranked: List[Tuple[float, Dict[str, str]]] = []
     for row in rows:
+        score = score_summary_row(row)
+        ranked.append((score, row))
         ok_rate = float_or_none(row.get("ok_rate"))
         tps = float_or_none(row.get("tps_med"))
         ttft = float_or_none(row.get("ttft_med"))
-        score = (ok_rate or 0.0) * 0.75 + min((tps or 0.0) / 40.0, 1.0) * 0.20 + (0.05 if ttft is not None and ttft <= 8 else 0.0)
-        ranked.append((score, row))
         reliability_grade = grade_score(ok_rate)
         throughput_grade = grade_throughput(tps)
         latency_grade = grade_latency(ttft)
@@ -342,7 +475,7 @@ def synthesize_recommendations(run_dir: Path) -> None:
     lines.append("## Model routing")
     lines.append("")
     if not ranked:
-        lines.append("No benchmark summary rows were found. Run `python3 lms.py quick` first.")
+        lines.append("No benchmark summary rows were found. Run `lms quick` first.")
     else:
         best_score, best = ranked[0]
         lines.append(f"- Default local model candidate: `{best.get('model_key')}` on `{best.get('base_url')}`.")
@@ -371,28 +504,53 @@ def synthesize_recommendations(run_dir: Path) -> None:
     print(f"wrote {md_path}")
 
 
-def recommended_use_for(row: Dict[str, str], score: float) -> str:
-    ok_rate = float_or_none(row.get("ok_rate")) or 0.0
-    tps = float_or_none(row.get("tps_med")) or 0.0
-    if score >= 0.85 and tps >= 20:
-        return "default local agent model for routine coding, planning, and summaries"
-    if ok_rate >= 0.8:
-        return "reliable draft/review model; use with normal verification"
-    if ok_rate > 0:
-        return "limited use for drafts only; require review or fallback"
-    return "not recommended"
+def choose_route(run_dir: Path, task: str = "general") -> Optional[Dict[str, str]]:
+    capability_rows = load_capability_rows(run_dir)
+    if capability_rows:
+        task_rows = [r for r in capability_rows if r.get("task_family") == task]
+        if not task_rows and task != "general":
+            task_rows = [r for r in capability_rows if r.get("task_family") == "general"]
+        rows = task_rows or capability_rows
+        rows.sort(key=lambda r: float_or_none(r.get("score")) or 0.0, reverse=True)
+        return rows[0] if rows else None
+
+    summary_rows = load_summary_rows(run_dir)
+    if not summary_rows:
+        return None
+    ranked = sorted(summary_rows, key=score_summary_row, reverse=True)
+    best = ranked[0]
+    return {
+        "run_id": best.get("run_id", ""),
+        "task_family": task,
+        "host_name": best.get("host_name", ""),
+        "host_ip": best.get("host_ip", ""),
+        "base_url": best.get("base_url", ""),
+        "model_key": best.get("model_key", ""),
+        "score": f"{score_summary_row(best):.4f}",
+        "grade": grade_score(score_summary_row(best)),
+        "evidence": f"ok_rate={best.get('ok_rate','')}; ttft_med={best.get('ttft_med','')}; tps_med={best.get('tps_med','')}",
+        "recommended_use": recommended_use_for(best, score_summary_row(best)),
+        "avoid_use": avoid_use_for(best, score_summary_row(best)),
+    }
 
 
-def avoid_use_for(row: Dict[str, str], score: float) -> str:
-    ok_rate = float_or_none(row.get("ok_rate")) or 0.0
-    tps = float_or_none(row.get("tps_med"))
-    if ok_rate <= 0:
-        return "avoid all autonomous work until endpoint/model errors are resolved"
-    if tps is not None and tps < 4:
-        return "avoid interactive workflows and large outputs"
-    if score < 0.55:
-        return "avoid complex coding, long-context, and tool-call tasks"
-    return "avoid only high-risk work until task-family benchmarks pass"
+def render_route_yaml(route: Dict[str, str]) -> str:
+    return "\n".join(
+        [
+            "routing:",
+            f"  {route.get('task_family', 'general')}:",
+            f"    preferred_model: {json.dumps(route.get('model_key', ''))}",
+            f"    base_url: {json.dumps(route.get('base_url', ''))}",
+            f"    host_name: {json.dumps(route.get('host_name', ''))}",
+            f"    score: {json.dumps(route.get('score', ''))}",
+            f"    grade: {json.dumps(route.get('grade', ''))}",
+            f"    evidence: {json.dumps(route.get('evidence', ''))}",
+            f"    recommended_use: {json.dumps(route.get('recommended_use', ''))}",
+            f"    avoid_use: {json.dumps(route.get('avoid_use', ''))}",
+            "    source: lms capability_matrix.csv",
+            "",
+        ]
+    )
 
 
 # ----------------------------
@@ -402,9 +560,10 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print("LMS doctor")
     print(f"Python: {sys.version.split()[0]} ({platform.platform()})")
     print(f"Repo root: {REPO_ROOT}")
-    scripts = [PROFILE_SCRIPT, EVAL_SCRIPT, BENCHMARK_SCRIPT, DEFAULT_SUITE]
+    scripts = [profile_script_path(), eval_script_path(), benchmark_script_path(), suite_path()]
     for script in scripts:
-        print(f"{'OK ' if script.exists() else 'MISS'} {script.relative_to(REPO_ROOT) if script.is_relative_to(REPO_ROOT) else script}")
+        label = script.name if script.parent == REPO_ROOT else str(script)
+        print(f"{'OK ' if script.exists() else 'MISS'} {label}")
 
     endpoints = args.endpoint or [default_endpoint()]
     print("\nEndpoint probes:")
@@ -449,7 +608,11 @@ def cmd_inventory(args: argparse.Namespace) -> int:
 
 
 def cmd_profile(args: argparse.Namespace) -> int:
-    cmd = [sys.executable, str(PROFILE_SCRIPT), "--output-dir", args.output_dir, "--timeout", str(args.timeout)]
+    script = profile_script_path()
+    if not script.exists():
+        print(f"profile script missing: {script}")
+        return 1
+    cmd = [sys.executable, str(script), "--output-dir", args.output_dir, "--timeout", str(args.timeout)]
     if args.inventory_csv:
         cmd += ["--inventory-csv", args.inventory_csv]
     for endpoint in args.endpoint or [default_endpoint()]:
@@ -464,9 +627,11 @@ def cmd_quick(args: argparse.Namespace) -> int:
 
     endpoints = args.endpoint or [default_endpoint()]
     inventory_csv = run_dir / "lmstudio_inventory.csv"
+    selected_suite = suite_path(args.suite_file)
 
     print(f"Creating LMS run: {run_dir}")
     probes = probe_endpoints(endpoints, timeout_s=args.timeout)
+    (run_dir / "endpoint_probes.json").write_text(json.dumps(probes, indent=2), encoding="utf-8")
     rows = write_inventory_csv(
         probes,
         inventory_csv,
@@ -482,16 +647,19 @@ def cmd_quick(args: argparse.Namespace) -> int:
         "created_at_utc": utc_now_iso(),
         "endpoints": [normalize_base_url(e) for e in endpoints],
         "inventory_csv": str(inventory_csv),
-        "suite_file": str(DEFAULT_SUITE),
+        "suite_file": str(selected_suite),
         "models_filter": parse_csv_arg(args.models),
+        "exclude_models": parse_csv_arg(args.exclude_models),
         "max_models": args.max_models,
         "timeout": args.timeout,
         "repeats": args.repeats,
     }
     (run_dir / "lms_run_config.json").write_text(json.dumps(run_config, indent=2), encoding="utf-8")
 
-    if DEFAULT_SUITE.exists():
-        shutil.copy2(DEFAULT_SUITE, run_dir / "agent_skill_suite.v1.json")
+    if selected_suite.exists():
+        shutil.copy2(selected_suite, run_dir / selected_suite.name)
+    else:
+        print(f"warning: suite file not found: {selected_suite}")
 
     profile_code = cmd_profile(
         argparse.Namespace(
@@ -508,13 +676,14 @@ def cmd_quick(args: argparse.Namespace) -> int:
         print(f"Run directory ready: {run_dir}")
         return 0 if rows else 1
 
-    if not BENCHMARK_SCRIPT.exists():
-        print(f"Benchmark script missing: {BENCHMARK_SCRIPT}")
+    bench_script = benchmark_script_path()
+    if not bench_script.exists():
+        print(f"Benchmark script missing: {bench_script}")
         return 1
 
     bench_cmd = [
         sys.executable,
-        str(BENCHMARK_SCRIPT),
+        str(bench_script),
         "--inventory-csv",
         str(inventory_csv),
         "--output-dir",
@@ -536,13 +705,19 @@ def cmd_quick(args: argparse.Namespace) -> int:
         return bench_code
 
     synthesize_recommendations(run_dir)
+    route = choose_route(run_dir, task="general")
+    if route:
+        (run_dir / "routing_rules.yaml").write_text(render_route_yaml(route), encoding="utf-8")
+        (run_dir / "routing_rules.json").write_text(json.dumps({"routing": {"general": route}}, indent=2), encoding="utf-8")
+        print(f"wrote {run_dir / 'routing_rules.yaml'}")
+
     print(f"\nDone. Agent artifacts are in: {run_dir}")
     print(f"Read: {run_dir / 'agent_recommendations.md'}")
     return bench_code
 
 
 def cmd_recommend(args: argparse.Namespace) -> int:
-    run_dir = Path(args.run_dir)
+    run_dir = resolve_run_dir(args.run_dir, args.runs_dir)
     if not run_dir.exists():
         print(f"run directory not found: {run_dir}")
         return 1
@@ -550,8 +725,109 @@ def cmd_recommend(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_route(args: argparse.Namespace) -> int:
+    run_dir = resolve_run_dir(args.run_dir, args.runs_dir)
+    if not run_dir.exists():
+        print(f"run directory not found: {run_dir}")
+        return 1
+    if not (run_dir / "capability_matrix.csv").exists():
+        synthesize_recommendations(run_dir)
+    route = choose_route(run_dir, task=args.task)
+    if not route:
+        print("No route could be selected. Run `lms quick` first.")
+        return 1
+
+    if args.json:
+        print(json.dumps(route, indent=2))
+    else:
+        print(render_route_yaml(route), end="")
+
+    if args.write:
+        yaml_path = run_dir / "routing_rules.yaml"
+        json_path = run_dir / "routing_rules.json"
+        yaml_path.write_text(render_route_yaml(route), encoding="utf-8")
+        json_path.write_text(json.dumps({"routing": {args.task: route}}, indent=2), encoding="utf-8")
+        print(f"wrote {yaml_path}")
+        print(f"wrote {json_path}")
+    return 0
+
+
+def cmd_runs(args: argparse.Namespace) -> int:
+    runs = discover_runs(Path(args.runs_dir))[: args.limit]
+    if not runs:
+        print(f"No runs found under {args.runs_dir}")
+        return 1
+    rows: List[List[str]] = []
+    for run in runs:
+        rows.append(
+            [
+                run.name,
+                run_status(run),
+                dt.datetime.fromtimestamp(run.stat().st_mtime).isoformat(timespec="seconds"),
+                str(run),
+            ]
+        )
+    print_table(rows, ["run_id", "status", "modified", "path"])
+    return 0
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    run_dir = resolve_run_dir(args.run_dir, args.runs_dir)
+    if not run_dir.exists():
+        print(f"run directory not found: {run_dir}")
+        return 1
+    print(f"Run: {run_dir}")
+    print(f"Status: {run_status(run_dir)}")
+
+    config = read_json(run_dir / "lms_run_config.json")
+    if config:
+        print(f"Created: {config.get('created_at_utc')}")
+        print(f"Endpoints: {', '.join(config.get('endpoints', []))}")
+
+    profile = load_profile(run_dir)
+    if profile:
+        host = profile.get("host", {})
+        mem = profile.get("memory", {})
+        mem_gib = None
+        if mem.get("mem_total_bytes") is not None:
+            mem_gib = round(float(mem["mem_total_bytes"]) / (1024 ** 3), 2)
+        print(f"Host: {host.get('hostname')} / {host.get('platform')}")
+        if mem_gib is not None:
+            print(f"RAM: {mem_gib} GiB")
+
+    rows = load_summary_rows(run_dir)
+    if rows:
+        table_rows = []
+        ranked = sorted(rows, key=score_summary_row, reverse=True)
+        for row in ranked[: args.limit]:
+            table_rows.append(
+                [
+                    row.get("host_name", ""),
+                    row.get("model_key", ""),
+                    row.get("ok_rate", ""),
+                    row.get("ttft_med", ""),
+                    row.get("tps_med", ""),
+                    f"{score_summary_row(row):.3f}",
+                ]
+            )
+        print("\nTop models")
+        print_table(table_rows, ["host", "model", "ok", "ttft", "tps", "score"])
+
+    route = choose_route(run_dir, args.task)
+    if route:
+        print("\nSelected route")
+        print(f"Model: {route.get('model_key')} @ {route.get('base_url')}")
+        print(f"Score: {route.get('score')} Grade: {route.get('grade')}")
+        print(f"Evidence: {route.get('evidence')}")
+    return 0
+
+
 def cmd_eval(args: argparse.Namespace) -> int:
-    cmd = [sys.executable, str(EVAL_SCRIPT)]
+    script = eval_script_path()
+    if not script.exists():
+        print(f"eval script missing: {script}")
+        return 1
+    cmd = [sys.executable, str(script)]
     if args.output_file:
         cmd += ["--output-file", args.output_file]
     if args.evaluators_json:
@@ -580,7 +856,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="lms",
         description="Simple CLI for agents to profile and benchmark LM Studio nodes.",
     )
-    parser.add_argument("--version", action="version", version="lms-agent-cli 0.1.0")
+    parser.add_argument("--version", action="version", version="lms-agent-cli 0.2.0")
     sub = parser.add_subparsers(dest="command", required=True)
 
     doctor = sub.add_parser("doctor", help="Check local scripts and endpoint reachability")
@@ -611,8 +887,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     quick = sub.add_parser("quick", help="One-command agent benchmark run with defaults")
     add_endpoint_arg(quick)
-    quick.add_argument("--output-dir", default="runs")
+    quick.add_argument("--output-dir", default=DEFAULT_RUNS_DIR)
     quick.add_argument("--run-id", default=None)
+    quick.add_argument("--suite-file", default=None, help="Benchmark suite manifest to copy into the run directory")
     quick.add_argument("--models", default=None, help="Comma-separated model IDs to include")
     quick.add_argument("--exclude-models", default=None, help="Comma-separated model IDs to exclude")
     quick.add_argument("--max-models", type=int, default=3, help="Limit models per endpoint for quick runs")
@@ -622,9 +899,30 @@ def build_parser() -> argparse.ArgumentParser:
     quick.add_argument("--strict", action="store_true", help="Fail immediately when profile or benchmark subprocess fails")
     quick.set_defaults(func=cmd_quick)
 
+    runs = sub.add_parser("runs", help="List known LMS run directories")
+    runs.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
+    runs.add_argument("--limit", type=int, default=20)
+    runs.set_defaults(func=cmd_runs)
+
+    show = sub.add_parser("show", help="Show a compact run summary")
+    show.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    show.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
+    show.add_argument("--task", default="general", help="Task family for route selection")
+    show.add_argument("--limit", type=int, default=10)
+    show.set_defaults(func=cmd_show)
+
     recommend = sub.add_parser("recommend", help="Generate capability matrix and agent recommendations from a run directory")
-    recommend.add_argument("run_dir")
+    recommend.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    recommend.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
     recommend.set_defaults(func=cmd_recommend)
+
+    route = sub.add_parser("route", help="Print/export the best route for an agent task")
+    route.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    route.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
+    route.add_argument("--task", default="general", help="Task family, e.g. general, coding, long_context")
+    route.add_argument("--json", action="store_true", help="Print JSON instead of YAML")
+    route.add_argument("--write", action="store_true", help="Write routing_rules.yaml and routing_rules.json into the run directory")
+    route.set_defaults(func=cmd_route)
 
     evaluate = sub.add_parser("eval", help="Run deterministic evaluators against an output file/stdin")
     evaluate.add_argument("--output-file", default=None)
