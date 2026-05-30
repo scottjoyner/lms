@@ -22,7 +22,7 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e .
+          python -m pip install -e '.[test]'
 
       - name: Compile modules
         run: |
@@ -61,3 +61,7 @@ jobs:
           lms-bench-endpoints add local http://127.0.0.1:1234/v1 --tags local,ci
           lms-bench-endpoints list
           lms-bench-endpoints list --json
+
+      - name: Run unit tests
+        run: |
+          pytest -q
