@@ -9,6 +9,7 @@ This is the active installed CLI entrypoint. It keeps the agent interface simple
   lms runs
   lms show latest
   lms route latest --task coding
+  lms compare runs/a runs/b
 
 The CLI intentionally requires no config file for the common path.
 """
@@ -29,7 +30,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 
 REPO_ROOT = Path(__file__).resolve().parent
@@ -177,6 +178,14 @@ def read_csv(path: Path) -> List[Dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def write_csv(path: Path, rows: List[Dict[str, Any]], fields: List[str]) -> None:
+    ensure_dir(path.parent)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows([{k: row.get(k, "") for k in fields} for row in rows])
+
+
 def float_or_zero(value: Any) -> float:
     try:
         return float(value)
@@ -229,7 +238,7 @@ def score_row(row: Dict[str, str]) -> float:
     tps = float_or_zero(row.get("tps_med"))
     ttft = float_or_zero(row.get("ttft_med"))
     quality = max(eval_score, eval_ok)
-    return ok * 0.35 + quality * 0.45 + min(tps / 40.0, 1.0) * 0.15 + (0.05 if ttft and ttft <= 8 else 0.0)
+    return round(ok * 0.35 + quality * 0.45 + min(tps / 40.0, 1.0) * 0.15 + (0.05 if ttft and ttft <= 8 else 0.0), 4)
 
 
 def discover_runs(runs_dir: Path) -> List[Path]:
@@ -290,19 +299,44 @@ def load_task_or_general_rows(run_dir: Path, task: Optional[str] = None) -> List
             filtered = [r for r in task_rows if r.get("task_family") == task]
             if filtered:
                 return filtered
+        if task == "general":
+            general_summary = read_csv(run_dir / "run_summary.csv")
+            for row in general_summary:
+                row.setdefault("task_family", "general")
+            return general_summary or task_rows
         return task_rows
     rows = read_csv(run_dir / "run_summary.csv")
-    if rows:
-        for row in rows:
-            row.setdefault("task_family", "general")
+    for row in rows:
+        row.setdefault("task_family", "general")
     return rows
+
+
+def reliable_context_by_route(run_dir: Path) -> Dict[Tuple[str, str, str], int]:
+    results = read_csv(run_dir / "run_results.csv")
+    best: Dict[Tuple[str, str, str], int] = {}
+    for row in results:
+        context = int(float_or_zero(row.get("context_tokens")))
+        if context <= 0:
+            continue
+        eval_ok = str(row.get("eval_ok", "")).lower() in {"true", "1", "yes"}
+        ok = str(row.get("ok", "")).lower() in {"true", "1", "yes"}
+        if ok and eval_ok:
+            key = (row.get("model_key", ""), row.get("task_family", ""), row.get("base_url", ""))
+            best[key] = max(best.get(key, 0), context)
+    return best
+
+
+def route_key(row: Dict[str, str]) -> Tuple[str, str, str, str]:
+    return (row.get("task_family", "general"), row.get("model_key", ""), row.get("base_url", ""), row.get("host_name", ""))
 
 
 def synthesize_recommendations(run_dir: Path) -> None:
     rows = load_task_or_general_rows(run_dir)
+    reliable_context = reliable_context_by_route(run_dir)
     capability_rows: List[Dict[str, Any]] = []
     for row in rows:
         score = score_row(row)
+        max_ctx = reliable_context.get((row.get("model_key", ""), row.get("task_family", "general"), row.get("base_url", "")), 0)
         capability_rows.append(
             {
                 "run_id": row.get("run_id", ""),
@@ -311,6 +345,7 @@ def synthesize_recommendations(run_dir: Path) -> None:
                 "base_url": row.get("base_url", ""),
                 "model_key": row.get("model_key", ""),
                 "context_tokens": row.get("context_tokens", ""),
+                "max_reliable_context_tokens": max_ctx or "",
                 "task_family": row.get("task_family", "general"),
                 "score": f"{score:.4f}",
                 "grade": grade(score),
@@ -319,15 +354,12 @@ def synthesize_recommendations(run_dir: Path) -> None:
                 "reliability_grade": grade(max(float_or_zero(row.get("ok_rate")), float_or_zero(row.get("eval_ok_rate")))),
                 "recommended_use": recommendation_text(score),
                 "avoid_use": avoid_text(score, row),
-                "evidence": f"task={row.get('task_family','general')}; ok_rate={row.get('ok_rate','')}; eval_ok_rate={row.get('eval_ok_rate','')}; eval_score={row.get('eval_score_avg','')}; ttft={row.get('ttft_med','')}; tps={row.get('tps_med','')}",
+                "evidence": f"task={row.get('task_family','general')}; ok_rate={row.get('ok_rate','')}; eval_ok_rate={row.get('eval_ok_rate','')}; eval_score={row.get('eval_score_avg','')}; ttft={row.get('ttft_med','')}; tps={row.get('tps_med','')}; max_ctx={max_ctx or ''}",
                 "notes": "Generated from task_summary.csv when available, otherwise run_summary.csv.",
             }
         )
-    fields = ["run_id", "host_name", "host_ip", "base_url", "model_key", "context_tokens", "task_family", "score", "grade", "latency_grade", "throughput_grade", "reliability_grade", "recommended_use", "avoid_use", "evidence", "notes"]
-    with (run_dir / "capability_matrix.csv").open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(capability_rows)
+    fields = ["run_id", "host_name", "host_ip", "base_url", "model_key", "context_tokens", "max_reliable_context_tokens", "task_family", "score", "grade", "latency_grade", "throughput_grade", "reliability_grade", "recommended_use", "avoid_use", "evidence", "notes"]
+    write_csv(run_dir / "capability_matrix.csv", capability_rows, fields)
 
     ranked = sorted(capability_rows, key=lambda r: float_or_zero(r.get("score")), reverse=True)
     lines = ["# LMS Agent Recommendations", "", f"- Generated UTC: `{utc_now_iso()}`", f"- Run directory: `{run_dir}`", ""]
@@ -336,18 +368,18 @@ def synthesize_recommendations(run_dir: Path) -> None:
         lines += ["## Machine synopsis", ""] + [f"- {r}" for r in profile.get("recommendations", [])] + [""]
     lines += ["## Task-specific routing", ""]
     if ranked:
-        lines += ["| Task | Host | Model | Score | Grade | Evidence |", "|---|---|---|---:|---|---|"]
-        for row in ranked[:30]:
-            lines.append(f"| `{row.get('task_family')}` | `{row.get('host_name')}` | `{row.get('model_key')}` | {row.get('score')} | {row.get('grade')} | {row.get('evidence')} |")
+        lines += ["| Task | Host | Model | Score | Grade | Max reliable context | Evidence |", "|---|---|---|---:|---|---:|---|"]
+        for row in ranked[:40]:
+            lines.append(f"| `{row.get('task_family')}` | `{row.get('host_name')}` | `{row.get('model_key')}` | {row.get('score')} | {row.get('grade')} | {row.get('max_reliable_context_tokens','')} | {row.get('evidence')} |")
     else:
         lines.append("No benchmark rows found. Run `lms quick` first.")
-    lines += ["", "## Operating rules", "", "- Prefer task-family routes over general routes.", "- Use `lms route latest --task coding` or another task family before assigning work.", "- Fall back to a stronger model when deterministic evaluator scores are low.", "- Treat routing as evidence-based guidance, not a guarantee.", ""]
+    lines += ["", "## Operating rules", "", "- Prefer task-family routes over general routes.", "- Use fallback routes when the preferred route is below threshold or unavailable.", "- Fall back to a stronger model when deterministic evaluator scores are low.", "- Treat routing as evidence-based guidance, not a guarantee.", ""]
     (run_dir / "agent_recommendations.md").write_text("\n".join(lines), encoding="utf-8")
     print(f"wrote {run_dir / 'capability_matrix.csv'}")
     print(f"wrote {run_dir / 'agent_recommendations.md'}")
 
 
-def choose_route(run_dir: Path, task: str) -> Optional[Dict[str, str]]:
+def sorted_routes(run_dir: Path, task: str) -> List[Dict[str, str]]:
     cap = read_csv(run_dir / "capability_matrix.csv")
     if not cap:
         synthesize_recommendations(run_dir)
@@ -356,30 +388,113 @@ def choose_route(run_dir: Path, task: str) -> Optional[Dict[str, str]]:
     if not rows and task != "general":
         rows = [r for r in cap if r.get("task_family") == "general"]
     rows = rows or cap
+    rows.sort(key=lambda r: float_or_zero(r.get("score")), reverse=True)
+    return rows
+
+
+def choose_route(run_dir: Path, task: str) -> Optional[Dict[str, str]]:
+    rows = sorted_routes(run_dir, task)
+    return rows[0] if rows else None
+
+
+def choose_route_with_fallback(run_dir: Path, task: str) -> Optional[Dict[str, Any]]:
+    rows = sorted_routes(run_dir, task)
     if not rows:
         return None
-    rows.sort(key=lambda r: float_or_zero(r.get("score")), reverse=True)
-    return rows[0]
+    preferred = rows[0]
+    fallback = None
+    for row in rows[1:]:
+        if row.get("model_key") != preferred.get("model_key") or row.get("base_url") != preferred.get("base_url"):
+            fallback = row
+            break
+    return {"preferred": preferred, "fallback": fallback, "task_family": task}
 
 
-def render_route_yaml(route: Dict[str, str]) -> str:
-    task = route.get("task_family", "general")
-    return "\n".join(
-        [
-            "routing:",
-            f"  {task}:",
-            f"    preferred_model: {json.dumps(route.get('model_key', ''))}",
-            f"    base_url: {json.dumps(route.get('base_url', ''))}",
-            f"    host_name: {json.dumps(route.get('host_name', ''))}",
-            f"    score: {json.dumps(route.get('score', ''))}",
-            f"    grade: {json.dumps(route.get('grade', ''))}",
-            f"    evidence: {json.dumps(route.get('evidence', ''))}",
-            f"    recommended_use: {json.dumps(route.get('recommended_use', ''))}",
-            f"    avoid_use: {json.dumps(route.get('avoid_use', ''))}",
-            "    source: lms capability_matrix.csv",
-            "",
+def render_route_yaml(route_bundle: Dict[str, Any]) -> str:
+    preferred = route_bundle.get("preferred") or route_bundle
+    fallback = route_bundle.get("fallback")
+    task = route_bundle.get("task_family") or preferred.get("task_family", "general")
+    lines = [
+        "routing:",
+        f"  {task}:",
+        f"    preferred_model: {json.dumps(preferred.get('model_key', ''))}",
+        f"    preferred_base_url: {json.dumps(preferred.get('base_url', ''))}",
+        f"    preferred_host_name: {json.dumps(preferred.get('host_name', ''))}",
+        f"    preferred_score: {json.dumps(preferred.get('score', ''))}",
+        f"    preferred_grade: {json.dumps(preferred.get('grade', ''))}",
+    ]
+    if fallback:
+        lines += [
+            f"    fallback_model: {json.dumps(fallback.get('model_key', ''))}",
+            f"    fallback_base_url: {json.dumps(fallback.get('base_url', ''))}",
+            f"    fallback_host_name: {json.dumps(fallback.get('host_name', ''))}",
+            f"    fallback_score: {json.dumps(fallback.get('score', ''))}",
+            f"    fallback_grade: {json.dumps(fallback.get('grade', ''))}",
         ]
-    )
+    else:
+        lines += ["    fallback_model: null", "    fallback_base_url: null"]
+    lines += [
+        f"    max_reliable_context_tokens: {json.dumps(preferred.get('max_reliable_context_tokens', ''))}",
+        f"    evidence: {json.dumps(preferred.get('evidence', ''))}",
+        f"    recommended_use: {json.dumps(preferred.get('recommended_use', ''))}",
+        f"    avoid_use: {json.dumps(preferred.get('avoid_use', ''))}",
+        "    source: lms capability_matrix.csv",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def compare_key(row: Dict[str, str]) -> Tuple[str, str, str]:
+    return (row.get("task_family", "general"), row.get("model_key", ""), row.get("base_url", ""))
+
+
+def compare_runs(run_a: Path, run_b: Path, out_dir: Optional[Path] = None) -> Tuple[Path, Path]:
+    if not (run_a / "capability_matrix.csv").exists():
+        synthesize_recommendations(run_a)
+    if not (run_b / "capability_matrix.csv").exists():
+        synthesize_recommendations(run_b)
+    rows_a = {compare_key(r): r for r in read_csv(run_a / "capability_matrix.csv")}
+    rows_b = {compare_key(r): r for r in read_csv(run_b / "capability_matrix.csv")}
+    keys = sorted(set(rows_a) | set(rows_b))
+    deltas: List[Dict[str, Any]] = []
+    for key in keys:
+        a = rows_a.get(key, {})
+        b = rows_b.get(key, {})
+        score_a = float_or_zero(a.get("score"))
+        score_b = float_or_zero(b.get("score"))
+        deltas.append(
+            {
+                "task_family": key[0],
+                "model_key": key[1],
+                "base_url": key[2],
+                "score_a": f"{score_a:.4f}" if a else "",
+                "score_b": f"{score_b:.4f}" if b else "",
+                "score_delta": f"{score_b - score_a:.4f}" if a and b else "",
+                "grade_a": a.get("grade", ""),
+                "grade_b": b.get("grade", ""),
+                "status": "added" if not a else "removed" if not b else "improved" if score_b > score_a else "regressed" if score_b < score_a else "unchanged",
+                "evidence_a": a.get("evidence", ""),
+                "evidence_b": b.get("evidence", ""),
+            }
+        )
+    out_dir = out_dir or (run_b / "comparisons" / safe_slug(run_a.name + "_vs_" + run_b.name))
+    ensure_dir(out_dir)
+    csv_path = out_dir / "compare_delta.csv"
+    md_path = out_dir / "compare_summary.md"
+    fields = ["task_family", "model_key", "base_url", "score_a", "score_b", "score_delta", "grade_a", "grade_b", "status", "evidence_a", "evidence_b"]
+    write_csv(csv_path, deltas, fields)
+
+    lines = ["# LMS Run Comparison", "", f"- Run A: `{run_a}`", f"- Run B: `{run_b}`", f"- Generated UTC: `{utc_now_iso()}`", ""]
+    lines += ["## Summary", ""]
+    for status in ["added", "removed", "improved", "regressed", "unchanged"]:
+        count = sum(1 for row in deltas if row["status"] == status)
+        lines.append(f"- {status}: {count}")
+    lines += ["", "## Largest changes", "", "| Status | Task | Model | Score A | Score B | Delta |", "|---|---|---|---:|---:|---:|"]
+    sortable = sorted(deltas, key=lambda r: abs(float_or_zero(r.get("score_delta"))), reverse=True)
+    for row in sortable[:30]:
+        lines.append(f"| {row['status']} | `{row['task_family']}` | `{row['model_key']}` | {row['score_a']} | {row['score_b']} | {row['score_delta']} |")
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    return csv_path, md_path
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -464,17 +579,7 @@ def cmd_quick(args: argparse.Namespace) -> int:
         return 0 if rows else 1
 
     bench = resolve_asset(BENCHMARK_SCRIPT)
-    bench_cmd = [
-        sys.executable,
-        str(bench),
-        "--inventory-csv", str(inventory),
-        "--cases-file", str(suite),
-        "--output-dir", str(run_dir),
-        "--sidecar-dir", str(run_dir / "sidecars"),
-        "--timeout", str(args.timeout),
-        "--repeats", str(args.repeats),
-        "--max-context-tokens", str(args.max_context_tokens),
-    ]
+    bench_cmd = [sys.executable, str(bench), "--inventory-csv", str(inventory), "--cases-file", str(suite), "--output-dir", str(run_dir), "--sidecar-dir", str(run_dir / "sidecars"), "--timeout", str(args.timeout), "--repeats", str(args.repeats), "--max-context-tokens", str(args.max_context_tokens)]
     if args.models:
         bench_cmd += ["--include-models", args.models]
     if args.exclude_models:
@@ -484,14 +589,13 @@ def cmd_quick(args: argparse.Namespace) -> int:
         return bench_code
 
     synthesize_recommendations(run_dir)
-    routes: Dict[str, Dict[str, str]] = {}
-    for task in ["general", "coding", "debugging", "agent_planning", "structured_output", "long_context", "repo_work", "operational_health"]:
-        route = choose_route(run_dir, task)
+    routes: Dict[str, Dict[str, Any]] = {}
+    for task in ["general", "coding", "debugging", "agent_planning", "structured_output", "long_context", "repo_work", "operational_health", "safety"]:
+        route = choose_route_with_fallback(run_dir, task)
         if route:
             routes[task] = route
     (run_dir / "routing_rules.json").write_text(json.dumps({"routing": routes}, indent=2), encoding="utf-8")
-    route_yaml = "".join(render_route_yaml(route) for route in routes.values())
-    (run_dir / "routing_rules.yaml").write_text(route_yaml, encoding="utf-8")
+    (run_dir / "routing_rules.yaml").write_text("".join(render_route_yaml(route) for route in routes.values()), encoding="utf-8")
     print(f"wrote {run_dir / 'routing_rules.yaml'}")
     print(f"Done. Read {run_dir / 'agent_recommendations.md'}")
     return bench_code
@@ -522,7 +626,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     if ranked:
         table = [[r.get("task_family", "general"), r.get("host_name", ""), r.get("model_key", ""), r.get("ok_rate", ""), r.get("eval_ok_rate", ""), r.get("eval_score_avg", ""), r.get("tps_med", ""), f"{score_row(r):.3f}"] for r in ranked]
         print_table(table, ["task", "host", "model", "ok", "eval_ok", "eval", "tps", "score"])
-    route = choose_route(run_dir, args.task)
+    route = choose_route_with_fallback(run_dir, args.task)
     if route:
         print("\nSelected route")
         print(render_route_yaml(route), end="")
@@ -537,7 +641,7 @@ def cmd_recommend(args: argparse.Namespace) -> int:
 
 def cmd_route(args: argparse.Namespace) -> int:
     run_dir = resolve_run_dir(args.run_dir, args.runs_dir)
-    route = choose_route(run_dir, args.task)
+    route = choose_route_with_fallback(run_dir, args.task)
     if not route:
         print("No route available. Run `lms quick` first.")
         return 1
@@ -548,6 +652,18 @@ def cmd_route(args: argparse.Namespace) -> int:
     if args.write:
         (run_dir / "routing_rules.json").write_text(json.dumps({"routing": {args.task: route}}, indent=2), encoding="utf-8")
         (run_dir / "routing_rules.yaml").write_text(render_route_yaml(route), encoding="utf-8")
+    return 0
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    run_a = resolve_run_dir(args.run_a, args.runs_dir)
+    run_b = resolve_run_dir(args.run_b, args.runs_dir)
+    out_dir = Path(args.output_dir) if args.output_dir else None
+    csv_path, md_path = compare_runs(run_a, run_b, out_dir)
+    print(f"wrote {csv_path}")
+    print(f"wrote {md_path}")
+    if args.show:
+        print(md_path.read_text(encoding="utf-8"))
     return 0
 
 
@@ -571,7 +687,7 @@ def add_endpoint_arg(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="lms", description="Agent CLI for profiling and benchmarking LM Studio nodes.")
-    parser.add_argument("--version", action="version", version="lms-agent-cli 0.3.0")
+    parser.add_argument("--version", action="version", version="lms-agent-cli 0.4.0")
     sub = parser.add_subparsers(dest="command", required=True)
 
     doctor = sub.add_parser("doctor", help="Check scripts and endpoint reachability")
@@ -632,13 +748,21 @@ def build_parser() -> argparse.ArgumentParser:
     recommend.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
     recommend.set_defaults(func=cmd_recommend)
 
-    route = sub.add_parser("route", help="Print/export selected route")
+    route = sub.add_parser("route", help="Print/export selected route with fallback")
     route.add_argument("run_dir", nargs="?", default="latest")
     route.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
     route.add_argument("--task", default="general")
     route.add_argument("--json", action="store_true")
     route.add_argument("--write", action="store_true")
     route.set_defaults(func=cmd_route)
+
+    compare = sub.add_parser("compare", help="Compare two LMS run directories")
+    compare.add_argument("run_a")
+    compare.add_argument("run_b")
+    compare.add_argument("--runs-dir", default=DEFAULT_RUNS_DIR)
+    compare.add_argument("--output-dir", default=None)
+    compare.add_argument("--show", action="store_true")
+    compare.set_defaults(func=cmd_compare)
 
     evaluate = sub.add_parser("eval", help="Run deterministic evaluators")
     evaluate.add_argument("--output-file", default=None)
