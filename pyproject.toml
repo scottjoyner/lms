@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.4.0"
+version = "0.5.0"
 description = "Agent-facing CLI for profiling and benchmarking local LM Studio nodes"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,11 +15,13 @@ dependencies = [
 ]
 
 [project.scripts]
-lms = "lms_cli:main"
+lms = "lms_cli_v2:main"
 
 [tool.setuptools]
 py-modules = [
+  "lms_cli_v2",
   "lms_cli",
+  "lms_model_fit",
   "lms",
   "lms_machine_profile",
   "lms_eval",
