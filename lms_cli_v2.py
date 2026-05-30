@@ -12,6 +12,7 @@ agent-facing command layer:
   lms-bench audit latest
   lms-bench export-skill latest
   lms-bench bundle latest
+  lms-bench history best --task coding
   lms-bench quick --from-registry --tags gpu
 
 The wrapper delegates most existing commands to `lms_cli.main`.
@@ -30,6 +31,7 @@ import lms_artifact_validate
 import lms_cli
 import lms_config
 import lms_endpoint_registry
+import lms_history
 import lms_manifest_validate
 import lms_model_fit
 import lms_run_audit
@@ -37,7 +39,7 @@ import lms_skill_export
 import lms_support_bundle
 
 
-VERSION = "lms-agent-cli 0.14.0"
+VERSION = "lms-agent-cli 0.15.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
@@ -51,6 +53,7 @@ MODULE_FILES = [
     "lms_agent_brief.py",
     "lms_model_fit.py",
     "lms_support_bundle.py",
+    "lms_history.py",
     "lms_machine_profile.py",
     "lms_eval.py",
     "benchmark_lmstudio_cross_machine_models.py",
@@ -259,6 +262,10 @@ def postprocess_latest_run(runs_dir: str) -> None:
     validation_rc = int(lms_artifact_validate.main(["run", str(run_dir)]))
     if validation_rc != 0:
         print("artifact validation reported schema issues")
+    print("\nIngesting run into local history index...")
+    history_rc = int(lms_history.main(["ingest", str(run_dir)]))
+    if history_rc != 0:
+        print("history ingest reported issues")
 
 
 def run_selftest() -> int:
@@ -305,6 +312,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_export_skill(args[1:])
     if args[0] == "bundle":
         return run_bundle(args[1:])
+    if args[0] == "history":
+        return int(lms_history.main(args[1:]))
     if args[0] in {"validate-run", "validate-artifacts"}:
         return run_validate_run(args[1:])
     if args[0] in {"validate-suite", "validate"}:
