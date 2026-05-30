@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Benchmark the same model across multiple machines/endpoints using an inventory CSV.
+Benchmark LM Studio OpenAI-compatible endpoints/models using an inventory CSV.
+
+This runner is manifest-aware and agent-skill oriented. It supports the legacy
+hard-coded benchmark cases, but prefers a cases manifest such as:
+
+  benchmarks/agent_skill_suite.v1.json
 
 Reads inventory rows with columns:
   - host_name, host_ip, endpoint_id, base_url, reachable, model_id, model_key
@@ -8,21 +13,19 @@ Reads inventory rows with columns:
 Emits:
   - run_results.csv
   - run_summary.csv
+  - task_summary.csv
   - config.json
   - Markdown sidecar reports per run
   - Full output text files for human evaluation
 
-Install:
-  pip install requests
-
 Run:
   python3 benchmark_lmstudio_cross_machine_models.py \
     --inventory-csv lmstudio_inventory.csv \
-    --output-dir bench_cross_csv \
-    --sidecar-dir sidecar_cross_md \
+    --cases-file benchmarks/agent_skill_suite.v1.json \
+    --output-dir runs/20260530T120000Z \
+    --sidecar-dir runs/20260530T120000Z/sidecars \
     --timeout 900 \
-    --repeats 1 \
-    --stream
+    --repeats 1
 """
 
 from __future__ import annotations
@@ -35,12 +38,18 @@ import os
 import re
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import requests
 from requests.exceptions import RequestException
+
+try:
+    from lms_eval import evaluate_output
+except Exception:  # pragma: no cover - defensive for partial installs
+    def evaluate_output(output_text: str, evaluator_specs: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+        return {"ok": True, "score": 1.0, "results": [], "failed": []}
 
 
 # ----------------------------
@@ -81,18 +90,62 @@ def parse_csv_set(raw: Optional[str]) -> Optional[set[str]]:
     return set(items) if items else None
 
 
+def ensure_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def median_or_blank(vals: Sequence[float]) -> str:
+    return f"{statistics.median(vals):.3f}" if vals else ""
+
+
+def mean_or_blank(vals: Sequence[float]) -> str:
+    return f"{statistics.mean(vals):.3f}" if vals else ""
+
+
+def float_or_none(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def ok_rate(items: Sequence[Dict[str, Any]]) -> float:
+    if not items:
+        return 0.0
+    return sum(1 for it in items if str(it.get("ok", "")).lower() in {"true", "1", "yes"} or it.get("ok") is True) / len(items)
+
+
+def eval_ok_rate(items: Sequence[Dict[str, Any]]) -> float:
+    eval_items = [it for it in items if it.get("eval_ok") not in (None, "")]
+    if not eval_items:
+        return 0.0
+    return sum(1 for it in eval_items if str(it.get("eval_ok", "")).lower() in {"true", "1", "yes"} or it.get("eval_ok") is True) / len(eval_items)
+
+
+def avg_eval_score(items: Sequence[Dict[str, Any]]) -> str:
+    vals = [float_or_none(it.get("eval_score")) for it in items]
+    real = [v for v in vals if v is not None]
+    return f"{statistics.mean(real):.4f}" if real else ""
+
+
 # ----------------------------
-# Benchmark Cases
+# Benchmark cases
 # ----------------------------
 @dataclass
 class BenchCase:
     case_key: str
-    task_type: str
+    task_family: str
     prompt: str
     system: str
     max_output_tokens: int
     temperature: float
-    notes: str
+    priority: str = "P1"
+    notes: str = ""
+    evaluators: List[Dict[str, Any]] = field(default_factory=list)
+    recommendation_signal: str = ""
+    context_tokens: Optional[int] = None
 
 
 def build_fibonacci_prompt(language: str) -> str:
@@ -105,29 +158,103 @@ def build_fibonacci_prompt(language: str) -> str:
     )
 
 
-LANG_CASES = [
-    ("c", "C programming language"),
-    ("rust", "Rust"),
-    ("python", "Python"),
-    ("javascript", "JavaScript"),
-]
-
 DEFAULT_CASES: List[BenchCase] = [
     BenchCase(
         case_key=f"code_fib_{key}",
-        task_type="code",
+        task_family="coding",
         system="You are a senior software engineer. Output code only.",
         prompt=build_fibonacci_prompt(language),
         max_output_tokens=1600,
         temperature=0.0,
-        notes=f"Fibonacci sequence (first 1000 numbers) in {language}.",
+        priority="P1",
+        notes=f"Fibonacci sequence in {language}.",
+        evaluators=[{"type": "no_markdown_fence"}],
+        recommendation_signal="small_code_generation",
     )
-    for key, language in LANG_CASES
+    for key, language in [
+        ("c", "C programming language"),
+        ("rust", "Rust"),
+        ("python", "Python"),
+        ("javascript", "JavaScript"),
+    ]
 ]
 
 
+def synthesize_context(target_tokens: int, spec: Dict[str, Any]) -> str:
+    """Create deterministic synthetic context with a needle sentence."""
+    needle = spec.get("needle_sentence") or "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+    style = spec.get("filler_style") or "technical_project_notes"
+    position = spec.get("needle_position") or "middle"
+    filler_sentence = (
+        "Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows."
+        if style == "technical_project_notes"
+        else "This is deterministic filler text used to measure long-context recall and instruction retention."
+    )
+    approx_chars = max(target_tokens * 4, len(needle) + 100)
+    filler_count = max(1, approx_chars // max(len(filler_sentence), 1))
+    filler = [f"{filler_sentence} Segment {i}." for i in range(filler_count)]
+    if position == "start":
+        parts = [needle] + filler
+    elif position == "end":
+        parts = filler + [needle]
+    else:
+        mid = len(filler) // 2
+        parts = filler[:mid] + [needle] + filler[mid:]
+    return "\n".join(parts)
+
+
+def render_prompt(case_def: Dict[str, Any], context_tokens: Optional[int]) -> str:
+    if case_def.get("prompt_template"):
+        synthetic_spec = case_def.get("synthetic_context") or {}
+        synthetic_context = synthesize_context(context_tokens or 4096, synthetic_spec)
+        return str(case_def["prompt_template"]).replace("{{synthetic_context}}", synthetic_context)
+    return str(case_def.get("prompt", ""))
+
+
+def load_cases_from_manifest(path: Path, max_context_tokens: int) -> Tuple[List[BenchCase], Dict[str, Any]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    cases: List[BenchCase] = []
+    for item in data.get("cases", []):
+        if not isinstance(item, dict):
+            continue
+        context_values: List[Optional[int]] = [None]
+        if item.get("prompt_template") and item.get("context_sweep_tokens"):
+            raw_values = [int(v) for v in item.get("context_sweep_tokens", [])]
+            context_values = [v for v in raw_values if v <= max_context_tokens]
+            if not context_values:
+                context_values = [min(raw_values) if raw_values else max_context_tokens]
+
+        for context_tokens in context_values:
+            base_key = str(item.get("case_key", "case"))
+            case_key = f"{base_key}_{context_tokens}tok" if context_tokens else base_key
+            cases.append(
+                BenchCase(
+                    case_key=case_key,
+                    task_family=str(item.get("task_family", "general")),
+                    priority=str(item.get("priority", "P1")),
+                    system=str(item.get("system", "You are a helpful assistant.")),
+                    prompt=render_prompt(item, context_tokens),
+                    max_output_tokens=int(item.get("max_output_tokens", 512)),
+                    temperature=float(item.get("temperature", 0.0)),
+                    notes=str(item.get("description") or item.get("notes") or ""),
+                    evaluators=list(item.get("evaluators") or []),
+                    recommendation_signal=str(item.get("recommendation_signal", "")),
+                    context_tokens=context_tokens,
+                )
+            )
+    if not cases:
+        raise ValueError(f"no runnable cases found in manifest: {path}")
+    return cases, data
+
+
+def load_cases(args: argparse.Namespace) -> Tuple[List[BenchCase], Dict[str, Any]]:
+    if args.cases_file:
+        return load_cases_from_manifest(Path(args.cases_file), max_context_tokens=args.max_context_tokens)
+    return DEFAULT_CASES, {"suite_id": "legacy_default_cases", "version": 0}
+
+
 # ----------------------------
-# OpenAI-compatible streaming parser
+# OpenAI-compatible completion callers
 # ----------------------------
 @dataclass
 class CompletionMetrics:
@@ -135,16 +262,13 @@ class CompletionMetrics:
     http_status: Optional[int]
     error: Optional[str]
     output_text: str
-
     wall_s: float
     ttft_s: Optional[float]
     load_s: Optional[float]
-
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
     total_tokens: Optional[int]
     tokens_per_sec: Optional[float]
-
     finish_reason: Optional[str]
     raw_last_chunk_json: Optional[Dict[str, Any]]
 
@@ -174,9 +298,8 @@ def call_chat_completions_stream(
     t0 = now_s()
     ttft = None
     output_parts: List[str] = []
-    last_chunk = None
+    last_chunk: Optional[Dict[str, Any]] = None
     finish_reason = None
-
     prompt_tokens = completion_tokens = total_tokens = None
 
     try:
@@ -184,21 +307,7 @@ def call_chat_completions_stream(
             http_status = resp.status_code
             if resp.status_code >= 400:
                 body = resp.text[:2000] if resp.text else ""
-                return CompletionMetrics(
-                    ok=False,
-                    http_status=http_status,
-                    error=f"HTTP {resp.status_code}: {body}",
-                    output_text="",
-                    wall_s=now_s() - t0,
-                    ttft_s=None,
-                    load_s=None,
-                    prompt_tokens=None,
-                    completion_tokens=None,
-                    total_tokens=None,
-                    tokens_per_sec=None,
-                    finish_reason=None,
-                    raw_last_chunk_json=None,
-                )
+                return CompletionMetrics(False, http_status, f"HTTP {resp.status_code}: {body}", "", now_s() - t0, None, None, None, None, None, None, None, None)
 
             for raw_line in resp.iter_lines(decode_unicode=True):
                 if not raw_line or not raw_line.startswith("data:"):
@@ -210,72 +319,30 @@ def call_chat_completions_stream(
                     chunk = json.loads(data)
                 except Exception:
                     continue
-
                 last_chunk = chunk
-
-                try:
-                    choice0 = (chunk.get("choices") or [None])[0] or {}
-                    delta = choice0.get("delta") or {}
-                    if ttft is None and (delta.get("content") is not None):
-                        ttft = now_s() - t0
-                    if delta.get("content"):
-                        output_parts.append(delta["content"])
-                    if choice0.get("finish_reason"):
-                        finish_reason = choice0.get("finish_reason")
-                except Exception:
-                    pass
-
+                choice0 = (chunk.get("choices") or [None])[0] or {}
+                delta = choice0.get("delta") or {}
+                if ttft is None and delta.get("content") is not None:
+                    ttft = now_s() - t0
+                if delta.get("content"):
+                    output_parts.append(delta["content"])
+                if choice0.get("finish_reason"):
+                    finish_reason = choice0.get("finish_reason")
                 if isinstance(chunk.get("usage"), dict):
-                    u = chunk["usage"]
-                    prompt_tokens = u.get("prompt_tokens")
-                    completion_tokens = u.get("completion_tokens")
-                    total_tokens = u.get("total_tokens")
+                    usage = chunk["usage"]
+                    prompt_tokens = usage.get("prompt_tokens")
+                    completion_tokens = usage.get("completion_tokens")
+                    total_tokens = usage.get("total_tokens")
 
-            out = "".join(output_parts)
+            output = "".join(output_parts)
             wall = now_s() - t0
+            if completion_tokens is None and output:
+                completion_tokens = approx_tokens_from_text(output)
+            tps = float(completion_tokens) / wall if completion_tokens and wall > 0 else None
+            return CompletionMetrics(True, http_status, None, output, wall, ttft, None, prompt_tokens, completion_tokens, total_tokens, tps, finish_reason, last_chunk)
 
-            tps = None
-            if completion_tokens is not None and wall > 0:
-                tps = float(completion_tokens) / wall
-            elif out:
-                est = approx_tokens_from_text(out)
-                if wall > 0:
-                    completion_tokens = est
-                    total_tokens = (prompt_tokens or 0) + est if prompt_tokens is not None else None
-                    tps = est / wall
-
-            return CompletionMetrics(
-                ok=True,
-                http_status=http_status,
-                error=None,
-                output_text=out,
-                wall_s=wall,
-                ttft_s=ttft,
-                load_s=None,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=total_tokens,
-                tokens_per_sec=tps,
-                finish_reason=finish_reason,
-                raw_last_chunk_json=last_chunk if isinstance(last_chunk, dict) else None,
-            )
-
-    except RequestException as e:
-        return CompletionMetrics(
-            ok=False,
-            http_status=None,
-            error=str(e),
-            output_text="",
-            wall_s=now_s() - t0,
-            ttft_s=None,
-            load_s=None,
-            prompt_tokens=None,
-            completion_tokens=None,
-            total_tokens=None,
-            tokens_per_sec=None,
-            finish_reason=None,
-            raw_last_chunk_json=None,
-        )
+    except RequestException as exc:
+        return CompletionMetrics(False, None, str(exc), "", now_s() - t0, None, None, None, None, None, None, None, None)
 
 
 def call_chat_completions_once(
@@ -303,214 +370,46 @@ def call_chat_completions_once(
     t0 = now_s()
     try:
         resp = requests.post(url, headers=headers, json=payload, timeout=timeout_s)
-        http_status = resp.status_code
         wall = now_s() - t0
         if resp.status_code >= 400:
             body = resp.text[:2000] if resp.text else ""
-            return CompletionMetrics(
-                ok=False,
-                http_status=http_status,
-                error=f"HTTP {resp.status_code}: {body}",
-                output_text="",
-                wall_s=wall,
-                ttft_s=None,
-                load_s=None,
-                prompt_tokens=None,
-                completion_tokens=None,
-                total_tokens=None,
-                tokens_per_sec=None,
-                finish_reason=None,
-                raw_last_chunk_json=None,
-            )
-
-        j = safe_json(resp) or {}
-        text = ""
-        finish_reason = None
-        try:
-            ch0 = (j.get("choices") or [None])[0] or {}
-            finish_reason = ch0.get("finish_reason")
-            msg = ch0.get("message") or {}
-            text = msg.get("content") or ""
-        except Exception:
-            pass
-
-        usage = j.get("usage") if isinstance(j.get("usage"), dict) else {}
+            return CompletionMetrics(False, resp.status_code, f"HTTP {resp.status_code}: {body}", "", wall, None, None, None, None, None, None, None, None)
+        data = safe_json(resp) or {}
+        choice0 = (data.get("choices") or [None])[0] or {}
+        msg = choice0.get("message") or {}
+        text = msg.get("content") or ""
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         prompt_tokens = usage.get("prompt_tokens")
-        completion_tokens = usage.get("completion_tokens")
+        completion_tokens = usage.get("completion_tokens") or approx_tokens_from_text(text)
         total_tokens = usage.get("total_tokens")
-
-        if completion_tokens is None and text:
-            completion_tokens = approx_tokens_from_text(text)
-        tps = (float(completion_tokens) / wall) if (completion_tokens and wall > 0) else None
-
-        return CompletionMetrics(
-            ok=True,
-            http_status=http_status,
-            error=None,
-            output_text=text,
-            wall_s=wall,
-            ttft_s=None,
-            load_s=None,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            tokens_per_sec=tps,
-            finish_reason=finish_reason,
-            raw_last_chunk_json=j,
-        )
-
-    except RequestException as e:
-        return CompletionMetrics(
-            ok=False,
-            http_status=None,
-            error=str(e),
-            output_text="",
-            wall_s=now_s() - t0,
-            ttft_s=None,
-            load_s=None,
-            prompt_tokens=None,
-            completion_tokens=None,
-            total_tokens=None,
-            tokens_per_sec=None,
-            finish_reason=None,
-            raw_last_chunk_json=None,
-        )
+        tps = float(completion_tokens) / wall if completion_tokens and wall > 0 else None
+        return CompletionMetrics(True, resp.status_code, None, text, wall, None, None, prompt_tokens, completion_tokens, total_tokens, tps, choice0.get("finish_reason"), data)
+    except RequestException as exc:
+        return CompletionMetrics(False, None, str(exc), "", now_s() - t0, None, None, None, None, None, None, None, None)
 
 
 # ----------------------------
-# Sidecar Markdown
+# Inventory
 # ----------------------------
-def write_run_index_md(
-    run_dir: Path,
-    run_id: int,
-    started_at: str,
-    config: Dict[str, Any],
-    summary_rows: List[Dict[str, Any]],
-) -> None:
-    run_dir.mkdir(parents=True, exist_ok=True)
-    p = run_dir / "INDEX.md"
-    lines = []
-    lines.append(f"# Benchmark Run `{run_id}`")
-    lines.append("")
-    lines.append(f"- Started (UTC): `{started_at}`")
-    lines.append(f"- Generated (UTC): `{utc_now_iso()}`")
-    lines.append("")
-    lines.append("## Config")
-    lines.append("")
-    lines.append("```json")
-    lines.append(json.dumps(config, indent=2))
-    lines.append("```")
-    lines.append("")
-    lines.append("## Summary (per endpoint/model)")
-    lines.append("")
-    lines.append("| Host | Endpoint | Model | Load s | Median TTFT s | Median TPS | OK Rate | Status |")
-    lines.append("|---|---|---|---:|---:|---:|---:|---|")
-
-    for r in summary_rows:
-        ok_rate_val = r.get("ok_rate")
-        if isinstance(ok_rate_val, str):
-            try:
-                ok_rate_val = float(ok_rate_val)
-            except ValueError:
-                ok_rate_val = None
-        if ok_rate_val is None:
-            ok_rate_display = ""
-            status = "❌"
-        else:
-            ok_rate_display = f"{ok_rate_val:.2f}"
-            status = "✅" if ok_rate_val >= 0.8 else "⚠️" if ok_rate_val > 0 else "❌"
-        lines.append(
-            f"| `{r['host_name']}` | `{r['base_url']}` | `{r['model_key']}` | "
-            f"{r.get('load_s','')} | {r.get('ttft_med','')} | {r.get('tps_med','')} | "
-            f"{ok_rate_display} | {status} |"
-        )
-
-    lines.append("")
-    p.write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_model_report_md(
-    run_dir: Path,
-    host_name: str,
-    host_ip: str,
-    base_url: str,
-    model_key: str,
-    items: List[Dict[str, Any]],
-) -> None:
-    fname = f"MODEL__{slugify_filename(host_name)}__{slugify_filename(model_key)}.md"
-    p = run_dir / fname
-
-    lines = []
-    lines.append(f"# Model Report: `{model_key}`")
-    lines.append("")
-    lines.append("## Endpoint")
-    lines.append("")
-    lines.append(f"- Host: `{host_name}` (`{host_ip}`)")
-    lines.append(f"- Base URL: `{base_url}`")
-    lines.append("")
-    lines.append("## Results")
-    lines.append("")
-    lines.append("| Case | Phase | OK | Wall s | TTFT s | TPS | Output File | Error |")
-    lines.append("|---|---|:---:|---:|---:|---:|---|---|")
-
-    for it in items:
-        lines.append(
-            f"| `{it['case_key']}` | `{it['phase']}` | {'✅' if it['ok'] else '❌'} | "
-            f"{it.get('wall_s','')} | {it.get('ttft_s','')} | {it.get('tokens_per_sec','')} | "
-            f"{it.get('output_file','')} | {(it.get('error') or '')[:80]} |"
-        )
-
-    lines.append("")
-    lines.append("## Sample Outputs (truncated)")
-    lines.append("")
-    for it in items:
-        if it.get("phase") != "run":
-            continue
-        out = (it.get("output_text") or "").strip()
-        if not out:
-            continue
-        lines.append(f"### {it['case_key']} (repeat {it['repeat_index']})")
-        lines.append("")
-        lines.append("```text")
-        lines.append(out[:2000] + ("\n... (truncated)\n" if len(out) > 2000 else ""))
-        lines.append("```")
-        lines.append("")
-
-    p.write_text("\n".join(lines), encoding="utf-8")
-
-
-# ----------------------------
-# Aggregation
-# ----------------------------
-def median_or_blank(vals: List[float]) -> str:
-    vals = [v for v in vals if v is not None]
-    if not vals:
-        return ""
-    return f"{statistics.median(vals):.3f}"
-
-
-def mean_or_blank(vals: List[float]) -> str:
-    vals = [v for v in vals if v is not None]
-    if not vals:
-        return ""
-    return f"{statistics.mean(vals):.3f}"
-
-
-def ok_rate(items: List[Dict[str, Any]]) -> float:
-    if not items:
-        return 0.0
-    return sum(1 for it in items if it["ok"]) / len(items)
-
-
-def load_inventory_rows(csv_path: Path) -> List[Dict[str, Any]]:
-    if not csv_path.exists():
-        raise FileNotFoundError(f"inventory csv not found: {csv_path}")
-    rows = []
-    with csv_path.open(newline="", encoding="utf-8") as f:
+def load_inventory_rows(path: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with path.open("r", encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            rows.append(row)
+            rows.append(dict(row))
     return rows
+
+
+def endpoint_matches(row: Dict[str, Any], tokens: Optional[set[str]]) -> bool:
+    if not tokens:
+        return True
+    values = {
+        str(row.get("endpoint_id", "")),
+        str(row.get("base_url", "")),
+        str(row.get("host_name", "")),
+        str(row.get("host_ip", "")),
+    }
+    return bool(values.intersection(tokens))
 
 
 def filter_inventory_rows(
@@ -521,43 +420,107 @@ def filter_inventory_rows(
     exclude_models: Optional[set[str]],
     only_reachable: bool,
 ) -> List[Dict[str, Any]]:
-    def endpoint_matches(token_set: Optional[set[str]], row: Dict[str, Any]) -> bool:
-        if not token_set:
-            return True
-        endpoint_id = str(row.get("endpoint_id", ""))
-        base_url = row.get("base_url", "")
-        host_name = row.get("host_name", "")
-        return any(tok in (endpoint_id, base_url, host_name) for tok in token_set)
-
-    filtered = []
-    for r in rows:
-        reachable = str(r.get("reachable", "")).lower() in ("1", "true", "yes", "y")
-        if only_reachable and not reachable:
+    filtered: List[Dict[str, Any]] = []
+    for row in rows:
+        if only_reachable and str(row.get("reachable", "")).lower() not in {"1", "true", "yes"}:
             continue
-        if include_endpoints and not endpoint_matches(include_endpoints, r):
+        if include_endpoints and not endpoint_matches(row, include_endpoints):
             continue
-        if exclude_endpoints and endpoint_matches(exclude_endpoints, r):
+        if exclude_endpoints and endpoint_matches(row, exclude_endpoints):
             continue
-        if include_models and r.get("model_key") not in include_models:
+        if include_models and row.get("model_key") not in include_models:
             continue
-        if exclude_models and r.get("model_key") in exclude_models:
+        if exclude_models and row.get("model_key") in exclude_models:
             continue
-        filtered.append(r)
+        filtered.append(row)
     return filtered
 
 
-def ensure_dir(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True)
+# ----------------------------
+# Reports
+# ----------------------------
+def write_run_index_md(run_dir: Path, run_id: int, started_at: str, config: Dict[str, Any], summary_rows: List[Dict[str, Any]], task_rows: List[Dict[str, Any]]) -> None:
+    ensure_dir(run_dir)
+    lines: List[str] = []
+    lines.append(f"# Benchmark Run `{run_id}`")
+    lines.append("")
+    lines.append(f"- Started UTC: `{started_at}`")
+    lines.append(f"- Generated UTC: `{utc_now_iso()}`")
+    lines.append(f"- Suite: `{config.get('suite_id')}`")
+    lines.append("")
+    lines.append("## Config")
+    lines.append("")
+    lines.append("```json")
+    lines.append(json.dumps(config, indent=2))
+    lines.append("```")
+    lines.append("")
+    lines.append("## Model summary")
+    lines.append("")
+    lines.append("| Host | Endpoint | Model | Load s | Median TTFT s | Median TPS | OK Rate | Eval OK Rate | Eval Score | Status |")
+    lines.append("|---|---|---|---:|---:|---:|---:|---:|---:|---|")
+    for r in summary_rows:
+        ok_val = float_or_none(r.get("ok_rate")) or 0.0
+        eval_val = float_or_none(r.get("eval_ok_rate")) or 0.0
+        status = "✅" if ok_val >= 0.8 and eval_val >= 0.8 else "⚠️" if ok_val > 0 else "❌"
+        lines.append(
+            f"| `{r.get('host_name','')}` | `{r.get('base_url','')}` | `{r.get('model_key','')}` | "
+            f"{r.get('load_s','')} | {r.get('ttft_med','')} | {r.get('tps_med','')} | "
+            f"{r.get('ok_rate','')} | {r.get('eval_ok_rate','')} | {r.get('eval_score_avg','')} | {status} |"
+        )
+    if task_rows:
+        lines.append("")
+        lines.append("## Task-family summary")
+        lines.append("")
+        lines.append("| Task family | Host | Model | OK Rate | Eval OK Rate | Eval Score | Median TPS |")
+        lines.append("|---|---|---|---:|---:|---:|---:|")
+        for r in task_rows:
+            lines.append(
+                f"| `{r.get('task_family','')}` | `{r.get('host_name','')}` | `{r.get('model_key','')}` | "
+                f"{r.get('ok_rate','')} | {r.get('eval_ok_rate','')} | {r.get('eval_score_avg','')} | {r.get('tps_med','')} |"
+            )
+    lines.append("")
+    (run_dir / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_model_report_md(run_dir: Path, host_name: str, host_ip: str, base_url: str, model_key: str, items: List[Dict[str, Any]]) -> None:
+    ensure_dir(run_dir)
+    path = run_dir / f"MODEL__{slugify_filename(host_name)}__{slugify_filename(model_key)}.md"
+    lines: List[str] = []
+    lines.append(f"# Model Report: `{model_key}`")
+    lines.append("")
+    lines.append(f"- Host: `{host_name}` (`{host_ip}`)")
+    lines.append(f"- Base URL: `{base_url}`")
+    lines.append("")
+    lines.append("| Case | Task | Phase | OK | Eval OK | Eval Score | Wall s | TTFT s | TPS | Output | Error |")
+    lines.append("|---|---|---|:---:|:---:|---:|---:|---:|---:|---|---|")
+    for it in items:
+        lines.append(
+            f"| `{it.get('case_key','')}` | `{it.get('task_family','')}` | `{it.get('phase','')}` | "
+            f"{'✅' if str(it.get('ok')).lower() in {'true','1'} or it.get('ok') is True else '❌'} | "
+            f"{'✅' if str(it.get('eval_ok')).lower() in {'true','1'} or it.get('eval_ok') is True else '❌' if it.get('phase') == 'run' else ''} | "
+            f"{it.get('eval_score','')} | {it.get('wall_s','')} | {it.get('ttft_s','')} | {it.get('tokens_per_sec','')} | "
+            f"`{it.get('output_file','')}` | `{str(it.get('error') or '')[:120]}` |"
+        )
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_csv(path: Path, rows: List[Dict[str, Any]], fields: List[str]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fields})
 
 
 # ----------------------------
-# Main
+# Main run
 # ----------------------------
-def main() -> int:
-    ap = argparse.ArgumentParser(description="Cross-machine benchmark for the same models.")
+def build_parser() -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(description="Cross-machine LM Studio model benchmark runner.")
     ap.add_argument("--inventory-csv", required=True, help="Inventory CSV from LM Studio discovery")
+    ap.add_argument("--cases-file", default=None, help="Benchmark suite manifest JSON")
     ap.add_argument("--output-dir", required=True, help="Directory for CSV artifacts")
-    ap.add_argument("--sidecar-dir", required=True, help="Directory for Markdown sidecars + outputs")
+    ap.add_argument("--sidecar-dir", required=True, help="Directory for Markdown sidecars + raw outputs")
     ap.add_argument("--timeout", type=float, default=900, help="Request timeout seconds")
     ap.add_argument("--repeats", type=int, default=1, help="Repeats per case")
     ap.add_argument("--stream", action="store_true", default=True, help="Use streaming for TTFT")
@@ -567,8 +530,80 @@ def main() -> int:
     ap.add_argument("--exclude-endpoints", default=None, help="Comma-separated endpoint IDs/base URLs/host names")
     ap.add_argument("--include-models", default=None, help="Comma-separated model keys to include")
     ap.add_argument("--exclude-models", default=None, help="Comma-separated model keys to exclude")
-    args = ap.parse_args()
+    ap.add_argument("--max-context-tokens", type=int, default=8192, help="Cap manifest context-sweep cases for quick local runs")
+    return ap
 
+
+def result_row_base(run_id: int, phase: str, row: Dict[str, Any], case_key: str, task_family: str, priority: str, repeat_index: int) -> Dict[str, Any]:
+    return {
+        "run_id": run_id,
+        "created_at_utc": utc_now_iso(),
+        "phase": phase,
+        "host_name": row.get("host_name", ""),
+        "host_ip": row.get("host_ip", ""),
+        "endpoint_id": row.get("endpoint_id", ""),
+        "base_url": str(row.get("base_url", "")).rstrip("/"),
+        "model_id": row.get("model_id", ""),
+        "model_key": row.get("model_key", ""),
+        "case_key": case_key,
+        "task_family": task_family,
+        "priority": priority,
+        "repeat_index": repeat_index,
+    }
+
+
+def attach_metrics(base: Dict[str, Any], met: CompletionMetrics) -> Dict[str, Any]:
+    base.update(
+        {
+            "ok": met.ok,
+            "http_status": met.http_status,
+            "error": met.error,
+            "wall_s": f"{met.wall_s:.3f}",
+            "ttft_s": f"{met.ttft_s:.3f}" if met.ttft_s is not None else "",
+            "load_s": f"{met.load_s:.3f}" if met.load_s is not None else "",
+            "prompt_tokens": met.prompt_tokens,
+            "completion_tokens": met.completion_tokens,
+            "total_tokens": met.total_tokens,
+            "tokens_per_sec": f"{met.tokens_per_sec:.3f}" if met.tokens_per_sec else "",
+            "finish_reason": met.finish_reason,
+            "output_text": met.output_text,
+        }
+    )
+    return base
+
+
+def summarize(results: List[Dict[str, Any]], group_fields: Sequence[str], run_id: int) -> List[Dict[str, Any]]:
+    grouped: Dict[Tuple[Any, ...], List[Dict[str, Any]]] = {}
+    for row in results:
+        key = tuple(row.get(field, "") for field in group_fields)
+        grouped.setdefault(key, []).append(row)
+
+    rows: List[Dict[str, Any]] = []
+    for key, items in grouped.items():
+        out = {field: value for field, value in zip(group_fields, key)}
+        run_items = [it for it in items if it.get("phase") == "run"]
+        load_items = [it for it in items if it.get("phase") == "load"]
+        ttft_vals = [v for v in (float_or_none(it.get("ttft_s")) for it in run_items) if v is not None]
+        tps_vals = [v for v in (float_or_none(it.get("tokens_per_sec")) for it in run_items) if v is not None]
+        load_vals = [v for v in (float_or_none(it.get("load_s")) for it in load_items) if v is not None]
+        out.update(
+            {
+                "run_id": run_id,
+                "load_s": mean_or_blank(load_vals),
+                "ttft_med": median_or_blank(ttft_vals),
+                "tps_med": median_or_blank(tps_vals),
+                "ok_rate": f"{ok_rate(run_items):.2f}",
+                "eval_ok_rate": f"{eval_ok_rate(run_items):.2f}" if run_items else "",
+                "eval_score_avg": avg_eval_score(run_items),
+                "cases": len(run_items),
+            }
+        )
+        rows.append(out)
+    return rows
+
+
+def main() -> int:
+    args = build_parser().parse_args()
     api_key = os.getenv(args.api_key_env)
 
     include_endpoints = parse_csv_set(args.include_endpoints)
@@ -579,20 +614,18 @@ def main() -> int:
     inventory_csv = Path(args.inventory_csv)
     output_dir = Path(args.output_dir)
     sidecar_dir = Path(args.sidecar_dir)
-
     ensure_dir(output_dir)
     ensure_dir(sidecar_dir)
 
-    rows = load_inventory_rows(inventory_csv)
+    cases, suite = load_cases(args)
     rows = filter_inventory_rows(
-        rows,
+        load_inventory_rows(inventory_csv),
         include_endpoints=include_endpoints,
         exclude_endpoints=exclude_endpoints,
         include_models=include_models,
         exclude_models=exclude_models,
         only_reachable=args.only_reachable,
     )
-
     if not rows:
         print("No inventory rows matched filters; exiting.")
         return 1
@@ -609,10 +642,15 @@ def main() -> int:
         "inventory_csv": str(inventory_csv),
         "output_dir": str(output_dir),
         "sidecar_dir": str(sidecar_dir),
+        "cases_file": args.cases_file,
+        "suite_id": suite.get("suite_id", "legacy_default_cases"),
+        "suite_version": suite.get("version"),
         "timeout_s": args.timeout,
         "repeats": args.repeats,
         "stream": args.stream,
-        "cases": [case.__dict__ for case in DEFAULT_CASES],
+        "max_context_tokens": args.max_context_tokens,
+        "case_count": len(cases),
+        "cases": [case.__dict__ for case in cases],
         "filters": {
             "only_reachable": args.only_reachable,
             "include_endpoints": sorted(include_endpoints) if include_endpoints else None,
@@ -624,118 +662,75 @@ def main() -> int:
 
     results: List[Dict[str, Any]] = []
 
-    for row in rows:
-        host_name = row.get("host_name", "")
-        host_ip = row.get("host_ip", "")
-        base_url = row.get("base_url", "").rstrip("/")
-        model_key = row.get("model_key", "")
+    for inv in rows:
+        host_name = inv.get("host_name", "")
+        host_ip = inv.get("host_ip", "")
+        base_url = str(inv.get("base_url", "")).rstrip("/")
+        model_key = inv.get("model_key", "")
 
-        load_prompt = "Respond with the single word READY."
         load_messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": load_prompt},
+            {"role": "user", "content": "Respond with the single word READY."},
         ]
-
-        load_met = call_chat_completions_once(
-            base_url=base_url,
-            model=model_key,
-            messages=load_messages,
-            max_tokens=8,
-            temperature=0.0,
-            timeout_s=args.timeout,
-            api_key=api_key,
-        )
+        load_met = call_chat_completions_once(base_url, model_key, load_messages, 8, 0.0, args.timeout, api_key)
         load_met.load_s = load_met.wall_s
-
         results.append(
-            {
-                "run_id": run_id,
-                "phase": "load",
-                "host_name": host_name,
-                "host_ip": host_ip,
-                "base_url": base_url,
-                "model_key": model_key,
-                "case_key": "load_probe",
-                "repeat_index": 0,
-                "ok": load_met.ok,
-                "http_status": load_met.http_status,
-                "error": load_met.error,
-                "wall_s": f"{load_met.wall_s:.3f}",
-                "ttft_s": "",
-                "load_s": f"{load_met.load_s:.3f}",
-                "prompt_tokens": load_met.prompt_tokens,
-                "completion_tokens": load_met.completion_tokens,
-                "total_tokens": load_met.total_tokens,
-                "tokens_per_sec": f"{load_met.tokens_per_sec:.3f}" if load_met.tokens_per_sec else "",
-                "finish_reason": load_met.finish_reason,
-                "output_text": load_met.output_text,
-                "output_file": "",
-            }
+            attach_metrics(
+                result_row_base(run_id, "load", inv, "load_probe", "operational_health", "P0", 0),
+                load_met,
+            )
         )
 
-        for case in DEFAULT_CASES:
+        for case in cases:
             messages = [
                 {"role": "system", "content": case.system},
                 {"role": "user", "content": case.prompt},
             ]
             for repeat in range(args.repeats):
-                met = call_chat_completions_stream(
-                    base_url=base_url,
-                    model=model_key,
-                    messages=messages,
-                    max_tokens=case.max_output_tokens,
-                    temperature=case.temperature,
-                    timeout_s=args.timeout,
-                    api_key=api_key,
-                )
+                met = call_chat_completions_stream(base_url, model_key, messages, case.max_output_tokens, case.temperature, args.timeout, api_key)
                 output_file = ""
                 if met.output_text:
                     output_name = (
                         f"{slugify_filename(host_name)}__{slugify_filename(model_key)}__"
-                        f"{case.case_key}__r{repeat + 1}.txt"
+                        f"{slugify_filename(case.case_key)}__r{repeat + 1}.txt"
                     )
                     output_path = outputs_dir / output_name
                     output_path.write_text(met.output_text, encoding="utf-8")
                     output_file = str(output_path.relative_to(run_dir))
 
-                results.append(
+                eval_result = evaluate_output(met.output_text, case.evaluators) if met.ok else {"ok": False, "score": 0.0, "results": [], "failed": [{"message": met.error or "completion failed"}]}
+                row = attach_metrics(
+                    result_row_base(run_id, "run", inv, case.case_key, case.task_family, case.priority, repeat + 1),
+                    met,
+                )
+                row.update(
                     {
-                        "run_id": run_id,
-                        "phase": "run",
-                        "host_name": host_name,
-                        "host_ip": host_ip,
-                        "base_url": base_url,
-                        "model_key": model_key,
-                        "case_key": case.case_key,
-                        "repeat_index": repeat + 1,
-                        "ok": met.ok,
-                        "http_status": met.http_status,
-                        "error": met.error,
-                        "wall_s": f"{met.wall_s:.3f}",
-                        "ttft_s": f"{met.ttft_s:.3f}" if met.ttft_s is not None else "",
-                        "load_s": "",
-                        "prompt_tokens": met.prompt_tokens,
-                        "completion_tokens": met.completion_tokens,
-                        "total_tokens": met.total_tokens,
-                        "tokens_per_sec": f"{met.tokens_per_sec:.3f}" if met.tokens_per_sec else "",
-                        "finish_reason": met.finish_reason,
-                        "output_text": met.output_text,
+                        "context_tokens": case.context_tokens or "",
+                        "recommendation_signal": case.recommendation_signal,
+                        "eval_ok": bool(eval_result.get("ok")),
+                        "eval_score": eval_result.get("score"),
+                        "eval_result_json": json.dumps(eval_result, sort_keys=True),
+                        "eval_failed_json": json.dumps(eval_result.get("failed", []), sort_keys=True),
                         "output_file": output_file,
                     }
                 )
-
-    output_csv = output_dir / "run_results.csv"
-    summary_csv = output_dir / "run_summary.csv"
-    config_json = output_dir / "config.json"
+                results.append(row)
 
     results_fields = [
         "run_id",
+        "created_at_utc",
         "phase",
         "host_name",
         "host_ip",
+        "endpoint_id",
         "base_url",
+        "model_id",
         "model_key",
         "case_key",
+        "task_family",
+        "priority",
+        "context_tokens",
+        "recommendation_signal",
         "repeat_index",
         "ok",
         "http_status",
@@ -748,88 +743,35 @@ def main() -> int:
         "total_tokens",
         "tokens_per_sec",
         "finish_reason",
+        "eval_ok",
+        "eval_score",
+        "eval_failed_json",
+        "eval_result_json",
         "output_file",
     ]
+    write_csv(output_dir / "run_results.csv", results, results_fields)
+    (output_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
-    with output_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=results_fields)
-        writer.writeheader()
-        for r in results:
-            row = {k: r.get(k, "") for k in results_fields}
-            writer.writerow(row)
+    summary_rows = summarize(results, ["host_name", "host_ip", "base_url", "model_key"], run_id)
+    summary_fields = ["run_id", "host_name", "host_ip", "base_url", "model_key", "load_s", "ttft_med", "tps_med", "ok_rate", "eval_ok_rate", "eval_score_avg", "cases"]
+    write_csv(output_dir / "run_summary.csv", summary_rows, summary_fields)
 
-    config_json.write_text(json.dumps(config, indent=2), encoding="utf-8")
-
-    summary_rows: List[Dict[str, Any]] = []
-    summary_fields = [
-        "run_id",
-        "host_name",
-        "host_ip",
-        "base_url",
-        "model_key",
-        "load_s",
-        "ttft_med",
-        "tps_med",
-        "ok_rate",
-    ]
+    task_rows = summarize(results, ["host_name", "host_ip", "base_url", "model_key", "task_family"], run_id)
+    task_fields = ["run_id", "host_name", "host_ip", "base_url", "model_key", "task_family", "load_s", "ttft_med", "tps_med", "ok_rate", "eval_ok_rate", "eval_score_avg", "cases"]
+    write_csv(output_dir / "task_summary.csv", task_rows, task_fields)
 
     grouped: Dict[Tuple[str, str, str, str], List[Dict[str, Any]]] = {}
     for r in results:
-        key = (r["host_name"], r["host_ip"], r["base_url"], r["model_key"])
+        key = (r.get("host_name", ""), r.get("host_ip", ""), r.get("base_url", ""), r.get("model_key", ""))
         grouped.setdefault(key, []).append(r)
-
     for (host_name, host_ip, base_url, model_key), items in grouped.items():
-        run_items = [it for it in items if it["phase"] == "run"]
-        load_items = [it for it in items if it["phase"] == "load"]
-        load_vals = [
-            float(it["load_s"]) for it in load_items if it.get("load_s")
-        ]
-        ttft_vals = [
-            float(it["ttft_s"]) for it in run_items if it.get("ttft_s")
-        ]
-        tps_vals = [
-            float(it["tokens_per_sec"]) for it in run_items if it.get("tokens_per_sec")
-        ]
-        ok_rate_val = ok_rate(run_items)
-        summary_rows.append(
-            {
-                "run_id": run_id,
-                "host_name": host_name,
-                "host_ip": host_ip,
-                "base_url": base_url,
-                "model_key": model_key,
-                "load_s": mean_or_blank(load_vals),
-                "ttft_med": median_or_blank(ttft_vals),
-                "tps_med": median_or_blank(tps_vals),
-                "ok_rate": ok_rate_val,
-            }
-        )
+        write_model_report_md(run_dir, host_name, host_ip, base_url, model_key, items)
 
-        write_model_report_md(
-            run_dir=run_dir,
-            host_name=host_name,
-            host_ip=host_ip,
-            base_url=base_url,
-            model_key=model_key,
-            items=items,
-        )
+    write_run_index_md(run_dir, run_id, started_at, config, summary_rows, task_rows)
 
-    with summary_csv.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=summary_fields)
-        writer.writeheader()
-        for r in summary_rows:
-            writer.writerow(r)
-
-    write_run_index_md(
-        run_dir=run_dir,
-        run_id=run_id,
-        started_at=started_at,
-        config=config,
-        summary_rows=summary_rows,
-    )
-
-    print(f"Wrote results to {output_csv}")
-    print(f"Wrote summary to {summary_csv}")
+    print(f"Wrote results to {output_dir / 'run_results.csv'}")
+    print(f"Wrote summary to {output_dir / 'run_summary.csv'}")
+    print(f"Wrote task summary to {output_dir / 'task_summary.csv'}")
     print(f"Wrote sidecars to {run_dir}")
     return 0
 
