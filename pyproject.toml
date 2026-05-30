@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.10.0"
+version = "0.11.0"
 description = "Agent-facing CLI for profiling and benchmarking local LM Studio nodes"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,12 @@ license = {text = "MIT"}
 authors = [{name = "Scott Joyner"}]
 dependencies = [
   "requests>=2.31.0"
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8.0.0",
+  "jsonschema>=4.21.0"
 ]
 
 [project.scripts]
@@ -40,3 +46,7 @@ py-modules = [
 
 [tool.setuptools.package-data]
 "*" = ["benchmarks/*.json", "schemas/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
