@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lms-agent-bench"
+version = "0.1.0"
+description = "Agent-facing CLI for profiling and benchmarking local LM Studio nodes"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Scott Joyner"}]
+dependencies = [
+  "requests>=2.31.0"
+]
+
+[project.scripts]
+lms = "lms:main"
+
+[tool.setuptools]
+py-modules = [
+  "lms",
+  "lms_machine_profile",
+  "lms_eval",
+  "benchmark_lmstudio_cross_machine_models",
+  "benchmark_lmstudio_inventory"
+]
+
+[tool.setuptools.package-data]
+"*" = ["benchmarks/*.json", "schemas/*.json"]
