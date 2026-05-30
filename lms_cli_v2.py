@@ -8,7 +8,8 @@ agent-facing command layer:
   lms validate-suite
   lms brief latest
   lms audit latest
-  lms quick ...   # also emits model_fit + AGENT_BRIEF + RUN_AUDIT after successful runs
+  lms export-skill latest
+  lms quick ...   # also emits model_fit + AGENT_BRIEF + RUN_AUDIT + skill export
 
 The wrapper delegates all existing commands to `lms_cli.main`.
 """
@@ -25,9 +26,10 @@ import lms_cli
 import lms_manifest_validate
 import lms_model_fit
 import lms_run_audit
+import lms_skill_export
 
 
-VERSION = "lms-agent-cli 0.7.0"
+VERSION = "lms-agent-cli 0.8.0"
 
 
 def build_fit_parser() -> argparse.ArgumentParser:
@@ -54,6 +56,16 @@ def build_audit_parser() -> argparse.ArgumentParser:
     parser.add_argument("--min-score", type=float, default=0.55)
     parser.add_argument("--min-eval-ok", type=float, default=0.60)
     parser.add_argument("--no-require-safety", action="store_true")
+    parser.add_argument("--pretty", action="store_true")
+    return parser
+
+
+def build_export_skill_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lms export-skill", description="Export an LMS run as an agent-readable skill contract.")
+    parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
+    parser.add_argument("--json-out", default=None)
+    parser.add_argument("--md-out", default=None)
     parser.add_argument("--pretty", action="store_true")
     return parser
 
@@ -98,6 +110,19 @@ def run_audit(argv: List[str]) -> int:
     return int(lms_run_audit.main(cmd))
 
 
+def run_export_skill(argv: List[str]) -> int:
+    args = build_export_skill_parser().parse_args(argv)
+    run_dir = lms_cli.resolve_run_dir(args.run_dir, args.runs_dir)
+    cmd = [str(run_dir)]
+    if args.json_out:
+        cmd += ["--json-out", args.json_out]
+    if args.md_out:
+        cmd += ["--md-out", args.md_out]
+    if args.pretty:
+        cmd += ["--pretty"]
+    return int(lms_skill_export.main(cmd))
+
+
 def run_validate_suite(argv: List[str]) -> int:
     args = build_validate_suite_parser().parse_args(argv)
     suite = Path(args.suite_file) if args.suite_file else lms_cli.resolve_asset(lms_cli.DEFAULT_SUITE)
@@ -137,6 +162,8 @@ def postprocess_latest_run(runs_dir: str) -> None:
     audit_rc = int(lms_run_audit.main([str(run_dir)]))
     if audit_rc != 0:
         print("run audit reported critical issues")
+    print("\nExporting agent skill contract...")
+    lms_skill_export.main([str(run_dir)])
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -152,6 +179,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_brief(args[1:])
     if args[0] == "audit":
         return run_audit(args[1:])
+    if args[0] in {"export-skill", "skill"}:
+        return run_export_skill(args[1:])
     if args[0] in {"validate-suite", "validate"}:
         return run_validate_suite(args[1:])
     if args[0] == "selftest":
