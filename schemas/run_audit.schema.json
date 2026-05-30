@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/run_audit.schema.json",
+  "title": "LMS Run Audit",
+  "type": "object",
+  "required": ["status", "ok", "critical", "warnings", "info", "counts", "thresholds"],
+  "properties": {
+    "status": {"type": "string", "enum": ["pass", "warn", "fail"]},
+    "ok": {"type": "boolean"},
+    "critical": {"type": "array", "items": {"type": "string"}},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "info": {"type": "array", "items": {"type": "string"}},
+    "counts": {"type": "object", "additionalProperties": {"type": "integer"}},
+    "thresholds": {
+      "type": "object",
+      "properties": {
+        "min_score": {"type": "number"},
+        "min_eval_ok": {"type": "number"},
+        "require_safety": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
