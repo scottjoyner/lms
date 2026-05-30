@@ -11,6 +11,7 @@ agent-facing command layer:
   lms-bench brief latest
   lms-bench audit latest
   lms-bench export-skill latest
+  lms-bench bundle latest
   lms-bench quick --from-registry --tags gpu
 
 The wrapper delegates most existing commands to `lms_cli.main`.
@@ -33,9 +34,10 @@ import lms_manifest_validate
 import lms_model_fit
 import lms_run_audit
 import lms_skill_export
+import lms_support_bundle
 
 
-VERSION = "lms-agent-cli 0.13.0"
+VERSION = "lms-agent-cli 0.14.0"
 MODULE_FILES = [
     "lms_cli_v2.py",
     "lms_cli.py",
@@ -48,6 +50,7 @@ MODULE_FILES = [
     "lms_artifact_validate.py",
     "lms_agent_brief.py",
     "lms_model_fit.py",
+    "lms_support_bundle.py",
     "lms_machine_profile.py",
     "lms_eval.py",
     "benchmark_lmstudio_cross_machine_models.py",
@@ -88,6 +91,16 @@ def build_export_skill_parser() -> argparse.ArgumentParser:
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--json-out", default=None)
     parser.add_argument("--md-out", default=None)
+    parser.add_argument("--pretty", action="store_true")
+    return parser
+
+
+def build_bundle_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lms-bench bundle", description="Create a redacted support bundle for an LMS run.")
+    parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
+    parser.add_argument("--out", default=None)
+    parser.add_argument("--include-raw-outputs", action="store_true")
     parser.add_argument("--pretty", action="store_true")
     return parser
 
@@ -151,6 +164,19 @@ def run_export_skill(argv: List[str]) -> int:
     if args.pretty:
         cmd += ["--pretty"]
     return int(lms_skill_export.main(cmd))
+
+
+def run_bundle(argv: List[str]) -> int:
+    args = build_bundle_parser().parse_args(argv)
+    run_dir = lms_cli.resolve_run_dir(args.run_dir, args.runs_dir)
+    cmd = [str(run_dir)]
+    if args.out:
+        cmd += ["--out", args.out]
+    if args.include_raw_outputs:
+        cmd.append("--include-raw-outputs")
+    if args.pretty:
+        cmd.append("--pretty")
+    return int(lms_support_bundle.main(cmd))
 
 
 def run_validate_suite(argv: List[str]) -> int:
@@ -277,6 +303,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_audit(args[1:])
     if args[0] in {"export-skill", "skill"}:
         return run_export_skill(args[1:])
+    if args[0] == "bundle":
+        return run_bundle(args[1:])
     if args[0] in {"validate-run", "validate-artifacts"}:
         return run_validate_run(args[1:])
     if args[0] in {"validate-suite", "validate"}:
