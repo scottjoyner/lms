@@ -7,7 +7,8 @@ agent-facing command layer:
   lms fit latest
   lms validate-suite
   lms brief latest
-  lms quick ...   # also emits model_fit + AGENT_BRIEF after successful runs
+  lms audit latest
+  lms quick ...   # also emits model_fit + AGENT_BRIEF + RUN_AUDIT after successful runs
 
 The wrapper delegates all existing commands to `lms_cli.main`.
 """
@@ -23,9 +24,10 @@ import lms_agent_brief
 import lms_cli
 import lms_manifest_validate
 import lms_model_fit
+import lms_run_audit
 
 
-VERSION = "lms-agent-cli 0.6.0"
+VERSION = "lms-agent-cli 0.7.0"
 
 
 def build_fit_parser() -> argparse.ArgumentParser:
@@ -42,6 +44,17 @@ def build_brief_parser() -> argparse.ArgumentParser:
     parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
     parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
     parser.add_argument("--out", default=None)
+    return parser
+
+
+def build_audit_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="lms audit", description="Audit an LMS run directory for completeness and route-readiness.")
+    parser.add_argument("run_dir", nargs="?", default="latest", help="Run directory or 'latest'")
+    parser.add_argument("--runs-dir", default=lms_cli.DEFAULT_RUNS_DIR)
+    parser.add_argument("--min-score", type=float, default=0.55)
+    parser.add_argument("--min-eval-ok", type=float, default=0.60)
+    parser.add_argument("--no-require-safety", action="store_true")
+    parser.add_argument("--pretty", action="store_true")
     return parser
 
 
@@ -72,6 +85,17 @@ def run_brief(argv: List[str]) -> int:
     if args.out:
         cmd += ["--out", args.out]
     return int(lms_agent_brief.main(cmd))
+
+
+def run_audit(argv: List[str]) -> int:
+    args = build_audit_parser().parse_args(argv)
+    run_dir = lms_cli.resolve_run_dir(args.run_dir, args.runs_dir)
+    cmd = [str(run_dir), "--min-score", str(args.min_score), "--min-eval-ok", str(args.min_eval_ok)]
+    if args.no_require_safety:
+        cmd.append("--no-require-safety")
+    if args.pretty:
+        cmd.append("--pretty")
+    return int(lms_run_audit.main(cmd))
 
 
 def run_validate_suite(argv: List[str]) -> int:
@@ -109,6 +133,10 @@ def postprocess_latest_run(runs_dir: str) -> None:
         print("model-fit analysis completed with warnings or no models found")
     print("\nGenerating agent brief...")
     lms_agent_brief.main([str(run_dir)])
+    print("\nAuditing run artifacts...")
+    audit_rc = int(lms_run_audit.main([str(run_dir)]))
+    if audit_rc != 0:
+        print("run audit reported critical issues")
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -122,6 +150,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return run_fit(args[1:])
     if args[0] == "brief":
         return run_brief(args[1:])
+    if args[0] == "audit":
+        return run_audit(args[1:])
     if args[0] in {"validate-suite", "validate"}:
         return run_validate_suite(args[1:])
     if args[0] == "selftest":
