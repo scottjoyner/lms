@@ -41,6 +41,7 @@ jobs:
             lms_support_bundle.py \
             lms_history.py \
             lms_decide.py \
+            lms_history_decide.py \
             lms_machine_profile.py \
             lms_eval.py \
             benchmark_lmstudio_cross_machine_models.py
