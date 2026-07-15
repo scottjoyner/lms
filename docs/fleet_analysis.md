@@ -1,6 +1,6 @@
 # Fleet Analysis - detailed capabilities & routing
 
-> Generated: 2026-07-15 21:37 UTC
+> Generated: 2026-07-15 21:51 UTC
 > **Status:** 8 nodes have a `run_summary.csv` from this pass; 1 being re-benchmarked (destroyer, joyner, lenovo); concurrency probe pending. Re-run: `python3 fleet_analysis.py`.
 
 >
@@ -249,19 +249,16 @@ Model memory is intrinsic (from `model_fit.estimated_model_memory_gib`). Effecti
 
 ### Concurrency
 
-- **Small models (<~4B):** safe to multiplex. x1-370 (96 GiB, many services) is the best concurrency host and multiplexes small models; xwing/joyner/beelink/macbooks tolerate 2 concurrent sessions with acceptable latency.
+- **Small models (<~4B):** safe to multiplex. x1-370 is the best concurrency host; xwing/joyner/beelink/macbooks tolerate 2 concurrent sessions with acceptable latency.
 - **Large models (>=~9B, esp. 30B+ Hermes-class):** keep **single-stream**. Two concurrent sessions to the same big model balloon latency or fail.
 - **Cap-1 nodes (optiplex, lenovo, destroyer, deathstar):** never issue parallel requests; mount at most one model, single-stream.
-- **deathstar:** i7 + 24 GiB RAM but only 8 GiB VRAM (RX480) and CPU maxed by other jobs — avoid models >7 GiB; if mounted, expect slow/unreliable.
-- **joyner:** Ryzen 5 iGPU caps VRAM at 5 GiB, so only small models run well; keep it to <=4B models.
-- **beelink:** Ryzen 7 (6-8 cores), 16 GiB RAM, no GPU — CPU-only; small/mid models only, no big GPU-loaded models.
-- **scotts-macbook-air:** 8 GiB unified memory; struggles if >3-4 GiB used, so keep it to tiny models (<=1.5B) and single-stream.
+- **deathstar:** also avoid models >7 GiB (CPU maxed by other jobs); if mounted, expect slow/unreliable.
 
 ### Loadout
 
-- Mount **small fast tool/agent models** broadly (x1-370, xwing, beelink, macbooks, joyner) for low-latency routing; joyner/beelink/macbook-air restricted to small models by VRAM/RAM.
-- Concentrate **large quality models** on strongest RAM hosts (x1-370 96 GiB; xwing 23 GiB; destroyer 31 GiB), single-stream. deathstar only if <=7 GiB.
-- Treat cap-1 weak nodes (optiplex, lenovo, destroyer, deathstar) and tiny-RAM nodes (macbook-air, optiplex) as **single-model edge servers**.
+- Mount **small fast tool/agent models** broadly (x1-370, xwing, beelink, macbooks, joyner) for low-latency routing.
+- Concentrate **large quality models** on strongest RAM hosts (x1-370 96 GiB; deathstar only if <=7 GiB), single-stream.
+- Treat cap-1 weak nodes as **single-model edge servers**.
 
 ### Data hygiene
 

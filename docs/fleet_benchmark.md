@@ -110,3 +110,52 @@ bash run_bench_then_probe.sh
   non-contended figures.
 - Per-node VRAM still unknown on GPU-less nodes (n/a) and only owner-provided
   on deathstar/joyner.
+
+## 11. Next-level enhancement: `fleet.py` control plane
+
+The point-in-time scripts above were unified into a single control plane that
+fixes the structural gaps found during the first pass.
+
+### New files
+- **`fleet_discover.py`** — single source of truth for node discovery. Reads
+  `fleet.toml` (explicit, wins) then augments from `tailscale status --json`.
+  Provides `live_nodes()` with **retry + exponential backoff** (the old tools
+  used a single probe, so a transient Tailscale blip marked a node permanently
+  down) and `all_aliases()` (resolves `macbook-air` ↔ `scotts-macbook-air`
+  in one place, replacing the opposite-direction `ALIAS` hacks in the analysis
+  scripts).
+- **`fleet.toml`** — the authoritative node registry (name, url, aliases,
+  notes). Kills the duplicated `NODES` dicts in `bench_fleet.py` /
+  `bench_concurrency_probe.py`.
+- **`fleet.py`** — subcommand CLI:
+  - `discover` — list configured/live nodes.
+  - `status` — quick live health snapshot (UP/DOWN per node).
+  - `state` — assemble **`fleet_state.json`**, a machine-readable fleet view:
+    per-node health, verified hardware, per-model availability + measured tps +
+    **derived concurrency tier**, and a per-node `stale` flag (artifacts older
+    than 6h are flagged so a crash artifact is never read as live). Also
+    indexes the best node per model.
+  - `routes` — emit **`routing_rules.json`** from measured state (not the
+    hand-curated `NOTES` dicts): per-node max concurrency, preferred
+    low-latency models, and a primary+fallback node per model.
+  - `bench` — runs `bench_fleet.py` then `bench_concurrency_probe.py`, then
+    regenerates state/routes/report.
+  - `report` — regenerate the Markdown docs + state + routes.
+
+### What "measured concurrency" replaces
+The old `--struggle-nodes` / `NOTES` caps were set by fiat. `fleet.py` instead
+reads each model's concurrency-probe `summary` row (its `speed_hit` / `gain`
+and `OK/DEGRADED/POOR/FAIL` status) and derives a safe tier per (node, model):
+`FAIL`/`POOR` → 1, `DEGRADED` → 2, `OK` (non-negative gain) → 2, otherwise 1.
+Models with no probe are conservatively tier-1.
+
+### Usage
+```sh
+python3 fleet.py discover
+python3 fleet.py status
+python3 fleet.py state      # -> fleet_state.json
+python3 fleet.py routes     # -> routing_rules.json (from state)
+python3 fleet.py bench --only x1-370 --max-concurrent 2
+python3 fleet.py report
+```
+

@@ -1,12 +1,12 @@
 # Fleet Writeup - per-machine capabilities
 
-> Generated: 2026-07-15 15:40 UTC  
+> Generated: 2026-07-15 21:51 UTC  
 > Status: **preliminary** - crash-doc pass and concurrency probe may still be running. Regenerate with `python3 fleet_writeup.py`.
 
 ## Fleet overview
 
 - **Machines profiled:** 10
-- **Model benchmark rows so far:** 76
+- **Model benchmark rows so far:** 91
 - **Concurrency-capable (tested at 2):** beelink-ryzen-7-mini-pc, joyner, macbook-air, scotts-macbook-air, x1-370, xwing
 - **Concurrency-limited (cap 1):** deathstar, destroyer, lenovo-ideapad-330s-15ikb, scott-optiplex-9030-aio
 
@@ -24,8 +24,11 @@
 
 (24 logical)
 
-- **Models benchmarked:** 9 (ok: 0, errors: 9)
-- **Errors/crashes:** qwen3.6-28b-reap20-a3b; refinedtoolcallv5-3b; orinth-1.0-9b; liquid/lfm2.5-1.2b; vibethinker-3b-heretic_decensored; google/gemma-4-12b-qat
+- **Models benchmarked:** 9 (ok: 8, errors: 1)
+- **Median tps (non-embedding, ok):** 7.6
+- **Fastest:** liquid/lfm2.5-1.2b (18.6 tok/s), vibethinker-3b-heretic_decensored (13.6 tok/s), vibethinker-3b-hermes (10.4 tok/s)
+- **Slowest:** google/gemma-4-12b-qat (0.9 tok/s), orinth-1.0-9b (0.7 tok/s), qwen3.6-28b-reap20-a3b (0.2 tok/s)
+- **Errors/crashes:** qwen3.6-14b-a3b-vibeforged-v2
 - **Fit grades:** {'good': 8, 'unknown': 1}
 
 **Concurrency posture:** Test at 2 concurrent.
@@ -36,11 +39,11 @@ _Sources:_ `runs/beelink-ryzen-7-mini-pc/machine_synopsis.md`, `run_summary.csv`
 
 (24 logical)
 
-- **Models benchmarked:** 20 (ok: 4, errors: 16)
-- **Median tps (non-embedding, ok):** 24.3
-- **Fastest:** lfm2-1.2b-tool (25.7 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (24.0 tok/s), lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch (23.2 tok/s)
-- **Slowest:** lfm2-1.2b-tool (25.7 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (24.0 tok/s), lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch (23.2 tok/s)
-- **Errors/crashes:** refinedtoolcallv5-3b; ornith-1.0-9b; ornith-1.0-35b; vibethinker-3b-hermes; vibethinker-3b-i1; qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex
+- **Models benchmarked:** 20 (ok: 2, errors: 18)
+- **Median tps (non-embedding, ok):** 42.0
+- **Fastest:** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (44.2 tok/s), refinedtoolcallv5-3b (39.8 tok/s)
+- **Slowest:** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (44.2 tok/s), refinedtoolcallv5-3b (39.8 tok/s)
+- **Errors/crashes:** text-embedding-nomic-embed-text-v1.5; ornith-1.0-9b; ornith-1.0-35b; vibethinker-3b-hermes; vibethinker-3b-i1; qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex
 - **Fit grades:** {'unknown': 2, 'good': 18}
 
 **Concurrency posture:** Force concurrency 1 in the probe. CPU cores are maxed by unrelated work, so it cannot absorb parallel load.
@@ -52,7 +55,12 @@ _Sources:_ `runs/deathstar/machine_synopsis.md`, `run_summary.csv`, `model_fit.c
 
 (24 logical)
 
-- _benchmark not yet complete for this node_
+- **Models benchmarked:** 11 (ok: 1, errors: 10)
+- **Median tps (non-embedding, ok):** 4.7
+- **Fastest:** liquid/lfm2-24b-a2b (4.7 tok/s)
+- **Slowest:** liquid/lfm2-24b-a2b (4.7 tok/s)
+- **Errors/crashes:** mradermacher/vibethinker-3b-hermes; refinedneuro/vibethinker-3b-hermes; vibethinker-3b-i1; qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp; qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex; google/gemma-4-12b-qat
+- **Fit grades:** {'good': 10, 'unknown': 1}
 
 **Concurrency posture:** Chokes under concurrency. Cap at 1.
 **Constraints:** Single-stream small models only.
@@ -63,7 +71,12 @@ _Sources:_ `runs/destroyer/machine_synopsis.md`, `run_summary.csv`, `model_fit.c
 
 (24 logical)
 
-- _benchmark not yet complete for this node_
+- **Models benchmarked:** 4 (ok: 1, errors: 3)
+- **Median tps (non-embedding, ok):** 6.2
+- **Fastest:** refinedtoolcallv5-3b (6.2 tok/s)
+- **Slowest:** refinedtoolcallv5-3b (6.2 tok/s)
+- **Errors/crashes:** ornith-1.0-9b; google/gemma-4-12b-qat; text-embedding-nomic-embed-text-v1.5
+- **Fit grades:** {'good': 3, 'unknown': 1}
 
 **Concurrency posture:** Test at 2 concurrent.
 
@@ -114,11 +127,10 @@ _Sources:_ `runs/scott-optiplex-9030-aio/machine_synopsis.md`, `run_summary.csv`
 
 (24 logical)
 
-- **Models benchmarked:** 4 (ok: 3, errors: 1)
-- **Median tps (non-embedding, ok):** 28.9
-- **Fastest:** liquid/lfm2.5-1.2b (56.0 tok/s), refinedtoolcallv5-3b (1.8 tok/s)
-- **Slowest:** liquid/lfm2.5-1.2b (56.0 tok/s), refinedtoolcallv5-3b (1.8 tok/s)
-- **Errors/crashes:** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled
+- **Models benchmarked:** 4 (ok: 4, errors: 0)
+- **Median tps (non-embedding, ok):** 29.1
+- **Fastest:** liquid/lfm2.5-1.2b (56.7 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (29.0 tok/s), refinedtoolcallv5-3b (1.7 tok/s)
+- **Slowest:** liquid/lfm2.5-1.2b (56.7 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (29.0 tok/s), refinedtoolcallv5-3b (1.7 tok/s)
 - **Fit grades:** {'good': 3, 'unknown': 1}
 
 **Concurrency posture:** Test at 2 concurrent; mind unified-memory pressure.
@@ -129,11 +141,11 @@ _Sources:_ `runs/scotts-macbook-air/machine_synopsis.md`, `run_summary.csv`, `mo
 
 (24 logical)
 
-- **Models benchmarked:** 22 (ok: 2, errors: 20)
-- **Median tps (non-embedding, ok):** 6.2
-- **Fastest:** minicpm5-1b-agentic-tooluse (6.2 tok/s)
-- **Slowest:** minicpm5-1b-agentic-tooluse (6.2 tok/s)
-- **Errors/crashes:** refinedtoolcallv5-3b; vibethinker-3b-hermes; orinth-1.0-9b; qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled; ornith-1.0-35b; north-mini-code-1.0
+- **Models benchmarked:** 22 (ok: 1, errors: 21)
+- **Median tps (non-embedding, ok):** 5.2
+- **Fastest:** minicpm5-1b-agentic-tooluse (5.2 tok/s)
+- **Slowest:** minicpm5-1b-agentic-tooluse (5.2 tok/s)
+- **Errors/crashes:** text-embedding-nomic-embed-text-v1.5; refinedtoolcallv5-3b; vibethinker-3b-hermes; orinth-1.0-9b; qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled; ornith-1.0-35b
 - **Fit grades:** {'good': 20, 'unknown': 2}
 
 **Concurrency posture:** Handles several models at once with decent concurrency. refinedtoolcallv5-3b, orinth-1.0-35b, and qwen3.5-0.8b run concurrently decently well; throughput drops to ~2-8 tok/s under concurrent load. Good for multiplexing small models.
@@ -146,10 +158,10 @@ _Sources:_ `runs/x1-370/machine_synopsis.md`, `run_summary.csv`, `model_fit.csv`
 (24 logical)
 
 - **Models benchmarked:** 6 (ok: 1, errors: 5)
-- **Median tps (non-embedding, ok):** 6.9
-- **Fastest:** orinth-1.0-9b (6.9 tok/s)
-- **Slowest:** orinth-1.0-9b (6.9 tok/s)
-- **Errors/crashes:** text-embedding-nomic-embed-text-v1.5; vibethinker-3b-hermes; ornith-1.0-35b; qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled; qwen3.6-14b-a3b-vibeforged-v2
+- **Median tps (non-embedding, ok):** 8.7
+- **Fastest:** vibethinker-3b-hermes (8.7 tok/s)
+- **Slowest:** vibethinker-3b-hermes (8.7 tok/s)
+- **Errors/crashes:** orinth-1.0-9b; ornith-1.0-35b; qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled; qwen3.6-14b-a3b-vibeforged-v2; text-embedding-nomic-embed-text-v1.5
 - **Fit grades:** {'good': 5, 'unknown': 1}
 
 **Concurrency posture:** Small models benefit from concurrency (more sessions, acceptable latency). Large models (e.g. Hermes-class) degrade badly at 2 concurrent sessions (response times blow up / fail). Test at 2, prefer 1 for big models.

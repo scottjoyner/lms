@@ -1,0 +1,49 @@
+# Fleet node registry — single source of truth for discovery.
+# Replaces the duplicated NODES dicts in bench_fleet.py / bench_concurrency_probe.py.
+# `tailscale status --json` is also consulted; explicit entries here win.
+
+[[nodes]]
+name = "x1-370"
+url = "http://127.0.0.1:1234/v1"
+notes = "Runner / orchestrator. Ryzen AI 9 HX 370, 96 GiB RAM."
+
+[[nodes]]
+name = "xwing"
+url = "http://xwing.tailcb8954.ts.net:1234/v1"
+notes = "Ryzen AI MAX PRO 390, 23 GiB RAM."
+
+[[nodes]]
+name = "destroyer"
+url = "http://destroyer.tailcb8954.ts.net:1234/v1"
+notes = "i7-10610U, 31 GiB RAM. Cap-1 (single-stream)."
+
+[[nodes]]
+name = "deathstar"
+url = "http://100.78.106.121:1234/v1"
+notes = "i7, 24 GiB RAM, RX480 8 GiB VRAM. Cap-1; avoid >7 GiB models."
+
+[[nodes]]
+name = "beelink-ryzen-7-mini-pc"
+url = "http://100.85.72.121:1234/v1"
+notes = "Ryzen 7 (6-8c), 16 GiB RAM, no GPU. CPU-only; small/mid models."
+
+[[nodes]]
+name = "joyner"
+url = "http://joyner.tailcb8954.ts.net:1234/v1"
+notes = "Ryzen 5 iGPU (max 5 GiB VRAM), 16 GiB RAM. Small models only."
+
+[[nodes]]
+name = "scotts-macbook-air"
+url = "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1"
+aliases = ["macbook-air"]
+notes = "Apple Silicon, 8 GiB unified. Struggles >3-4 GiB; tiny models only."
+
+[[nodes]]
+name = "scott-optiplex-9030-aio"
+url = "http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1"
+notes = "i5-4590, 7.7 GiB RAM. Cap-1 single-model edge."
+
+[[nodes]]
+name = "lenovo-ideapad-330s-15ikb"
+url = "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1"
+notes = "i3-8130U, 11.6 GiB RAM. Cap-1 single-model edge."
