@@ -328,7 +328,7 @@ def load_capability() -> dict[str, Capability]:
     return caps
 
 
-def _merge_reporter_specs(caps: dict[str, Capability]) -> dict[str, Capability]:
+def _merge_reporter_specs(caps: dict[str, Capability], nodes: list[dict] | None = None) -> dict[str, Capability]:
     """Override per-node specs with the REAL hardware reported by the node
     reporter (orchestrator-side fix for the benchmark spec-contamination gap).
 
@@ -337,12 +337,24 @@ def _merge_reporter_specs(caps: dict[str, Capability]) -> dict[str, Capability]:
     The node reporter, however, publishes this node's own ``/proc/meminfo`` /
     ``sysctl`` specs. When present and non-zero, prefer those for the RAM budget so
     a 16 GiB MacBook is not budgeted like x1-370's 91 GiB. Nodes with no reporter
-    data keep their (contaminated) model_fit specs as before."""
+    data keep their (contaminated) model_fit specs as before.
+
+    We iterate the authoritative fleet nodes (baseline), resolve each node's report
+    by hostname or tailscale IP (the reporter's source IP as seen by the router --
+    a node's actual hostname need not equal its baseline slug, e.g. the MacBook Air
+    reports as ``kipnerter``), then attach the specs to the cap via the tolerant
+    ``_match_cap`` (runs-dir keys like ``deathstar`` / ``lenovo-ideapad-...`` do not
+    match reporter hostnames directly)."""
     reports = fetch_fleet_reports()
     if not reports:
         return caps
-    for slug, cap in caps.items():
-        rep = reports.get(slug)
+    by_ip = {r.get("ip"): r for r in reports.values() if r.get("ip")}
+    if nodes is None:
+        nodes = discover_nodes()
+    for n in nodes:
+        slug = n["slug"]
+        ip = n.get("ip")
+        rep = reports.get(slug) or by_ip.get(ip)
         if rep is None:
             rep = next(
                 (r for r in reports.values()
@@ -350,6 +362,9 @@ def _merge_reporter_specs(caps: dict[str, Capability]) -> dict[str, Capability]:
                 None,
             )
         if not rep:
+            continue
+        cap = _match_cap(caps, slug)
+        if cap is None:
             continue
         rs = rep.get("specs") or {}
         ram = rs.get("available_ram_gib") or rs.get("system_ram_gib")
@@ -472,7 +487,8 @@ def plan_loadouts(nodes: list[dict], caps: dict[str, Capability], demand: str) -
         if cap is None:
             # No benchmark data for this node yet -> leave as-is, just report.
             plan.append({"node": slug, "ip": node["ip"], "actions": [],
-                         "note": "no capability data; run bench_fleet.py"})
+                         "note": "no capability data; run bench_fleet.py",
+                         "spec_source": "none"})
             continue
         # Candidate models = everything we have a fit record for on this node.
         # Gate on REAL benchmark success: a model with ok_rate==0 never actually
@@ -544,6 +560,8 @@ def plan_loadouts(nodes: list[dict], caps: dict[str, Capability], demand: str) -
         plan.append({"node": slug, "ip": node["ip"], "actions": actions,
                      "mounted": sorted(mounted), "used_gib": round(used, 1),
                      "budget_gib": round(budget, 1),
+                     "spec_source": ("reporter(real)" if cap.specs.get("source") == "node-reporter"
+                                     else "model_fit(CONTAMINATED)"),
                      "skipped_failed": sorted(skipped_bad)})
     return plan
 
@@ -618,12 +636,20 @@ def cmd_status(args: argparse.Namespace) -> None:
     for n in nodes:
         p = probe_node(n)
         n["loaded_models"] = p.get("loaded_models", [])
+        n["reachable"] = p.get("reachable", False)
         n["_busy"] = busy.get(n["ip"], set())
         cap = _match_cap(caps, n["slug"])
         n_caps = len(cap.models) if cap else 0
+        if cap and cap.specs:
+            real = cap.specs.get("source") == "node-reporter"
+            sp = (f"ram={cap.specs.get('system_ram_gib')}GiB "
+                  f"avail={cap.specs.get('available_ram_gib')}GiB "
+                  f"[{'reporter(real)' if real else 'model_fit(CONTAMINATED)'}]")
+        else:
+            sp = "no specs"
         print(f"{n['slug']:28} online={n['online']} reachable={n['reachable']} "
               f"loaded={len(n['loaded_models'])} caps={n_caps} "
-              f"busy_models={len(n['_busy'])}")
+              f"busy_models={len(n['_busy'])}  {sp}")
         for mk in n["loaded_models"]:
             print(f"    loaded: {mk}")
 
@@ -640,7 +666,7 @@ def cmd_plan(args: argparse.Namespace) -> None:
     for item in plan:
         print(f"{item['node']:28} mounted_target={item.get('mounted')} "
               f"used={item.get('used_gib')}/{item.get('budget_gib')}GiB "
-              f"note={item.get('note','')}")
+              f"[{item.get('spec_source','')}] note={item.get('note','')}")
         for a in item["actions"]:
             print(f"    {a['op']:10} {a['model']}")
         if item.get("skipped_failed"):
