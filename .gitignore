@@ -13,3 +13,12 @@ lmstudio_inventory_tiny.csv
 sidecar_bench/*
 
 lmstudio_inventory.sqlite
+
+# Fleet benchmark run output (large, regenerable)
+runs/
+*.log
+__pycache__/
+fleet_baseline.csv
+bench_fleet_run.log
+lenovo_redo.log
+redo_missing.log
