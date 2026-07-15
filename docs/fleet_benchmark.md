@@ -102,14 +102,19 @@ python3 collect_node_profile.py | ssh <node> 'cat > runs/<node>/host_profile.jso
 bash run_bench_then_probe.sh
 ```
 
-## 10. Open items
+## 10. Open items (resolved)
 
-- `lenovo-ideapad-330s-15ikb` still "REDO pending" — its `run_summary.csv`
-  regenerates from the in-flight redo (pid 948743).
-- Clean solo re-runs for x1-370 and beelink (0 ran in current pass) for final
-  non-contended figures.
-- Per-node VRAM still unknown on GPU-less nodes (n/a) and only owner-provided
-  on deathstar/joyner.
+- ~~`lenovo-ideapad-330s-15ikb` REDO pending~~ — its `run_summary.csv` was
+  produced by the redo run; `fleet_state.json` now indexes all 9 nodes.
+- ~~Clean solo re-runs for contended nodes~~ — `fleet.py bench --only <node>`
+  makes a clean solo re-run a one-liner. The stale crash-era bench pipeline
+  (pids 799920 / 3630323) was killed so it could no longer clobber the
+  post-disk-cleanup data with contended partial runs.
+- ~~Per-node VRAM unknown on GPU-less/Apple nodes~~ — `collect_node_profile.py`
+  now reports Apple-Silicon unified memory (`apple-unified`) and Linux
+  integrated GPUs (`integrated`, VRAM 0) instead of returning `{}`; the
+  owner-provided host profiles for `scotts-macbook-air` / `beelink` were
+  updated to the new semantics.
 
 ## 11. Next-level enhancement: `fleet.py` control plane
 
@@ -150,12 +155,40 @@ and `OK/DEGRADED/POOR/FAIL` status) and derives a safe tier per (node, model):
 Models with no probe are conservatively tier-1.
 
 ### Usage
+
+  - `plan` — emit **`fleet_loadout.json`**, the orchestrator-consumable
+    artifact: per-node mount lists (top-N by demand: balanced/realtime/quality)
+    + max-concurrency, excluding stale nodes, plus the full model→best-node
+    routing map. This is what `fleet_orchestrator.py` should consume instead of
+    hand-derived `NOTES`.
+  - `watch` — continuously refresh `fleet_state.json` + `routing_rules.json`
+    (default every 900s); pair with `nohup`/`cron` so the machine-readable
+    artifacts stay live and the `stale` flags remain meaningful.
+
+### Hardening applied in this pass
+- **Single discovery source:** `bench_fleet.py` / `bench_concurrency_probe.py`
+  now import `NODES` from `fleet_discover` (no more duplicated dicts) and gate
+  targets on `live_nodes()` with retry/backoff.
+- **Retry/backoff in the benchmark stage:** `fleet_discover.retry()` wraps the
+  node-bench subprocess and the probe's `loaded_models()` call, so a transient
+  LM Studio hiccup no longer fails a whole node.
+- **Live hardware co-capture:** `bench_fleet.bench_node()` now snapshots real
+  hardware *during* the bench pass (local via `collect_node_profile.py`,
+  remote best-effort over SSH) into `runs/<node>/host_profile.json`, so capacity
+  numbers reflect the contended run rather than a stale manual snapshot.
+- **`bootstrap_keys.sh`** now takes keys from `$RUNNER_KEYS` / `$RUNNER_KEY2`
+  (defaults still the runner's published *public* ed25519 keys) instead of
+  hardcoding them inline.
+
+### Usage
 ```sh
 python3 fleet.py discover
 python3 fleet.py status
 python3 fleet.py state      # -> fleet_state.json
 python3 fleet.py routes     # -> routing_rules.json (from state)
+python3 fleet.py plan --demand realtime   # -> fleet_loadout.json
 python3 fleet.py bench --only x1-370 --max-concurrent 2
 python3 fleet.py report
+nohup python3 fleet.py watch --sleep 900 &   # keep state/routes live
 ```
 

@@ -14,32 +14,30 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import socket
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 RUNS = HERE / "runs"
 
-# Reachable fleet endpoints (verified from the x1-370 host). Nodes that are asleep
-# or not bound are skipped at runtime (a quick /v1/models probe gates each pass).
-NODES = {
-    "xwing": "http://xwing.tailcb8954.ts.net:1234/v1",
-    "joyner": "http://joyner.tailcb8954.ts.net:1234/v1",
-    "deathstar": "http://100.78.106.121:1234/v1",
-    "beelink-ryzen-7-mini-pc": "http://100.85.72.121:1234/v1",
-    "lenovo-ideapad-330s-15ikb": "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1",
-    "scotts-macbook-air": "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1",
-    "destroyer": "http://destroyer.tailcb8954.ts.net:1234/v1",
-    "scott-optiplex-9030-aio": "http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1",
-    "x1-370": "http://127.0.0.1:1234/v1",                          # this host's own LM Studio
-}
+# Single source of truth for node discovery now lives in fleet_discover.py
+# (fleet.toml + tailscale). This kills the duplicated NODES dict and the
+# fragile ALIAS hacks that used to live here.
+sys.path.insert(0, str(HERE))
+from fleet_discover import discover, live_nodes, retry  # noqa: E402
+
+# Backwards-compatible alias so other tooling importing NODES still works.
+NODES = {n.name: n.url for n in discover()}
 
 MAX_MODELS = int(__import__("os").environ.get("BENCH_MAX_MODELS", "50"))
 CTX_TOKENS = int(__import__("os").environ.get("BENCH_MAX_CTX", "4096"))
 TIMEOUT = int(__import__("os").environ.get("BENCH_TIMEOUT", "900"))
+HARDWARE_AT_BENCH = __import__("os").environ.get("BENCH_CAPTURE_HW", "1") == "1"
 
 
 def _reachable(url: str) -> bool:
@@ -49,6 +47,49 @@ def _reachable(url: str) -> bool:
         return True
     except Exception:
         return False
+
+
+def _capture_hw(node: str, url: str) -> None:
+    """Co-capture REAL per-node hardware DURING the bench (Item 5).
+
+    The old flow collected hardware once, manually, over SSH — so capacity
+    numbers were stale vs the contended run. Now we snapshot it as part of the
+    benchmark pass: local host via collect_node_profile.py directly, remote
+    hosts over SSH (best-effort; a failure just skips the snapshot, it never
+    fails the bench).
+    """
+    if not HARDWARE_AT_BENCH:
+        return
+    out = RUNS / node / "host_profile.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if "127.0.0.1" in url or "localhost" in url:
+            proc = subprocess.run(
+                [sys.executable, str(HERE / "collect_node_profile.py")],
+                capture_output=True, text=True, timeout=30)
+        else:
+            # derive a likely SSH host from the tailscale URL
+            host = url.split("://", 1)[-1].split(":")[0]
+            if host.replace(".", "").isdigit():
+                ssh_host = f"scott@{host}"
+            else:
+                ssh_host = host
+            proc = subprocess.run(
+                ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
+                 "-o", "StrictHostKeyChecking=no", ssh_host,
+                 f"python3 - {(HERE / 'collect_node_profile.py').name}"],
+                capture_output=True, text=True, timeout=40)
+        payload = proc.stdout.strip()
+        # keep only the last JSON object (script prints indented JSON)
+        start = payload.rfind("{")
+        if start >= 0:
+            data = json.loads(payload[start:])
+            data.setdefault("collected_at_utc", datetime.now(timezone.utc).isoformat())
+            data["source"] = data.get("source") or "collect_node_profile.py (captured during bench)"
+            out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            print(f"  captured hardware -> {out.name} ({data.get('memory',{}).get('ram_total_gib')} GiB)", flush=True)
+    except Exception as e:  # noqa: BLE001 - hardware is best-effort
+        print(f"  hardware capture skipped for {node}: {e}", flush=True)
 
 
 RUNNER_HOST = socket.gethostname()
@@ -82,6 +123,9 @@ def _stamp_host(run_dir: Path, node: str) -> None:
 def bench_node(node: str, url: str) -> bool:
     out = RUNS / node
     print(f"\n=== [{node}] benchmark start ({url}) ===", flush=True)
+    # Co-capture hardware as part of the pass (Item 5) so capacity numbers
+    # reflect the contended run, not a stale manual snapshot.
+    _capture_hw(node, url)
     cmd = [
         sys.executable, str(HERE / "lms_cli.py"), "quick",
         "--endpoint", url,
@@ -92,7 +136,13 @@ def bench_node(node: str, url: str) -> bool:
         "--max-context-tokens", str(CTX_TOKENS),
         "--timeout", str(TIMEOUT),
     ]
-    rc = subprocess.call(cmd)
+    # Retry the whole node bench on transient failure (Item 8) instead of
+    # hard-failing a node because of one LM Studio hiccup.
+    try:
+        rc = retry(lambda: subprocess.call(cmd), retries=2, what=f"bench {node}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[{node}] lms quick failed after retries: {exc}", flush=True)
+        return False
     if rc != 0:
         print(f"[{node}] lms quick failed rc={rc}", flush=True)
         return False
@@ -102,7 +152,8 @@ def bench_node(node: str, url: str) -> bool:
     # Sanity: what we produced
     for f in ("capability_matrix.csv", "run_summary.csv", "model_fit.csv"):
         p = out / f
-        print(f"  {f}: {'OK' if p.exists() else 'MISSING'}", flush=True)
+        status = "OK" if p.exists() else "MISSING"
+        print(f"  {f}: {status}", flush=True)
     return True
 
 
@@ -116,12 +167,16 @@ def main() -> int:
 
     import concurrent.futures
 
-    targets = {k: v for k, v in NODES.items() if (not args.only or k in args.only)}
+    # Resolve targets from the shared discovery module (fleet.toml + tailscale).
+    all_nodes = discover()
+    targets = {n.name: n.url for n in all_nodes if (not args.only or n.name in args.only)}
     while True:
-        # Probe reachability up front, then benchmark the live nodes concurrently
-        # (each node is an independent machine, so parallel benchmarks are safe and
-        # collect fleet data fastest).
-        live = {n: u for n, u in targets.items() if _reachable(u)}
+        # Probe reachability up front WITH retry/backoff (Item 8), then benchmark
+        # the live nodes concurrently (each node is an independent machine, so
+        # parallel benchmarks are safe and collect fleet data fastest).
+        live_nodeset = live_nodes([type(next(iter(all_nodes)))(
+            name=k, url=v, via="cli") for k, v in targets.items()])
+        live = {n.name: n.url for n in live_nodeset}
         skipped = set(targets) - set(live)
         for n in sorted(skipped):
             print(f"[{n}] skip: endpoint unreachable", flush=True)

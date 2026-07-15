@@ -23,6 +23,7 @@ import argparse
 import csv
 import json
 import ssl
+import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -32,18 +33,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 OUT = HERE / "runs" / "concurrency_probe"
 
-# Mirrors bench_fleet.py discovery; self (x1-370) included.
-NODES = {
-    "xwing": "http://xwing.tailcb8954.ts.net:1234/v1",
-    "joyner": "http://joyner.tailcb8954.ts.net:1234/v1",
-    "deathstar": "http://100.78.106.121:1234/v1",
-    "beelink-ryzen-7-mini-pc": "http://100.85.72.121:1234/v1",
-    "lenovo-ideapad-330s-15ikb": "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1",
-    "scotts-macbook-air": "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1",
-    "destroyer": "http://destroyer.tailcb8954.ts.net:1234/v1",
-    "scott-optiplex-9030-aio": "http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1",
-    "x1-370": "http://127.0.0.1:1234/v1",
-}
+# Single source of truth for discovery now lives in fleet_discover.py
+# (fleet.toml + tailscale). Backwards-compatible alias.
+sys.path.insert(0, str(HERE))
+from fleet_discover import discover, retry  # noqa: E402
+NODES = {n.name: n.url for n in discover()}
 
 PROMPT = "Write a short, concrete paragraph explaining why distributed systems are harder than single-machine systems."
 MAX_TOKENS = 256
@@ -141,9 +135,11 @@ def measure(base: str, model: str, concurrency: int, timeout: float):
 
 
 def loaded_models(base: str) -> list[str]:
-    try:
+    def _get():
         with urllib.request.urlopen(base + "/models", timeout=8) as r:
-            data = json.load(r)
+            return json.load(r)
+    try:
+        data = retry(_get, retries=2, what=f"models {base}")
     except Exception:
         return []
     objs = data.get("data", data) if isinstance(data, dict) else data
@@ -167,6 +163,14 @@ def main() -> int:
     filter_sub = args.model_filter.lower()
 
     targets = {n: u for n, u in NODES.items() if (not args.only or n in args.only)}
+    from fleet_discover import live_nodes
+    all_nodes = discover()
+    live_nodeset = {n.name for n in live_nodes(
+        [type(next(iter(all_nodes)))(name=k, url=v, via="cli") for k, v in targets.items()])}
+    targets = {n: u for n, u in targets.items() if n in live_nodeset}
+    if not targets:
+        print("no live nodes to probe", flush=True)
+        return 0
 
     rows: list[dict] = []
     for node, base in targets.items():

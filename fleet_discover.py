@@ -138,6 +138,24 @@ def live_nodes(nodes: list[Node], retries: int = 3) -> list[Node]:
     return [n for n in nodes if _reachable(n.url, retries=retries)]
 
 
+def retry(call, retries: int = 3, backoff: float = 1.5, what: str = "op"):
+    """Run ``call`` up to ``retries`` times with exponential backoff.
+
+    Used by the benchmark stage so a transient LM Studio hiccup (model still
+    loading, brief CPU stall) doesn't fail a whole node's run. Returns the
+    call's result, or raises the last exception after exhausting retries.
+    """
+    last: Optional[Exception] = None
+    for attempt in range(1, retries + 1):
+        try:
+            return call()
+        except Exception as e:  # noqa: BLE001
+            last = e
+            if attempt < retries:
+                time.sleep(backoff * (2 ** (attempt - 1)))
+    raise last if last else RuntimeError(f"{what} failed")
+
+
 def all_aliases(nodes: list[Node]) -> dict[str, str]:
     """Map every alias (and the canonical name) -> canonical name.
 

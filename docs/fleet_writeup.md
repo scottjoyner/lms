@@ -1,13 +1,13 @@
 # Fleet Writeup - per-machine capabilities
 
-> Generated: 2026-07-15 21:51 UTC  
+> Generated: 2026-07-15 22:06 UTC  
 > Status: **preliminary** - crash-doc pass and concurrency probe may still be running. Regenerate with `python3 fleet_writeup.py`.
 
 ## Fleet overview
 
-- **Machines profiled:** 10
-- **Model benchmark rows so far:** 91
-- **Concurrency-capable (tested at 2):** beelink-ryzen-7-mini-pc, joyner, macbook-air, scotts-macbook-air, x1-370, xwing
+- **Machines profiled:** 9
+- **Model benchmark rows so far:** 94
+- **Concurrency-capable (tested at 2):** beelink-ryzen-7-mini-pc, joyner, scotts-macbook-air, x1-370, xwing
 - **Concurrency-limited (cap 1):** deathstar, destroyer, lenovo-ideapad-330s-15ikb, scott-optiplex-9030-aio
 
 ### Concurrency principles (from fleet observation)
@@ -86,26 +86,17 @@ _Sources:_ `runs/joyner/machine_synopsis.md`, `run_summary.csv`, `model_fit.csv`
 
 (24 logical)
 
-- _benchmark not yet complete for this node_
+- **Models benchmarked:** 7 (ok: 1, errors: 6)
+- **Median tps (non-embedding, ok):** 2.6
+- **Fastest:** liquid/lfm2.5-1.2b (2.6 tok/s)
+- **Slowest:** liquid/lfm2.5-1.2b (2.6 tok/s)
+- **Errors/crashes:** vibethinker-3b-heretic-i1; google/gemma-4-e2b; qwopus3.5-4b-coder-mtp; qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled; lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch; text-embedding-nomic-embed-text-v1.5
+- **Fit grades:** {'unknown': 2, 'good': 5}
 
 **Concurrency posture:** Chokes under concurrency. Cap at 1.
 **Constraints:** Single-stream small models only.
 
 _Sources:_ `runs/lenovo-ideapad-330s-15ikb/machine_synopsis.md`, `run_summary.csv`, `model_fit.csv`
-
-### macbook-air
-
-(24 logical)
-
-- **Models benchmarked:** 4 (ok: 3, errors: 1)
-- **Median tps (non-embedding, ok):** 42.5
-- **Fastest:** liquid/lfm2.5-1.2b (57.2 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (27.7 tok/s)
-- **Slowest:** liquid/lfm2.5-1.2b (57.2 tok/s), qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (27.7 tok/s)
-- **Errors/crashes:** refinedtoolcallv5-3b
-
-**Concurrency posture:** Test at 2 concurrent; mind unified-memory pressure.
-
-_Sources:_ `runs/macbook-air/machine_synopsis.md`, `run_summary.csv`, `model_fit.csv`
 
 ### scott-optiplex-9030-aio
 

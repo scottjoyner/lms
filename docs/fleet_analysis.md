@@ -1,7 +1,7 @@
 # Fleet Analysis - detailed capabilities & routing
 
-> Generated: 2026-07-15 21:51 UTC
-> **Status:** 8 nodes have a `run_summary.csv` from this pass; 1 being re-benchmarked (destroyer, joyner, lenovo); concurrency probe pending. Re-run: `python3 fleet_analysis.py`.
+> Generated: 2026-07-15 22:06 UTC
+> **Status:** 9 nodes have a `run_summary.csv` from this pass; 0 being re-benchmarked (destroyer, joyner, lenovo); concurrency probe pending. Re-run: `python3 fleet_analysis.py`.
 
 >
 > **Data reliability - read first.** The high *Failed (no output)* counts in this pass are almost certainly **artifacts, not real model breakage**: (1) the fleet hit a disk-full condition mid-run (Docker filled the root volume), interrupting several node benchmarks and leaving zero-tps rows; (2) x1-370 was benchmarked *while also orchestrating* the other 8 nodes, heavily contending its own CPU/RAM. The initial pre-crash pass had x1-370's 22 models all producing tokens at 5-13 tok/s. **Treat per-node failure tallies as 'needs a clean solo re-run', not 'model is broken'.** Re-run contended/interrupted nodes solo (`bench_fleet.py --only <node>`) for final figures.
@@ -14,9 +14,9 @@
 | deathstar | V | Intel Core i7 (owner-prov… | 24.0 | 8.0 | 20 | 19 | 5 | 14 | 23.9 | 1 | has data |
 | destroyer | V | Intel(R) Core(TM) i7-1061… | 31.0 | - | 11 | 10 | 3 | 7 | 4.7 | 1 | has data |
 | joyner | V | AMD Ryzen 5 (owner-provid… | 16.0 | 5.0 | 4 | 3 | 1 | 2 | 6.2 | 2 | has data |
-| lenovo-ideapad-330s-15ikb | V | Intel(R) Core(TM) i3-8130… | 11.6 | - | 7 | - | - | - | - | 1 | REDO pending |
-| scotts-macbook-air | V | Apple Silicon (owner-prov… | 8.0 | - | 4 | 3 | 3 | 0 | 29.0 | 2 | has data |
+| lenovo-ideapad-330s-15ikb | V | Intel(R) Core(TM) i3-8130… | 11.6 | - | 7 | 6 | 5 | 1 | 0.8 | 1 | has data |
 | scott-optiplex-9030-aio | V | Intel(R) Core(TM) i5-4590… | 7.7 | - | 11 | 10 | 1 | 9 | 8.8 | 1 | has data |
+| scotts-macbook-air | V | Apple Silicon (owner-prov… | 8.0 | 8.0 | 4 | 3 | 3 | 0 | 29.0 | 2 | has data |
 | x1-370 | V | AMD Ryzen AI 9 HX 370 w/ … | 91.9 | - | 22 | 21 | 3 | 18 | 5.2 | 2 | has data |
 | xwing | V | AMD RYZEN AI MAX PRO 390 … | 23.2 | - | 6 | 5 | 2 | 3 | 6.7 | 2 | has data |
 
@@ -117,8 +117,32 @@ _Hardware: real, captured on this host via `collect_node_profile.py`._
 
 _Hardware: real, captured on this host via `collect_node_profile.py`._
 
-_No validated benchmark data yet - unreachable during the last pass, being re-benchmarked now._
+- **Chat models benchmarked:** 6 | **Ran:** 5 | **Failed (no output):** 1
+- **Median throughput (ran, non-embed):** 0.8 tok/s  |  **Avg eval score:** 0.38
+- **Fastest (ran):** liquid/lfm2.5-1.2b (2.6 tok/s, ttft 11 ms), google/gemma-4-e2b (1.0 tok/s, ttft 297 ms), vibethinker-3b-heretic-i1 (0.8 tok/s, ttft 30 ms), lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch (0.5 tok/s, ttft 261 ms), qwopus3.5-4b-coder-mtp (0.4 tok/s, ttft 713 ms)
+- **Slowest (ran):** qwopus3.5-4b-coder-mtp (0.4 tok/s), lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch (0.5 tok/s), vibethinker-3b-heretic-i1 (0.8 tok/s), google/gemma-4-e2b (1.0 tok/s), liquid/lfm2.5-1.2b (2.6 tok/s)
+- **Failed (no output / crash):** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (0.00)
+- **Fit grades:** {'unknown': 2, 'good': 5}
 
+**Concurrency posture:** Chokes under concurrency. Cap at 1.
+**Constraints:** Single-stream small models only.
+
+### scott-optiplex-9030-aio
+
+**CPU:** Intel(R) Core(TM) i5-4590S CPU @ 3.00GHz (4 logical)  
+**RAM:** 7.7 GiB (5.8 avail)  
+**GPU:** Intel Corporation 4th Gen Core Processor DRAM Controller (rev 06); Intel Corporation Xeon E3-1200 v3/4th Gen Core Processor Integrated Graphics Controller (rev 06)  
+**Endpoint:** `http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1`  
+**Models loaded at profile:** 11
+
+_Hardware: real, captured on this host via `collect_node_profile.py`._
+
+- **Chat models benchmarked:** 10 | **Ran:** 1 | **Failed (no output):** 9
+- **Median throughput (ran, non-embed):** 8.8 tok/s  |  **Avg eval score:** 0.61
+- **Fastest (ran):** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (8.8 tok/s, ttft 24 ms)
+- **Slowest (ran):** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (8.8 tok/s)
+- **Failed (no output / crash):** refinedtoolcallv5-3b (0.00); vibethinker-3b-i1 (0.00); qwen3.5-2b-claude-4.6-opus-reasoning-distilled (0.00); lfm2.5-8b-a1b (0.00); qwen3.5-4b (0.00); qwen3.5-2b (0.00); ibm/granite-4-h-tiny (0.00); liquid/lfm2.5-1.2b (0.00); google/gemma-3-1b (0.00)
+- **Fit grades:** {'good': 9, 'unknown': 2}
 
 **Concurrency posture:** Chokes under concurrency. Cap at 1.
 **Constraints:** Single-stream small models only.
@@ -140,26 +164,6 @@ _Hardware: real, captured on this host via `collect_node_profile.py`._
 - **Fit grades:** {'good': 3, 'unknown': 1}
 
 **Concurrency posture:** Test at 2 concurrent; mind unified-memory pressure.
-
-### scott-optiplex-9030-aio
-
-**CPU:** Intel(R) Core(TM) i5-4590S CPU @ 3.00GHz (4 logical)  
-**RAM:** 7.7 GiB (5.8 avail)  
-**GPU:** Intel Corporation 4th Gen Core Processor DRAM Controller (rev 06); Intel Corporation Xeon E3-1200 v3/4th Gen Core Processor Integrated Graphics Controller (rev 06)  
-**Endpoint:** `http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1`  
-**Models loaded at profile:** 11
-
-_Hardware: real, captured on this host via `collect_node_profile.py`._
-
-- **Chat models benchmarked:** 10 | **Ran:** 1 | **Failed (no output):** 9
-- **Median throughput (ran, non-embed):** 8.8 tok/s  |  **Avg eval score:** 0.61
-- **Fastest (ran):** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (8.8 tok/s, ttft 24 ms)
-- **Slowest (ran):** qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled (8.8 tok/s)
-- **Failed (no output / crash):** refinedtoolcallv5-3b (0.00); vibethinker-3b-i1 (0.00); qwen3.5-2b-claude-4.6-opus-reasoning-distilled (0.00); lfm2.5-8b-a1b (0.00); qwen3.5-4b (0.00); qwen3.5-2b (0.00); ibm/granite-4-h-tiny (0.00); liquid/lfm2.5-1.2b (0.00); google/gemma-3-1b (0.00)
-- **Fit grades:** {'good': 9, 'unknown': 2}
-
-**Concurrency posture:** Chokes under concurrency. Cap at 1.
-**Constraints:** Single-stream small models only.
 
 ### x1-370
 
@@ -208,17 +212,18 @@ For each chat model on >1 node, fastest validated home (produced output). Embedd
 | Model | Available on (tps) | Best home | Fit on best |
 |---|---|---|---|
 | refinedtoolcallv5-3b | deathstar (40), x1-370 (17), beelink-ryzen-7-mini-pc (9), joyner (6), scotts-macbook-air (2), scott-optiplex-9030-aio (0) | deathstar | 1.89 |
-| qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled | deathstar (44), scotts-macbook-air (29), scott-optiplex-9030-aio (9), x1-370 (0), xwing (0) | deathstar | 0.50 |
+| qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled | deathstar (44), scotts-macbook-air (29), scott-optiplex-9030-aio (9), lenovo-ideapad-330s-15ikb (0), x1-370 (0), xwing (0) | deathstar | 0.50 |
+| liquid/lfm2.5-1.2b | scotts-macbook-air (57), beelink-ryzen-7-mini-pc (19), lenovo-ideapad-330s-15ikb (3), scott-optiplex-9030-aio (0) | scotts-macbook-air | 0.75 |
 | google/gemma-4-12b-qat | beelink-ryzen-7-mini-pc (1), deathstar (0), destroyer (0), joyner (0) | beelink-ryzen-7-mini-pc | 7.54 |
 | vibethinker-3b-hermes | beelink-ryzen-7-mini-pc (10), xwing (9), deathstar (0), x1-370 (0) | beelink-ryzen-7-mini-pc | 1.89 |
 | orinth-1.0-9b | xwing (5), beelink-ryzen-7-mini-pc (1), x1-370 (0) | xwing | 5.66 |
-| liquid/lfm2.5-1.2b | scotts-macbook-air (57), beelink-ryzen-7-mini-pc (19), scott-optiplex-9030-aio (0) | scotts-macbook-air | 0.75 |
 | ornith-1.0-35b | deathstar (0), x1-370 (0), xwing (0) | _none ran_ | - |
 | vibethinker-3b-i1 | deathstar (17), destroyer (0), scott-optiplex-9030-aio (0) | deathstar | 1.89 |
 | qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex | deathstar (0), destroyer (0), x1-370 (0) | _none ran_ | - |
 | lfm2.5-8b-a1b | destroyer (2), deathstar (0), scott-optiplex-9030-aio (0) | destroyer | 5.03 |
 | qwen3.6-14b-a3b-vibeforged-v2 | beelink-ryzen-7-mini-pc (0), xwing (0) | _none ran_ | - |
 | ornith-1.0-9b | deathstar (0), joyner (0) | _none ran_ | - |
+| lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch | lenovo-ideapad-330s-15ikb (0), deathstar (0) | lenovo-ideapad-330s-15ikb | 5.03 |
 | openai/gpt-oss-20b | deathstar (0), destroyer (0) | _none ran_ | - |
 
 ## Per-node capacity (RAM / VRAM vs model memory)
@@ -227,22 +232,22 @@ Model memory is intrinsic (from `model_fit.estimated_model_memory_gib`). Effecti
 
 | Node | HW | Eff limit (GiB) | Basis | Models fit | Largest fit | Too-big |
 |---|---|---:|---|---:|---|---:|
-| beelink-ryzen-7-mini-pc | V | 12.8 | RAM | 33 | qwen3.6-14b-a3b-vibeforged-v2 | 13 |
-| deathstar | V | 8.0 | VRAM | 31 | google/gemma-4-12b-qat | 15 |
-| destroyer | V | 27.0 | RAM | 46 | ornith-1.0-35b | 0 |
-| joyner | V | 5.0 | VRAM | 21 | qwen3.5-4b-claude-4.6-opus-reasoning-distilled-v2 | 25 |
-| lenovo-ideapad-330s-15ikb | V | 9.3 | RAM | 33 | qwen3.6-14b-a3b-vibeforged-v2 | 13 |
-| scotts-macbook-air | V | 6.4 | RAM | 28 | orinth-1.0-9b | 18 |
-| scott-optiplex-9030-aio | V | 6.2 | RAM | 28 | orinth-1.0-9b | 18 |
-| x1-370 | V | 87.9 | RAM | 46 | ornith-1.0-35b | 0 |
-| xwing | V | 19.2 | RAM | 38 | qwen3.5-27b-claude-4.6-opus-reasoning-distilled | 8 |
+| beelink-ryzen-7-mini-pc | V | 12.8 | RAM | 35 | qwen3.6-14b-a3b-vibeforged-v2 | 13 |
+| deathstar | V | 8.0 | VRAM | 33 | google/gemma-4-12b-qat | 15 |
+| destroyer | V | 27.0 | RAM | 48 | ornith-1.0-35b | 0 |
+| joyner | V | 5.0 | VRAM | 23 | qwen3.5-4b-claude-4.6-opus-reasoning-distilled-v2 | 25 |
+| lenovo-ideapad-330s-15ikb | V | 9.3 | RAM | 35 | qwen3.6-14b-a3b-vibeforged-v2 | 13 |
+| scott-optiplex-9030-aio | V | 6.2 | RAM | 30 | orinth-1.0-9b | 18 |
+| scotts-macbook-air | V | 6.4 | RAM | 30 | orinth-1.0-9b | 18 |
+| x1-370 | V | 87.9 | RAM | 48 | ornith-1.0-35b | 0 |
+| xwing | V | 19.2 | RAM | 40 | qwen3.5-27b-claude-4.6-opus-reasoning-distilled | 8 |
 
 - **beelink-ryzen-7-mini-pc** (limit 12.8 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 - **deathstar** (limit 8.0 GiB, VRAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 - **joyner** (limit 5.0 GiB, VRAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 - **lenovo-ideapad-330s-15ikb** (limit 9.3 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
-- **scotts-macbook-air** (limit 6.4 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 - **scott-optiplex-9030-aio** (limit 6.2 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
+- **scotts-macbook-air** (limit 6.4 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 - **xwing** (limit 19.2 GiB, RAM) - too big: ornith-1.0-35b (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex (25.7), qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp (25.7), huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp (25.7), qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive (25.7), qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive (25.7)
 
 ## Recommendations for agents & the orchestrator

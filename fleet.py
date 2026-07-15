@@ -337,6 +337,64 @@ def cmd_report(args=None) -> int:
     return rc
 
 
+# --------------------------------------------------------------------------
+# Loadout plan — the orchestrator-consumable artifact (Item 7).
+# Converts measured fleet_state.json into per-node mount lists + routing.
+# --------------------------------------------------------------------------
+def cmd_plan(args=None) -> int:
+    if not STATE_JSON.exists():
+        cmd_state()
+    state = json.loads(STATE_JSON.read_text(encoding="utf-8"))
+
+    # demand mode: balanced | realtime | quality
+    demand = (args.demand if args else "balanced")
+    per_node = {}
+    for n in state["nodes"]:
+        if n["stale"]:
+            continue
+        av = [m for m in n["models"] if m["available"]]
+        if demand == "realtime":
+            av.sort(key=lambda m: (m["ttft_med_ms"], -m["tps_med"]))
+        elif demand == "quality":
+            av.sort(key=lambda m: -m["eval_score"])
+        else:  # balanced
+            av.sort(key=lambda m: (m["tps_med"] * 0.5 + m["eval_score"] * 10))
+        per_node[n["name"]] = {
+            "url": n["url"],
+            "max_concurrency": max([m["concurrency"]["tier"] for m in av], default=1),
+            "mount": [m["model"] for m in av[: args.top if args else 6]],
+            "ram_gib": n["hardware"]["ram_gib"],
+            "vram_gib": n["hardware"]["vram_gib"],
+        }
+
+    plan = {
+        "generated_at": state["generated_at"],
+        "demand": demand,
+        "nodes": per_node,
+        "routing": state["model_best_node"],
+    }
+    LOADOUT_JSON = HERE / "fleet_loadout.json"
+    LOADOUT_JSON.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+    print(f"Wrote {LOADOUT_JSON} | {len(per_node)} nodes, demand={demand}")
+    return 0
+
+
+def cmd_watch(args=None) -> int:
+    """Continuous refresh of fleet_state.json + routing_rules.json (Item 9).
+
+    Keeps the machine-readable artifacts live so the orchestrator never reads a
+    stale snapshot. Pair with cron or nohup:
+        nohup python3 fleet.py watch --sleep 900 &
+    """
+    sleep = (args.sleep if args else 900)
+    while True:
+        cmd_state()
+        cmd_routes()
+        print(f"[watch] refreshed; next in {sleep}s", flush=True)
+        time.sleep(sleep)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(prog="fleet.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -346,6 +404,11 @@ def main() -> int:
     sub.add_parser("routes", help="emit routing_rules.json")
     sub.add_parser("report", help="regenerate markdown docs + state")
     sub.add_parser("status", help="quick live health snapshot")
+    w = sub.add_parser("watch", help="continuously refresh state+routes")
+    w.add_argument("--sleep", type=int, default=900, help="seconds between refreshes")
+    p = sub.add_parser("plan", help="emit fleet_loadout.json (orchestrator-consumable)")
+    p.add_argument("--demand", choices=["balanced", "realtime", "quality"], default="balanced")
+    p.add_argument("--top", type=int, default=6, help="max models to mount per node")
 
     b = sub.add_parser("bench", help="run full benchmark + probe pipeline")
     b.add_argument("--only", action="append", default=[], help="restrict to nodes")
@@ -356,6 +419,8 @@ def main() -> int:
     fn = {
         "discover": cmd_discover, "state": cmd_state, "routes": cmd_routes,
         "report": cmd_report, "status": cmd_status, "bench": cmd_bench,
+        "plan": cmd_plan, "watch": cmd_watch,
+        "plan": cmd_plan,
     }[args.cmd]
     return fn(args)
 

@@ -96,6 +96,19 @@ def vram_info():
             return {"vram_total_mib": tot, "vendor": "amd"}
     except Exception:
         pass
+    # Apple Silicon: unified memory IS the GPU memory. Report the system RAM
+    # ceiling as the effective VRAM so the capacity model isn't silently blind
+    # on macbooks (previously returned {} -> capacity math fell back to RAM).
+    if platform.system() == "Darwin":
+        total = int(sh("sysctl -n hw.memsize") or 0)
+        if total:
+            return {"vram_total_mib": total // 1048576, "vendor": "apple-unified"}
+    # Intel/AMD integrated GPU on Linux: the UMA framebuffer is carved from
+    # system RAM. We can't read the exact carve-out reliably, so report the
+    # dGPU-less case as "integrated" with VRAM = 0 so the capacity model
+    # knows GPU memory is NOT independent of RAM (it competes with it).
+    if platform.system() == "Linux":
+        return {"vram_total_mib": 0, "vendor": "integrated"}
     return {}
 
 
