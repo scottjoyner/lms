@@ -569,21 +569,96 @@ def plan_loadouts(nodes: list[dict], caps: dict[str, Capability], demand: str) -
 # --------------------------------------------------------------------------- #
 # Actuator
 # --------------------------------------------------------------------------- #
-def _load_unload(native_url: str, op: str, model: str) -> tuple[bool, str]:
-    if op == "load":
-        payload = json.dumps({"model": model}).encode()
-    else:
-        payload = json.dumps({"model": model}).encode()
-    url = native_url.rsplit("/api/v1/models", 1)[0] + f"/api/v1/models/{op}"
-    req = Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+INSTANCE_CACHE = Path.home() / ".cache" / "fleet_orchestrator" / "instances.json"
+
+
+def _load_instance_cache() -> dict:
     try:
+        return json.loads(INSTANCE_CACHE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_instance_cache(cache: dict) -> None:
+    try:
+        INSTANCE_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        INSTANCE_CACHE.write_text(json.dumps(cache), encoding="utf-8")
+    except Exception:
+        pass
+
+
+def _ip_from_native(native_url: str) -> str:
+    try:
+        return native_url.split("/")[2].rsplit(":", 1)[0]
+    except Exception:
+        return native_url
+
+
+def _loaded_instance_ids(native_url: str, model: str) -> list[str]:
+    """Return the instance_ids of currently-loaded copies of ``model`` via the
+    LM Studio native API. NOTE: in current LM Studio the listing omits
+    ``loaded_instances``/``instance_id``, so this is a best-effort fallback; the
+    authoritative id is captured at load time (see ``_load_unload`` cache)."""
+    try:
+        req = Request(native_url, headers={"Accept": "application/json"})
         with urlopen(req, timeout=HTTP_TIMEOUT) as resp:
-            return True, f"{resp.status}"
-    except Exception as exc:  # pragma: no cover - network dependent
-        return False, str(exc)[:120]
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return []
+    out: list[str] = []
+    for m in data.get("models", []):
+        if m.get("key") == model or m.get("id") == model:
+            for inst in (m.get("loaded_instances") or []):
+                iid = inst.get("instance_id")
+                if iid:
+                    out.append(iid)
+    return out
+
+
+def _load_unload(native_url: str, op: str, model: str, cache: dict | None = None) -> tuple[bool, str, bool]:
+    """Returns (ok, detail, skipped). ``skipped`` is True when an unload could not
+    be resolved (no captured instance_id for an externally-loaded model) so the
+    caller can treat it as non-fatal rather than a hard failure."""
+    base = native_url.rsplit("/api/v1/models", 1)[0] + "/api/v1/models"
+    if op == "load":
+        url = f"{base}/load"
+        payload = json.dumps({"model": model}).encode()
+        req = Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+                body = resp.read().decode("utf-8")
+            # Capture the instance_id for later unload.
+            if cache is not None:
+                try:
+                    iid = json.loads(body).get("instance_id")
+                    if iid:
+                        cache[(_ip_from_native(native_url), model)] = iid
+                except Exception:
+                    pass
+            return True, f"{resp.status}", False
+        except Exception as exc:  # pragma: no cover - network dependent
+            return False, str(exc)[:120], False
+    else:  # unload requires the loaded instance_id, not the model key
+        ip = _ip_from_native(native_url)
+        iid = (cache or {}).get((ip, model)) if cache is not None else None
+        ids = [iid] if iid else _loaded_instance_ids(native_url, model)
+        if not ids:
+            return False, f"skip:no instance_id for {model} (externally loaded?)", True
+        last = ""
+        for iid in ids:
+            url = f"{base}/unload"
+            payload = json.dumps({"instance_id": iid}).encode()
+            req = Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+            try:
+                with urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+                    last = f"{resp.status}"
+            except Exception as exc:
+                return False, str(exc)[:120], False
+        return True, last, False
 
 
 def apply_loadouts(plan: list[dict], dry_run: bool = True) -> None:
+    cache = _load_instance_cache()
     for item in plan:
         native = f"http://{item['ip']}:{LM_PORT}/api/v1/models"
         for action in item["actions"]:
@@ -591,11 +666,12 @@ def apply_loadouts(plan: list[dict], dry_run: bool = True) -> None:
                 if dry_run:
                     print(f"  [dry-run] {item['node']}: {action['op']} {action['model']}")
                     continue
-                ok, detail = _load_unload(native, action["op"], action["model"])
-                print(f"  {'OK' if ok else 'FAIL'} {item['node']}: {action['op']} "
-                      f"{action['model']} -> {detail}")
+                ok, detail, skipped = _load_unload(native, action["op"], action["model"], cache)
+                tag = "SKIP" if skipped else ("OK" if ok else "FAIL")
+                print(f"  {tag} {item['node']}: {action['op']} {action['model']} -> {detail}")
             else:
                 print(f"  keep {item['node']}: {action['model']} ({action.get('note','')})")
+    _save_instance_cache(cache)
 
 
 # --------------------------------------------------------------------------- #
