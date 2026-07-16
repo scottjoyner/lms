@@ -42,7 +42,7 @@ ROUTES_JSON = HERE / "routing_rules.json"
 STALE_SECONDS = 6 * 3600  # artifacts older than this are flagged stale
 
 sys.path.insert(0, str(HERE))
-from fleet_discover import discover, live_nodes, all_aliases  # noqa: E402
+from fleet_discover import discover, discover_fleet, live_nodes, all_aliases  # noqa: E402
 
 
 def _f(x):
@@ -296,7 +296,9 @@ def cmd_routes(args=None) -> int:
 # Live status
 # --------------------------------------------------------------------------
 def cmd_status(args=None) -> int:
-    nodes = discover()
+    nodes = discover() if getattr(args, "all", False) else discover_fleet()
+    exc = set(getattr(args, "exclude", None) or [])
+    nodes = [n for n in nodes if n.name not in exc]
     live = live_nodes(nodes)
     live_names = {n.name for n in live}
     print(f"Fleet status — {len(live)}/{len(nodes)} nodes live\n")
@@ -316,10 +318,18 @@ def cmd_discover(args=None) -> int:
 # Pipeline
 # --------------------------------------------------------------------------
 def cmd_bench(args) -> int:
-    only = args.only or []
-    # One --only flag per node so the sub-tools' action="append" parser gets
-    # each node as a separate value (not a single space-joined string).
+    # Resolve --only / --exclude against the curated fleet (explicit toml nodes);
+    # tailscale-only peers (raspberrypi, iphones) are not benchmarked unless --all.
+    all_nodes = discover() if args.all else discover_fleet()
+    names = {n.name for n in all_nodes}
+    if args.only:
+        only = [n for n in args.only if n in names]
+    else:
+        only = [n.name for n in all_nodes]
+    for ex in (args.exclude or []):
+        only = [n for n in only if n != ex]
     extra = [a for n in only for a in ("--only", n)]
+    print(f"=== fleet bench targets: {only} ===", flush=True)
     print("=== fleet bench: stage 1/2 single-stream ===", flush=True)
     rc1 = subprocess.call(
         [sys.executable, str(HERE / "bench_fleet.py"), "--concurrency", str(args.concurrency), *extra])
@@ -410,7 +420,9 @@ def main() -> int:
     sub.add_parser("state", help="build fleet_state.json")
     sub.add_parser("routes", help="emit routing_rules.json")
     sub.add_parser("report", help="regenerate markdown docs + state")
-    sub.add_parser("status", help="quick live health snapshot")
+    st = sub.add_parser("status", help="quick live health snapshot")
+    st.add_argument("--exclude", action="append", default=[], help="exclude nodes")
+    st.add_argument("--all", action="store_true", help="include tailscale peers")
     w = sub.add_parser("watch", help="continuously refresh state+routes")
     w.add_argument("--sleep", type=int, default=900, help="seconds between refreshes")
     p = sub.add_parser("plan", help="emit fleet_loadout.json (orchestrator-consumable)")
@@ -421,6 +433,8 @@ def main() -> int:
     b.add_argument("--only", action="append", default=[], help="restrict to nodes")
     b.add_argument("--concurrency", type=int, default=4, help="parallel node benchmarks")
     b.add_argument("--max-concurrent", type=int, default=2, help="probe concurrency ceiling")
+    b.add_argument("--exclude", action="append", default=[], help="exclude nodes (e.g. x1-370 when localhost is shared)")
+    b.add_argument("--all", action="store_true", help="include tailscale-discovered peers, not just fleet.toml nodes")
 
     args = ap.parse_args()
     fn = {

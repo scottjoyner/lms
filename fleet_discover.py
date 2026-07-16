@@ -133,6 +133,17 @@ def discover(retries: int = 3) -> list[Node]:
         by_name[n.name] = n
     return list(by_name.values())
 
+def discover_fleet() -> list[Node]:
+    """The *benchmarked* fleet = explicit fleet.toml entries only.
+
+    Tailscale auto-discovery is useful for `status`/`discover` visibility, but
+    the benchmark pipeline must not try to bench every tailscale peer (raspberrypi,
+    iphones, other MacBooks). Those are not part of the curated fleet. Use
+    `discover()` (explicit + tailscale) when you want full visibility.
+    """
+    return _load_toml()
+
+
 
 def live_nodes(nodes: list[Node], retries: int = 3) -> list[Node]:
     return [n for n in nodes if _reachable(n.url, retries=retries)]
