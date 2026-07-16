@@ -317,7 +317,9 @@ def cmd_discover(args=None) -> int:
 # --------------------------------------------------------------------------
 def cmd_bench(args) -> int:
     only = args.only or []
-    extra = ["--only", *only] if only else []
+    # One --only flag per node so the sub-tools' action="append" parser gets
+    # each node as a separate value (not a single space-joined string).
+    extra = [a for n in only for a in ("--only", n)]
     print("=== fleet bench: stage 1/2 single-stream ===", flush=True)
     rc1 = subprocess.call(
         [sys.executable, str(HERE / "bench_fleet.py"), "--concurrency", str(args.concurrency), *extra])
@@ -425,7 +427,6 @@ def main() -> int:
         "discover": cmd_discover, "state": cmd_state, "routes": cmd_routes,
         "report": cmd_report, "status": cmd_status, "bench": cmd_bench,
         "plan": cmd_plan, "watch": cmd_watch,
-        "plan": cmd_plan,
     }[args.cmd]
     return fn(args)
 
