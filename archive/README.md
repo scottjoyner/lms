@@ -17,3 +17,7 @@ They are MOVED here (not deleted) so history is preserved. Each entry notes why.
   same canonical set as above. Not imported anywhere. Archived 2026-07-16.
 
 To restore any of these, move them back to the repo root and update references.
+
+- `bootstrap_keys.sh` — installed runner PUBLIC SSH keys via inline
+  `authorized_keys` append. Moved to archive 2026-07-16 (W-71): keys/paths should
+  be templated or managed out-of-band rather than committed inline.

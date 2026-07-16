@@ -15,7 +15,8 @@
 set -euo pipefail
 
 TARGET="${1:?usage: deploy_reporter.sh <user@host> [router-url]}"
-ROUTER_URL="${2:-http://100.64.43.123:8088}"
+# Router URL is parameterized (no hardcoded personal IP). Override via ROUTER_URL.
+ROUTER_URL="${2:-${ROUTER_URL:-http://100.64.43.123:8088}}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPORTER="$HERE/fleet_node_reporter.py"
 
