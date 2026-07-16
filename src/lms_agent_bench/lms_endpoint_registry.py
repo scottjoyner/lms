@@ -21,7 +21,16 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
+from lms_agent_bench.discovery import iter_tailscale_nodes, tailscale_status
+from lms_agent_bench.http_probe import normalize_base_url, probe_endpoint
 
+
+# Backwards-compatible local alias (logic now lives in lms_agent_bench.http_probe).
+def probe_endpoints(base_urls: Sequence[str], timeout: int = 8) -> List[Dict[str, Any]]:
+    return [
+        {**probe_endpoint(b, timeout), "base_url": normalize_base_url(b)}
+        for b in base_urls
+    ]
 DEFAULT_REGISTRY = Path(os.environ.get("LMS_BENCH_ENDPOINTS", "~/.config/lms-bench/endpoints.json")).expanduser()
 DEFAULT_TAILSCALE_PORT = int(os.environ.get("LMS_BENCH_TAILSCALE_PORT", "1234"))
 
@@ -38,15 +47,6 @@ def _slugify(value: str) -> str:
 
 def utc_now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
-
-
-def normalize_base_url(value: str) -> str:
-    value = value.strip().rstrip("/")
-    if not value.startswith("http://") and not value.startswith("https://"):
-        value = "http://" + value
-    if not value.endswith("/v1"):
-        value += "/v1"
-    return value
 
 
 def registry_path(path: Optional[str]) -> Path:
@@ -94,39 +94,6 @@ def format_ip_host(ip: str) -> str:
 
 def endpoint_from_ip(ip: str, port: int = DEFAULT_TAILSCALE_PORT) -> str:
     return f"http://{format_ip_host(ip)}:{port}/v1"
-
-
-def tailscale_status(timeout: int = 8) -> Optional[Dict[str, Any]]:
-    try:
-        proc = subprocess.run(
-            ["tailscale", "status", "--json"],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
-        return None
-    if proc.returncode != 0:
-        return None
-    try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        return None
-    return data if isinstance(data, dict) else None
-
-
-def iter_tailscale_nodes(status: Dict[str, Any], include_self: bool = True) -> List[Dict[str, Any]]:
-    nodes: List[Dict[str, Any]] = []
-    self_node = status.get("Self")
-    if include_self and isinstance(self_node, dict):
-        nodes.append(self_node)
-    peers = status.get("Peer")
-    if isinstance(peers, dict):
-        for peer in peers.values():
-            if isinstance(peer, dict):
-                nodes.append(peer)
-    return nodes
 
 
 def build_tailscale_endpoint_candidates(status: Dict[str, Any], port: int = DEFAULT_TAILSCALE_PORT, include_self: bool = True) -> List[Dict[str, Any]]:
@@ -220,24 +187,6 @@ def refresh_tailscale_registry(path: Path, *, port: int = DEFAULT_TAILSCALE_PORT
         "registry": str(path),
         "error": None,
     }
-
-
-def probe_endpoint(base_url: str, timeout: int = 8) -> Dict[str, Any]:
-    url = normalize_base_url(base_url).rstrip("/") + "/models"
-    started = dt.datetime.now(dt.timezone.utc)
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read(5_000_000).decode("utf-8", errors="replace")
-            data = json.loads(body)
-            models = []
-            if isinstance(data, dict) and isinstance(data.get("data"), list):
-                models = [str(m["id"]) for m in data["data"] if isinstance(m, dict) and m.get("id")]
-            elapsed = (dt.datetime.now(dt.timezone.utc) - started).total_seconds()
-            return {"reachable": True, "status": getattr(resp, "status", None), "elapsed_s": round(elapsed, 4), "models": models, "model_count": len(models), "error": None}
-    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        elapsed = (dt.datetime.now(dt.timezone.utc) - started).total_seconds()
-        return {"reachable": False, "status": None, "elapsed_s": round(elapsed, 4), "models": [], "model_count": 0, "error": repr(exc)}
 
 
 def select_endpoints(data: Dict[str, Any], names: Optional[Sequence[str]], tags: Optional[Sequence[str]], enabled_only: bool = True) -> List[Dict[str, Any]]:

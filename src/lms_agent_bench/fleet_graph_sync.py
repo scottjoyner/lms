@@ -25,8 +25,9 @@ Run:
   python3 fleet_graph_sync.py --watch --sleep 60   # loop
   python3 fleet_graph_sync.py --router-url http://localhost:8088
 
-Env: NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD (default bolt://localhost:7687,
-neo4j / knowledge_graph_2026).
+Env: NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD / NEO4J_DB are read from the
+environment (no hardcoded secret). The driver is provided by
+:mod:`lms_agent_bench.neo4j`.
 """
 from __future__ import annotations
 
@@ -40,14 +41,12 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from lms_agent_bench.neo4j import NEO4J_DB, get_driver
+from lms_agent_bench.graph_common import ensure_schema
+
 HERE = Path(__file__).resolve().parents[1]
 STATE_JSON = HERE / "fleet_state.json"
 ROUTES_JSON = HERE / "routing_rules.json"
-
-NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
-NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "knowledge_graph_2026")
-NEO4J_DB = os.environ.get("NEO4J_DB", "neo4j")
 
 DEFAULT_ROUTER = os.environ.get("FLEET_ROUTER_URL", "http://localhost:8088")
 
@@ -320,7 +319,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
         print("[error] no live fleet nodes retrieved from router; aborting.", file=sys.stderr)
         return 2
 
-    driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+    driver = get_driver()
     try:
         ensure_schema(driver, NEO4J_DB)
         previous = latest_snapshot_id(driver, NEO4J_DB)

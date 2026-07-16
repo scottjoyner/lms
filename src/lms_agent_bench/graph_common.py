@@ -12,7 +12,9 @@ from typing import List, Optional
 
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "knowledge_graph_2026")
+# NOTE: no hardcoded default password — NEO4J_PASSWORD must be supplied via the
+# environment ( secrets are never committed; see docs/LLD_UNIFIED_FLEET.md W-71).
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "")
 NEO4J_DB = os.environ.get("NEO4J_DB", "neo4j")
 
 LOCAL_EMBEDDING_MODEL = os.environ.get("LMS_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
@@ -20,6 +22,11 @@ LOCAL_EMBED_DIM = int(os.environ.get("LMS_EMBED_DIM", "384"))
 
 
 def get_driver():
+    if not NEO4J_PASSWORD:
+        raise RuntimeError(
+            "NEO4J_PASSWORD is not set. Export it from your environment/secret "
+            "manager before running any lms graph-sync module."
+        )
     from neo4j import GraphDatabase
 
     return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
