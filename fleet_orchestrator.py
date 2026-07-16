@@ -59,6 +59,9 @@ FLEET_NODES_URL = os.environ.get("FLEET_NODES_URL", "http://localhost:8088/api/f
 # identity (device id + hostname + IP + OS) so discovery is reproducible.
 FLEET_BASELINE = Path(os.environ.get("FLEET_BASELINE", HERE / "fleet_baseline.csv"))
 
+# Measured loadout produced by fleet.py plan (per-node mount lists + routing).
+FLEET_LOADOUT = Path(os.environ.get("FLEET_LOADOUT", HERE / "fleet_loadout.json"))
+
 
 def _params_b(model: dict | None) -> float:
     """Best-effort parameter count in billions from a library entry."""
@@ -796,6 +799,66 @@ def cmd_bootstrap(args: argparse.Namespace) -> None:
                 print(f"  [dry-run] {n['slug']}: load {mk}")
 
 
+def cmd_loadout(args: argparse.Namespace) -> None:
+    """Apply a measured loadout from fleet_loadout.json (produced by fleet.py plan).
+
+    This is the payoff for the benchmark pipeline: instead of deriving mount
+    targets from capability/Capability data (which can be stale or contaminated
+    by RAM-only fit grades), we use the *measured* per-node mount lists and the
+    best-node-per-model routing map. We still probe each node for its currently
+    loaded models and respect busy models (never unmount a serving model).
+    """
+    if not FLEET_LOADOUT.exists():
+        print(f"no measured loadout at {FLEET_LOADOUT}; run: python3 fleet.py plan",
+              file=sys.stderr)
+        return
+    data = json.loads(FLEET_LOADOUT.read_text(encoding="utf-8"))
+    loadout_nodes = data.get("nodes", {})
+    routing = data.get("routing", {})
+
+    nodes = _filter_nodes(discover_nodes(), args.only)
+    busy = load_busy_map()
+    plan: list[dict] = []
+    for n in nodes:
+        p = probe_node(n)
+        if not p.get("reachable", False):
+            print(f"{n['slug']:28} SKIP (unreachable)", file=sys.stderr)
+            continue
+        n["loaded_models"] = p.get("loaded_models", [])
+        n["_busy"] = busy.get(n["ip"], set())
+
+        entry = loadout_nodes.get(n["slug"]) or loadout_nodes.get(n["hostname"])
+        if not entry:
+            # slug not in measured loadout (e.g. tailscale alias mismatch) -> skip
+            plan.append({"node": n["slug"], "ip": n["ip"], "actions": [],
+                         "mounted": [], "used_gib": 0.0, "budget_gib": 0.0,
+                         "spec_source": "measured-loadout",
+                         "note": "node absent from fleet_loadout.json"})
+            continue
+        target = set(entry.get("mount", []))
+        current = set(n["loaded_models"])
+        actions: list[dict] = []
+        for mk in target - current:
+            actions.append({"op": "load", "model": mk})
+        for mk in current - target:
+            if mk in n["_busy"]:
+                actions.append({"op": "keep_busy", "model": mk,
+                                "note": "busy; not unmounting"})
+            else:
+                actions.append({"op": "unload", "model": mk})
+        plan.append({"node": n["slug"], "ip": n["ip"], "actions": actions,
+                     "mounted": sorted(target),
+                     "used_gib": 0.0,
+                     "budget_gib": round(entry.get("ram_gib") or 0.0, 1),
+                     "spec_source": "measured-loadout",
+                     "max_concurrency": entry.get("max_concurrency"),
+                     "note": f"routing_best={routing.get(next(iter(target),''),{}).get('best_node') if target else None}"})
+
+    header = f"{'DRY-RUN' if not args.apply else 'APPLYING'} measured loadout from {FLEET_LOADOUT.name} (demand={data.get('demand')})"
+    print(header)
+    apply_loadouts(plan, dry_run=not args.apply)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Fleet model-loadout orchestrator")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -818,6 +881,10 @@ def main() -> None:
     p_boot.add_argument("--apply", action="store_true", help="actually mount (default dry-run)")
     p_boot.add_argument("--only", default=None, help="restrict to one node (slug/hostname, or 'self')")
     p_boot.set_defaults(func=cmd_bootstrap)
+    p_load = sub.add_parser("loadout", help="apply measured loadout from fleet_loadout.json")
+    p_load.add_argument("--apply", action="store_true", help="actually mount/unmount (default dry-run)")
+    p_load.add_argument("--only", default=None, help="restrict to one node (slug/hostname, or 'self')")
+    p_load.set_defaults(func=cmd_loadout)
     args = ap.parse_args()
     args.func(args)
 

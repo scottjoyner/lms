@@ -93,3 +93,31 @@ fleet can shift from "mostly small fast models" to "a couple of big quality mode
 - `docs/deploy_model.md` — operator runbook for adding one model to the fleet
   (acquire → place → load → verify → benchmark), including the two-layer decision
   model (placement vs. routing) and troubleshooting.
+
+## Measured loadout (`loadout` command)
+In addition to the capability-driven `plan`/`apply` flow, the orchestrator can
+consume the *measured* loadout produced by `fleet.py plan`:
+
+```
+python3 fleet_orchestrator.py loadout            # dry-run convergence from fleet_loadout.json
+python3 fleet_orchestrator.py loadout --apply    # actually mount/unmount
+python3 fleet_orchestrator.py loadout --only x1-370
+```
+
+`cmd_loadout` reads `fleet_loadout.json` (per-node mount lists + best-node-per-model
+routing, all derived from real benchmark tps and the measured concurrency tiers),
+probes each node for its currently-loaded and busy models, and reuses the existing
+`apply_loadouts` actuator to emit only the `load`/`unload`/`keep_busy` actions needed.
+This is the payoff for the benchmark pipeline: it bypasses the RAM-only fit grades
+that can label a 35B model "fits" on a small node, and instead mounts what actually
+ran at useful throughput. Nodes absent from `fleet_loadout.json` are skipped.
+
+## Relation to the rest of the stack
+- `bench_fleet.py` / `lms_model_fit.py` **produce** the capability data this reads.
+- `fleet.py plan` produces `fleet_loadout.json` (measured mount lists) which the
+  `loadout` command here consumes — closing the benchmark→orchestrate loop.
+- `auto-router` **consumes** the resulting mounted models (and tells us what is busy).
+- This harness is the **control loop** between them: it watches demand + capacity
+  and keeps the fleet's mounted models aligned with what the router needs.
+- `fleet.py watch` keeps `fleet_state.json` / `routing_rules.json` live in the
+  background (default every 900s) so the measured artifacts never go stale.

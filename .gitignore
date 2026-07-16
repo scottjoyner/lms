@@ -27,3 +27,4 @@ redo_missing.log
 fleet_state.json
 routing_rules.json
 fleet_loadout.json
+fleet_watch.log

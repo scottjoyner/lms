@@ -116,7 +116,6 @@ def derive_concurrency_tier(node: str, model: str, probe_rows: list[dict]) -> di
 def build_state() -> dict:
     nodes = discover()
     aliases = all_aliases(nodes)
-    live = {n.name for n in live_nodes(nodes)}
     # The real fleet = nodes we have actually benchmarked (a runs/<node> dir).
     # Tailscale peers without artifacts (raspberrypi, other MacBooks, etc.) are
     # not part of the benchmarked fleet and are excluded from the state.
@@ -131,6 +130,12 @@ def build_state() -> dict:
         if prev is None or _newest_stamp(nd) > _newest_stamp(prev):
             by_canon[canon] = nd
     bench_dirs = list(by_canon.values())
+    # Liveness is probed ONLY for nodes we have actually benchmarked (the real
+    # fleet), not the whole tailscale view — probing every peer (raspberrypi,
+    # iphones, etc.) with retry/backoff would hang build_state for minutes.
+    canon_names = {aliases.get(nd.name, nd.name) for nd in bench_dirs}
+    live_nodeset = live_nodes([n for n in nodes if n.name in canon_names])
+    live = {n.name for n in live_nodeset}
     probe_dir = RUNS / "concurrency_probe"
     probe_rows: list[dict] = []
     if probe_dir.exists():
