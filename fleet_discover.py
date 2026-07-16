@@ -34,6 +34,7 @@ class Node:
     via: str = "explicit"          # explicit | tailscale | manual
     aliases: list[str] = field(default_factory=list)
     notes: str = ""
+    shared: bool = False             # True => localhost/endpoint used by other systems; exclude from bench by default
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -108,6 +109,7 @@ def _load_toml() -> list[Node]:
             via="explicit",
             aliases=list(n.get("aliases", [])),
             notes=n.get("notes", ""),
+            shared=bool(n.get("shared", False)),
         ))
     return nodes
 

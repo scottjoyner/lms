@@ -322,12 +322,20 @@ def cmd_bench(args) -> int:
     # tailscale-only peers (raspberrypi, iphones) are not benchmarked unless --all.
     all_nodes = discover() if args.all else discover_fleet()
     names = {n.name for n in all_nodes}
+    # Shared endpoints (e.g. x1-370 localhost used by other systems) are excluded
+    # by default so we don't contend with them; opt in with --include-shared.
+    shared = {n.name for n in all_nodes if getattr(n, "shared", False)}
+    if shared and not args.include_shared:
+        print(f"=== excluding shared nodes: {sorted(shared)} "
+              f"(use --include-shared to bench them) ===", flush=True)
     if args.only:
         only = [n for n in args.only if n in names]
     else:
         only = [n.name for n in all_nodes]
     for ex in (args.exclude or []):
         only = [n for n in only if n != ex]
+    if not args.include_shared:
+        only = [n for n in only if n not in shared]
     extra = [a for n in only for a in ("--only", n)]
     print(f"=== fleet bench targets: {only} ===", flush=True)
     print("=== fleet bench: stage 1/2 single-stream ===", flush=True)
@@ -435,6 +443,7 @@ def main() -> int:
     b.add_argument("--max-concurrent", type=int, default=2, help="probe concurrency ceiling")
     b.add_argument("--exclude", action="append", default=[], help="exclude nodes (e.g. x1-370 when localhost is shared)")
     b.add_argument("--all", action="store_true", help="include tailscale-discovered peers, not just fleet.toml nodes")
+    b.add_argument("--include-shared", action="store_true", help="also bench shared endpoints (e.g. x1-370 localhost)")
 
     args = ap.parse_args()
     fn = {
