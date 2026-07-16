@@ -1,4 +1,3 @@
-import json
 
 from lms_eval import evaluate_output
 

@@ -1,79 +1,35 @@
-name: lms-bench-ci
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
-  test:
+  lint-and-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e '.[test]'
+          pip install ruff
+          pip install -e ".[test]"
 
-      - name: Compile modules
-        run: |
-          python -m py_compile \
-            lms_cli_v2.py \
-            lms_cli.py \
-            lms_config.py \
-            lms_endpoint_registry.py \
-            lmstudio_cli_bridge.py \
-            lms_skill_export.py \
-            lms_run_audit.py \
-            lms_manifest_validate.py \
-            lms_artifact_validate.py \
-            lms_agent_brief.py \
-            lms_model_fit.py \
-            lms_support_bundle.py \
-            lms_history.py \
-            lms_decide.py \
-            lms_history_decide.py \
-            lms_machine_profile.py \
-            lms_eval.py \
-            benchmark_lmstudio_cross_machine_models.py
+      - name: Ruff lint
+        run: ruff check src tests
 
-      - name: Validate CLI commands
-        run: |
-          lms-bench --version
-          lms-bench config show --pretty
-          lms-bench config validate --pretty
-          lms-bench validate-suite --pretty
-          lms-bench selftest
-          lms-bench-endpoints --help
-          lmstudio-bridge --help
-
-      - name: Validate evaluator behavior
-        run: |
-          echo '{"x": 1}' | lms-bench eval --evaluators-json '[{"type":"json_parse"}]' --pretty
-          set +e
-          echo 'rm -rf /' | lms-bench eval --evaluators-json '[{"type":"forbidden_shell_patterns"}]' --pretty
-          test "$?" -ne 0
-
-      - name: Exercise endpoint registry offline path
-        run: |
-          export LMS_BENCH_ENDPOINTS="$PWD/.tmp/endpoints.json"
-          lms-bench-endpoints add local http://127.0.0.1:1234/v1 --tags local,ci
-          lms-bench-endpoints list
-          lms-bench-endpoints list --json
-
-      - name: Run unit tests
-        run: |
-          pytest -q
-
-      - name: Build package artifacts
-        run: |
-          python -m build
+      - name: pytest
+        run: pytest -q
+        env:
+          # No live Neo4j in CI; graph-sync smoke tests mock the driver.
+          NEO4J_PASSWORD: ""

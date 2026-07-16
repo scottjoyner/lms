@@ -15,7 +15,7 @@ import json
 import os
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence
 
 
 DEFAULT_DB = Path(os.environ.get("LMS_BENCH_HISTORY_DB", "~/.local/share/lms-bench/history.sqlite3")).expanduser()

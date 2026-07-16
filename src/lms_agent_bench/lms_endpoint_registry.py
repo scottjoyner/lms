@@ -14,9 +14,6 @@ import datetime as dt
 import json
 import os
 import socket
-import subprocess
-import urllib.error
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence

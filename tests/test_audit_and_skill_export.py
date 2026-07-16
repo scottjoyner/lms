@@ -1,6 +1,5 @@
 import csv
 import json
-from pathlib import Path
 
 from lms_run_audit import audit_run
 from lms_skill_export import export_skill

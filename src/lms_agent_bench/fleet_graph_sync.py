@@ -42,9 +42,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from lms_agent_bench.neo4j import NEO4J_DB, get_driver
-from lms_agent_bench.graph_common import ensure_schema
 
-HERE = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parents[2]
 STATE_JSON = HERE / "fleet_state.json"
 ROUTES_JSON = HERE / "routing_rules.json"
 
@@ -312,7 +311,6 @@ def latest_snapshot_id(driver, db: str) -> Optional[str]:
 
 
 def cmd_publish(args: argparse.Namespace) -> int:
-    from neo4j import GraphDatabase
 
     snap = build_snapshot(args.router_url)
     if not snap["node_states"]:

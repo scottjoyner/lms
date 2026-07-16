@@ -1,13 +1,6 @@
 import json
-import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-import fleet
-import fleet_orchestrator as orch
+from lms_agent_bench import fleet, fleet_orchestrator as orch
 
 
 def test_build_state_no_hang_and_counts():

@@ -35,7 +35,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parents[2]
 RUNS = HERE / "runs"
 STATE_JSON = HERE / "fleet_state.json"
 ROUTES_JSON = HERE / "routing_rules.json"

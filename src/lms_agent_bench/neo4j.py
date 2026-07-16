@@ -16,20 +16,23 @@ from typing import Any, Dict, Optional
 
 from lms_agent_bench.graph_common import (
     NEO4J_DB,
-    NEO4J_PASSWORD,
-    NEO4J_URI,
-    NEO4J_USER,
     get_driver as _graph_common_get_driver,
 )
 
 
 def neo4j_config() -> Dict[str, str]:
-    """Return the resolved Neo4j connection config (no secrets defaulted)."""
+    """Return the resolved Neo4j connection config (no secrets defaulted).
+
+    Reads the values live from :mod:`lms_agent_bench.graph_common` so environment
+    overrides are reflected even after import.
+    """
+    from lms_agent_bench import graph_common
+
     return {
-        "uri": NEO4J_URI,
-        "user": NEO4J_USER,
-        "password": NEO4J_PASSWORD,
-        "db": NEO4J_DB,
+        "uri": graph_common.NEO4J_URI,
+        "user": graph_common.NEO4J_USER,
+        "password": graph_common.NEO4J_PASSWORD,
+        "db": graph_common.NEO4J_DB,
     }
 
 

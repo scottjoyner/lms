@@ -30,10 +30,10 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_ENDPOINT = "http://127.0.0.1:1234/v1"
 DEFAULT_RUNS_DIR = "runs"
 DEFAULT_SUITE = Path("benchmarks") / "agent_skill_suite.v1.json"

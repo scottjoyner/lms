@@ -14,7 +14,7 @@ import json
 import re
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 
 DEFAULT_INCLUDE_FILES = [

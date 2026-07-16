@@ -23,21 +23,21 @@ import json
 import os
 import subprocess
 import sys
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.request import Request, urlopen
 
-HERE = Path(__file__).resolve().parents[1]
-RUNS = HERE / "runs"
-
 # Canonical fleet identity/discovery now lives in lms_agent_bench.fleet_discover
 # (fleet.toml + tailscale, one hostname scheme). The orchestrator consumes it
 # instead of maintaining its own device list. See docs/LLD_UNIFIED_FLEET.md W-70.
-from lms_agent_bench.fleet_discover import discover as _discover_fleet_nodes
 from lms_agent_bench.discovery import discover_tailscale_nodes
-LM_PORT = int(__import__("os").environ.get("LM_PORT", "1234"))
+from lms_agent_bench.fleet_discover import discover as _discover_fleet_nodes
+
+HERE = Path(__file__).resolve().parents[2]
+RUNS = HERE / "runs"
+
+LM_PORT = int(os.environ.get("LM_PORT", "1234"))
 # Router fleet state (per-owner in-flight) used for busy detection.
 FLEET_JSON = Path(
     __import__("os").environ.get(

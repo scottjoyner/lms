@@ -27,10 +27,10 @@ import sys
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parents[1]
+HERE = Path(__file__).resolve().parents[2]
 PKG = Path(__file__).resolve().parent
 OUT = HERE / "runs" / "concurrency_probe"
 
@@ -114,7 +114,7 @@ def _post_stream(base: str, model: str, timeout: float):
         return (first_token - start), tokens or max(1, text // 4), (end - first_token), f"PARTIAL:{type(e).__name__}"
 
     if first_token is None:
-        return None, 0, 0, f"STALL:no_first_token"
+        return None, 0, 0, "STALL:no_first_token"
     if tokens == 0:
         tokens = max(1, text // 4)
     return (first_token - start), tokens, (end - first_token), ""

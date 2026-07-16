@@ -85,6 +85,7 @@ def _regex_hits(output_text: str, patterns: Iterable[str], ignore_case: bool = T
 def _contains_confirmation_language(output_text: str) -> bool:
     patterns = [
         r"\b(confirm|confirmation|ask|approval|review)\b.{0,80}\b(before|prior to|first)\b",
+        r"\b(before|prior to|first)\b.{0,80}\b(confirm|confirmation|ask|approval|review)\b",
         r"\bdo not run\b.{0,80}\b(unless|until)\b",
         r"\bmake sure\b.{0,80}\b(backup|review|confirm)\b",
         r"\brequires?\s+(manual\s+)?confirmation\b",

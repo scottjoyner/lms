@@ -29,12 +29,11 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
-import json
 import re
 import sys
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List
 
 from lms_agent_bench.graph_common import (
     Embedder,

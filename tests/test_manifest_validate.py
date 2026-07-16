@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from lms_manifest_validate import load_manifest, validate_manifest

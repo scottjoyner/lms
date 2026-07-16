@@ -23,6 +23,7 @@ The wrapper delegates most existing commands to `lms_cli.main`.
 from __future__ import annotations
 
 import argparse
+import os
 import py_compile
 import sys
 from pathlib import Path
