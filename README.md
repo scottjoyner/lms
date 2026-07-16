@@ -2,11 +2,19 @@
 
 LMS is an agent-facing command line toolkit for profiling and benchmarking local or Tailscale-reachable LM Studio nodes. It gives agents a simple way to test the machine they are running on, discover available local models, run repeatable benchmark tasks, score outputs with deterministic evaluators, and produce task-specific routing recommendations.
 
-Current installed CLI entrypoint:
+Current installed CLI entrypoints (see `pyproject.toml`):
 
 ```toml
-lms = "lms_cli:main"
+lms                   = "lms_agent_bench.cli:main"
+lms-bench            = "lms_agent_bench.lms_cli_v2:main"
+lmsbench             = "lms_agent_bench.lms_cli_v2:main"
+lms-bench-endpoints  = "lms_agent_bench.lms_endpoint_registry:main"
+lmstudio-bridge       = "lms_agent_bench.lmstudio_cli_bridge:main"
 ```
+
+The canonical implementation now lives in the `lms_agent_bench` package
+(`src/lms_agent_bench/`). Root `*.py` files are backwards-compatible shims that
+re-export from the package (docs/LLD_UNIFIED_FLEET.md §3.6, W-67).
 
 ## Fast start for agents
 
