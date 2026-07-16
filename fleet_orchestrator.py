@@ -46,7 +46,7 @@ HTTP_TIMEOUT = 8.0
 # xwing / x1-370 / deathstar run multiple models well; beelink can run a few).
 # Keys that are not present in a node's local LM Studio library simply fail to
 # load (we skip them), so this is safe to run fleet-wide.
-EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5"
+LMSTUDIO_EMBEDDING_MODEL = "text-embedding-nomic-embed-text-v1.5"
 TINY_MODEL = "liquid/lfm2.5-1.2b"
 SMALL_MODEL = "orinth-1.0-9b"
 MEDIUM_MODEL = "google/gemma-4-12b-qat"
@@ -869,11 +869,11 @@ def main() -> None:
     p_stat.add_argument("--only", default=None, help="restrict to one node (slug/hostname, or 'self')")
     p_stat.set_defaults(func=cmd_status)
     p_plan = sub.add_parser("plan")
-    p_plan.add_argument("--demand", choices=["realtime", "quality", "balanced"], default="realtime")
+    p_plan.add_argument("--demand", choices=["realtime", "quality", "balanced"], default="balanced")
     p_plan.add_argument("--only", default=None, help="restrict to one node (slug/hostname, or 'self')")
     p_plan.set_defaults(func=cmd_plan)
     p_apply = sub.add_parser("apply")
-    p_apply.add_argument("--demand", choices=["realtime", "quality", "balanced"], default="realtime")
+    p_apply.add_argument("--demand", choices=["realtime", "quality", "balanced"], default="balanced")
     p_apply.add_argument("--apply", action="store_true", help="actually mount/unmount (default dry-run)")
     p_apply.add_argument("--only", default=None, help="restrict to one node (slug/hostname, or 'self')")
     p_apply.set_defaults(func=cmd_apply)

@@ -15,8 +15,8 @@ NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "knowledge_graph_2026")
 NEO4J_DB = os.environ.get("NEO4J_DB", "neo4j")
 
-EMBEDDING_MODEL = os.environ.get("LMS_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-EMBED_DIM = int(os.environ.get("LMS_EMBED_DIM", "384"))
+LOCAL_EMBEDDING_MODEL = os.environ.get("LMS_EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+LOCAL_EMBED_DIM = int(os.environ.get("LMS_EMBED_DIM", "384"))
 
 
 def get_driver():
@@ -44,14 +44,14 @@ class Embedder:
         if cls._model is None:
             from sentence_transformers import SentenceTransformer
 
-            cls._model = SentenceTransformer(EMBEDDING_MODEL)
+            cls._model = SentenceTransformer(LOCAL_EMBEDDING_MODEL)
         return cls._model
 
     @classmethod
     def embed(cls, text: str) -> List[float]:
         text = (text or "").strip()
         if not text:
-            return [0.0] * EMBED_DIM
+            return [0.0] * LOCAL_EMBED_DIM
         vec = cls.model().encode(text, normalize_embeddings=True)
         return vec.tolist()
 

@@ -93,7 +93,6 @@ def derive_concurrency_tier(node: str, model: str, probe_rows: list[dict]) -> di
     import re
     mh = re.search(r"speed_hit=(-?\d+)", err)
     mg = re.search(r"gain=(-?\d+)", err)
-    mg = re.search(r"gain=(-?\d+)", err)
     if mh:
         hit = int(mh.group(1))
     if mg:
