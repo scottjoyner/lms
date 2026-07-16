@@ -405,19 +405,31 @@ def cmd_plan(args=None) -> int:
 
 
 def cmd_watch(args=None) -> int:
-    """Continuous refresh of fleet_state.json + routing_rules.json (Item 9).
+    """Continuous refresh of fleet_state.json + routing_rules.json + loadout (Item 9).
 
     Keeps the machine-readable artifacts live so the orchestrator never reads a
-    stale snapshot. Pair with cron or nohup:
+    stale snapshot, and keeps fleet_loadout.json current so `loadout` converges
+    against fresh measured data. Pair with cron or nohup:
         nohup python3 fleet.py watch --sleep 900 &
     """
     sleep = (args.sleep if args else 900)
+    demand = (args.demand if args else "balanced")
     while True:
         cmd_state()
         cmd_routes()
+        try:
+            cmd_plan(_WatchArgs(demand=demand))
+        except Exception as e:  # noqa: BLE001 - loadout refresh must never kill the loop
+            print(f"[watch] loadout refresh failed: {e}", flush=True)
         print(f"[watch] refreshed; next in {sleep}s", flush=True)
         time.sleep(sleep)
     return 0
+
+
+class _WatchArgs:
+    def __init__(self, demand="balanced", top=6):
+        self.demand = demand
+        self.top = top
 
 
 def main() -> int:
@@ -431,8 +443,9 @@ def main() -> int:
     st = sub.add_parser("status", help="quick live health snapshot")
     st.add_argument("--exclude", action="append", default=[], help="exclude nodes")
     st.add_argument("--all", action="store_true", help="include tailscale peers")
-    w = sub.add_parser("watch", help="continuously refresh state+routes")
+    w = sub.add_parser("watch", help="continuously refresh state+routes/loadout")
     w.add_argument("--sleep", type=int, default=900, help="seconds between refreshes")
+    w.add_argument("--demand", choices=["balanced", "realtime", "quality"], default="balanced", help="demand profile for the loadout refresh")
     p = sub.add_parser("plan", help="emit fleet_loadout.json (orchestrator-consumable)")
     p.add_argument("--demand", choices=["balanced", "realtime", "quality"], default="balanced")
     p.add_argument("--top", type=int, default=6, help="max models to mount per node")
