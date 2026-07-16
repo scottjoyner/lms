@@ -1,0 +1,12 @@
+[Unit]
+Description=opencode session -> Neo4j sync
+
+[Service]
+Type=oneshot
+Environment=LMS_REPO=/home/scott/git/lms
+Environment=PYTHONUNBUFFERED=1
+# NEO4J_PASSWORD supplied via environment (not hardcoded — W-71).
+WorkingDirectory=%h
+ExecStart=/usr/bin/python3 -m lms_agent_bench.session_graph_sync sync --since-days 1
+StandardOutput=journal
+StandardError=journal

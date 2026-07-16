@@ -1,0 +1,17 @@
+[Unit]
+Description=Fleet node reporter (pubsub model library/health to auto-router)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# ROUTER_URL override via environment; default points at the auto-router.
+Environment=ROUTER_URL=http://localhost:8088
+Environment=PYTHONUNBUFFERED=1
+WorkingDirectory=%h
+ExecStart=/usr/bin/python3 ${LMS_REPO}/fleet_node_reporter.py --router-url ${ROUTER_URL} --interval 30
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

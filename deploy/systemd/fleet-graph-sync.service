@@ -1,0 +1,21 @@
+[Unit]
+Description=Fleet health -> Neo4j graph sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# LMS_REPO points at the lms checkout; override per-host via an environment drop-in.
+Environment=LMS_REPO=/home/scott/git/lms
+Environment=PYTHONUNBUFFERED=1
+# NEO4J_PASSWORD must be provided via environment (e.g. `systemctl --user import-environment`
+# or a drop-in) — it is intentionally NOT hardcoded here (docs/LLD_UNIFIED_FLEET.md W-71).
+WorkingDirectory=%h
+ExecStart=/usr/bin/python3 -m lms_agent_bench.fleet_graph_sync watch --sleep 60 --router-url http://localhost:8088
+Restart=on-failure
+RestartSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
