@@ -1,0 +1,7 @@
+# fleet_baseline.csv
+#
+# This file is NO LONGER committed. It is an auto-generated cache of tailscale
+# fleet discovery, written by fleet_orchestrator._regenerate_baseline() when
+# absent (docs/LLD_UNIFIED_FLEET.md W-70). The canonical fleet identity now
+# lives in fleet.toml + lms_agent_bench.fleet_discover. Do not re-commit a
+# hardcoded device list here.

@@ -31,6 +31,12 @@ from urllib.request import Request, urlopen
 
 HERE = Path(__file__).resolve().parents[1]
 RUNS = HERE / "runs"
+
+# Canonical fleet identity/discovery now lives in lms_agent_bench.fleet_discover
+# (fleet.toml + tailscale, one hostname scheme). The orchestrator consumes it
+# instead of maintaining its own device list. See docs/LLD_UNIFIED_FLEET.md W-70.
+from lms_agent_bench.fleet_discover import discover as _discover_fleet_nodes
+from lms_agent_bench.discovery import discover_tailscale_nodes
 LM_PORT = int(__import__("os").environ.get("LM_PORT", "1234"))
 # Router fleet state (per-owner in-flight) used for busy detection.
 FLEET_JSON = Path(
@@ -139,77 +145,54 @@ def _slug(hostname: str) -> str:
 
 
 def discover_nodes() -> list[dict]:
-    """Enumerate the fleet from the authoritative baseline (device inventory) and
-    build each node's LM Studio endpoints. The baseline gives stable, reproducible
-    node identity (device id + hostname + IP + OS); tailscale is only a fallback when
-    no baseline file is present. Liveness is confirmed later by probe_node()."""
-    baseline = _load_baseline()
-    if baseline:
-        nodes: list[dict] = []
-        for b in baseline:
-            ip = b.get("ip")
-            if not ip:
-                continue
-            nodes.append({
-                "hostname": b["hostname"],
-                "slug": _slug(b["hostname"]),
-                "device_id": b.get("device_id"),
-                "ip": ip,
-                "online": True,  # confirmed later by probe_node
-                "os": b.get("os", ""),
-                "base_url": f"http://{ip}:{LM_PORT}/v1",
-                "native_url": f"http://{ip}:{LM_PORT}/api/v1/models",
-            })
+    """Enumerate the fleet using the canonical discovery module
+    (lms_agent_bench.fleet_discover: fleet.toml + tailscale). This is the single
+    source of fleet identity now — one hostname scheme, no duplicated device
+    lists. Liveness is confirmed later by probe_node()."""
+    nodes: list[dict] = []
+    for n in _discover_fleet_nodes():
+        ip = n.url.rsplit(":", 1)[0].rsplit("://", 1)[-1]
+        nodes.append({
+            "hostname": n.name,
+            "slug": _slug(n.name),
+            "device_id": None,
+            "ip": ip,
+            "online": True,  # confirmed later by probe_node
+            "os": "",
+            "base_url": f"http://{ip}:{LM_PORT}/v1",
+            "native_url": f"http://{ip}:{LM_PORT}/api/v1/models",
+        })
+    if nodes:
         return nodes
+    # Fallback: tailscale-only discovery (no fleet.toml).
     return _discover_tailscale()
 
 
 def _discover_tailscale() -> list[dict]:
-    """Fallback discovery via `tailscale status --json`."""
+    """Fallback discovery via `tailscale status --json`, delegated to the shared
+    lms_agent_bench.discovery module."""
     nodes: list[dict] = []
-    try:
-        raw = subprocess.run(
-            ["tailscale", "status", "--json"],
-            capture_output=True, text=True, timeout=15,
-        ).stdout
-        data = json.loads(raw)
-    except Exception as exc:  # pragma: no cover - env dependent
-        print(f"tailscale status failed: {exc}", file=sys.stderr)
-        return nodes
-
-    def add(hostname: str, ip: str | None, online: bool, os_name: str = "") -> None:
-        if not ip:
-            return
+    for n in discover_tailscale_nodes(port=LM_PORT):
         nodes.append({
-            "hostname": hostname,
-            "slug": _slug(hostname),
-            "ip": ip,
-            "online": bool(online),
-            "os": os_name,
-            "base_url": f"http://{ip}:{LM_PORT}/v1",
-            "native_url": f"http://{ip}:{LM_PORT}/api/v1/models",
+            "hostname": n["name"],
+            "slug": _slug(n["name"]),
+            "ip": n["ip"],
+            "online": bool(n.get("online", False)),
+            "os": n.get("os", ""),
+            "base_url": f"http://{n['ip']}:{LM_PORT}/v1",
+            "native_url": f"http://{n['ip']}:{LM_PORT}/api/v1/models",
         })
-
-    self_ip = None
-    try:
-        self_ip = subprocess.run(
-            ["tailscale", "ip", "-4"], capture_output=True, text=True, timeout=10
-        ).stdout.strip().splitlines()
-        self_ip = self_ip[0] if self_ip else None
-    except Exception:
-        self_ip = None
-    if self_ip:
-        add("self", self_ip, True, "self")
-
-    for peer in (data.get("Peer") or {}).values():
-        ip = (peer.get("TailscaleIPs") or [None])[0]
-        add(peer.get("HostName", "unknown"), ip, peer.get("Online", False), peer.get("OS", ""))
     return nodes
 
 
 def _load_baseline() -> list[dict]:
-    """Load the authoritative fleet device inventory CSV (device_id, hostname, os,
-    tailscale_ip). Returns [] when the file is absent so we fall back to tailscale."""
+    """Load the fleet device inventory CSV (device_id, hostname, os, tailscale_ip).
+
+    The committed ``fleet_baseline.csv`` is a *cache* of tailscale discovery, not a
+    hardcoded source of truth: if the file is absent it is regenerated from live
+    tailscale discovery so the repo no longer ships a stale device list."""
+    if not FLEET_BASELINE.exists():
+        _regenerate_baseline()
     if not FLEET_BASELINE.exists():
         return []
     out: list[dict] = []
@@ -224,6 +207,30 @@ def _load_baseline() -> list[dict]:
                 "ip": row.get("tailscale_ip"),
             })
     return out
+
+
+def _regenerate_baseline() -> None:
+    """Write fleet_baseline.csv from live tailscale discovery (best-effort)."""
+    try:
+        rows = discover_tailscale_nodes(port=LM_PORT)
+    except Exception:
+        return
+    if not rows:
+        return
+    try:
+        FLEET_BASELINE.parent.mkdir(parents=True, exist_ok=True)
+        with FLEET_BASELINE.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=["device_id", "hostname", "os", "tailscale_ip"])
+            w.writeheader()
+            for n in rows:
+                w.writerow({
+                    "device_id": "",
+                    "hostname": n["name"],
+                    "os": n.get("os", ""),
+                    "tailscale_ip": n["ip"],
+                })
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -392,20 +399,19 @@ def _merge_reporter_specs(caps: dict[str, Capability], nodes: list[dict] | None 
 # Planner — the "rigid harness"
 # --------------------------------------------------------------------------- #
 def _match_cap(caps: dict[str, Capability], slug: str) -> Capability | None:
-    """Tolerant capability lookup. Benchmark runs are named by short node keys
-    (``deathstar``, ``lenovo-ideapad-330s-15ikb``) while the fleet baseline uses
-    full hostnames (``deathstar-xps-8920``, ``scott-lenovo-ideapad-330s-15ikb``),
-    so an exact slug match only works for nodes whose names coincide (e.g. x1-370).
-    Fall back to a prefix/suffix containment match so the real per-node benchmark
-    data is actually joined to the node for placement decisions."""
+    """Capability lookup by node slug.
+
+    With fleet identity unified on ``fleet_discover`` (W-70), benchmark run dirs
+    (``runs/<node>``) are keyed by the same canonical node name as the slug, so an
+    exact match is sufficient. We still normalize ``-``/``_`` so a benchmark dir
+    stamped with one separator joins a node named with the other. The old
+    prefix/suffix substring hack is removed — it silently joined unrelated nodes'
+    capability data."""
     if slug in caps:
         return caps[slug]
-    s = slug.lower()
+    norm = slug.replace("_", "-").lower()
     for k, v in caps.items():
-        kk = k.lower()
-        if kk == s:
-            return v
-        if s.startswith(kk) or s.endswith(kk) or kk.startswith(s) or kk.endswith(s):
+        if k.replace("_", "-").lower() == norm:
             return v
     return None
 
