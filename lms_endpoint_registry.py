@@ -14,13 +14,26 @@ import datetime as dt
 import json
 import os
 import socket
+import subprocess
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 
 DEFAULT_REGISTRY = Path(os.environ.get("LMS_BENCH_ENDPOINTS", "~/.config/lms-bench/endpoints.json")).expanduser()
+DEFAULT_TAILSCALE_PORT = int(os.environ.get("LMS_BENCH_TAILSCALE_PORT", "1234"))
+
+
+def _slugify(value: str) -> str:
+    out: List[str] = []
+    for ch in value.lower().strip():
+        if ch.isalnum():
+            out.append(ch)
+        else:
+            out.append("-")
+    return "".join(out).strip("-") or "node"
 
 
 def utc_now_iso() -> str:
@@ -71,6 +84,142 @@ def local_host_ip() -> str:
             return sock.getsockname()[0]
     except Exception:
         return "127.0.0.1"
+
+
+def format_ip_host(ip: str) -> str:
+    if ":" in ip and not ip.startswith("["):
+        return f"[{ip}]"
+    return ip
+
+
+def endpoint_from_ip(ip: str, port: int = DEFAULT_TAILSCALE_PORT) -> str:
+    return f"http://{format_ip_host(ip)}:{port}/v1"
+
+
+def tailscale_status(timeout: int = 8) -> Optional[Dict[str, Any]]:
+    try:
+        proc = subprocess.run(
+            ["tailscale", "status", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def iter_tailscale_nodes(status: Dict[str, Any], include_self: bool = True) -> List[Dict[str, Any]]:
+    nodes: List[Dict[str, Any]] = []
+    self_node = status.get("Self")
+    if include_self and isinstance(self_node, dict):
+        nodes.append(self_node)
+    peers = status.get("Peer")
+    if isinstance(peers, dict):
+        for peer in peers.values():
+            if isinstance(peer, dict):
+                nodes.append(peer)
+    return nodes
+
+
+def build_tailscale_endpoint_candidates(status: Dict[str, Any], port: int = DEFAULT_TAILSCALE_PORT, include_self: bool = True) -> List[Dict[str, Any]]:
+    candidates: List[Dict[str, Any]] = []
+    seen_urls = set()
+    for node in iter_tailscale_nodes(status, include_self=include_self):
+        host_name = str(node.get("HostName") or node.get("DNSName") or "").strip().rstrip(".")
+        ips = [str(ip).strip() for ip in (node.get("TailscaleIPs") or []) if str(ip).strip()]
+        if not ips:
+            continue
+        base_url = endpoint_from_ip(ips[0], port=port)
+        if base_url in seen_urls:
+            continue
+        seen_urls.add(base_url)
+        candidates.append(
+            {
+                "name": f"tailscale-{_slugify(host_name or ips[0])}",
+                "base_url": base_url,
+                "enabled": True,
+                "tags": ["tailscale", "auto"],
+                "notes": f"discovered from tailscale status on host {host_name or ips[0]}",
+            }
+        )
+    return candidates
+
+
+def upsert_endpoints(data: Dict[str, Any], entries: Sequence[Dict[str, Any]]) -> int:
+    endpoints = list(data.get("endpoints") or [])
+    by_name = {str(e.get("name")): idx for idx, e in enumerate(endpoints) if e.get("name")}
+    changed = 0
+    for entry in entries:
+        name = str(entry["name"])
+        new_tags = sorted({str(tag) for tag in entry.get("tags") or [] if str(tag).strip()})
+        if name in by_name:
+            idx = by_name[name]
+            current = dict(endpoints[idx])
+            merged_tags = sorted({str(tag) for tag in (current.get("tags") or []) + new_tags if str(tag).strip()})
+            current.update({
+                "base_url": entry["base_url"],
+                "enabled": bool(entry.get("enabled", current.get("enabled", True))),
+                "tags": merged_tags,
+                "notes": str(entry.get("notes") or current.get("notes") or ""),
+                "updated_at_utc": utc_now_iso(),
+            })
+            if not current.get("created_at_utc"):
+                current["created_at_utc"] = utc_now_iso()
+            endpoints[idx] = current
+        else:
+            endpoints.append(
+                {
+                    "name": name,
+                    "base_url": entry["base_url"],
+                    "enabled": bool(entry.get("enabled", True)),
+                    "tags": new_tags,
+                    "notes": str(entry.get("notes") or ""),
+                    "created_at_utc": utc_now_iso(),
+                    "updated_at_utc": utc_now_iso(),
+                }
+            )
+            by_name[name] = len(endpoints) - 1
+        changed += 1
+    data["endpoints"] = sorted(endpoints, key=lambda e: e.get("name", ""))
+    return changed
+
+
+def refresh_tailscale_registry(path: Path, *, port: int = DEFAULT_TAILSCALE_PORT, timeout: int = 8, include_self: bool = True) -> Dict[str, Any]:
+    data = load_registry(path)
+    status = tailscale_status(timeout=timeout)
+    if not status:
+        return {"refreshed": 0, "discovered": 0, "reachable": 0, "registry": str(path), "error": "tailscale status unavailable"}
+
+    candidates = build_tailscale_endpoint_candidates(status, port=port, include_self=include_self)
+    if not candidates:
+        return {"refreshed": 0, "discovered": 0, "reachable": 0, "registry": str(path), "error": "no tailscale nodes discovered"}
+
+    reachable_entries: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=min(8, len(candidates))) as pool:
+        future_map = {pool.submit(probe_endpoint, candidate["base_url"], timeout): candidate for candidate in candidates}
+        for future in as_completed(future_map):
+            probe = future.result()
+            if probe.get("reachable"):
+                reachable_entries.append(future_map[future])
+
+    changed = upsert_endpoints(data, reachable_entries)
+    if changed:
+        save_registry(path, data)
+    return {
+        "refreshed": changed,
+        "discovered": len(candidates),
+        "reachable": len(reachable_entries),
+        "registry": str(path),
+        "error": None,
+    }
 
 
 def probe_endpoint(base_url: str, timeout: int = 8) -> Dict[str, Any]:
@@ -154,6 +303,8 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 def cmd_probe(args: argparse.Namespace) -> int:
     path = registry_path(args.registry)
+    if getattr(args, "discover_tailscale", False):
+        refresh_tailscale_registry(path, port=args.tailscale_port, timeout=args.tailscale_timeout, include_self=not args.no_self)
     data = load_registry(path)
     endpoints = select_endpoints(data, args.name, split_tags(args.tags), enabled_only=not args.all)
     results = []
@@ -171,6 +322,8 @@ def cmd_probe(args: argparse.Namespace) -> int:
 
 def cmd_export_inventory(args: argparse.Namespace) -> int:
     path = registry_path(args.registry)
+    if getattr(args, "discover_tailscale", False):
+        refresh_tailscale_registry(path, port=args.tailscale_port, timeout=args.tailscale_timeout, include_self=not args.no_self)
     data = load_registry(path)
     endpoints = select_endpoints(data, args.name, split_tags(args.tags), enabled_only=not args.all)
     rows = []
@@ -221,6 +374,19 @@ def cmd_disable(args: argparse.Namespace) -> int:
     return cmd_set_enabled(args, False)
 
 
+def cmd_discover_tailscale(args: argparse.Namespace) -> int:
+    path = registry_path(args.registry)
+    result = refresh_tailscale_registry(path, port=args.tailscale_port, timeout=args.timeout, include_self=not args.no_self)
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        if result.get("error"):
+            print(result["error"])
+        else:
+            print(f"refreshed {result['refreshed']} endpoint(s); discovered {result['discovered']} tailscale node(s), {result['reachable']} reachable")
+    return 0 if not result.get("error") else 1
+
+
 def cmd_enable(args: argparse.Namespace) -> int:
     return cmd_set_enabled(args, True)
 
@@ -262,6 +428,10 @@ def build_parser() -> argparse.ArgumentParser:
     probe.add_argument("--tags", default=None)
     probe.add_argument("--all", action="store_true")
     probe.add_argument("--timeout", type=int, default=8)
+    probe.add_argument("--discover-tailscale", action="store_true")
+    probe.add_argument("--tailscale-port", type=int, default=DEFAULT_TAILSCALE_PORT)
+    probe.add_argument("--tailscale-timeout", type=int, default=8)
+    probe.add_argument("--no-self", action="store_true")
     probe.add_argument("--json", action="store_true")
     probe.set_defaults(func=cmd_probe)
 
@@ -270,10 +440,21 @@ def build_parser() -> argparse.ArgumentParser:
     inv.add_argument("--tags", default=None)
     inv.add_argument("--all", action="store_true")
     inv.add_argument("--timeout", type=int, default=8)
+    inv.add_argument("--discover-tailscale", action="store_true")
+    inv.add_argument("--tailscale-port", type=int, default=DEFAULT_TAILSCALE_PORT)
+    inv.add_argument("--tailscale-timeout", type=int, default=8)
+    inv.add_argument("--no-self", action="store_true")
     inv.add_argument("--out", default="lmstudio_inventory.csv")
     inv.add_argument("--max-models", type=int, default=0)
     inv.add_argument("--host-ip", default=None)
     inv.set_defaults(func=cmd_export_inventory)
+
+    discover = sub.add_parser("discover-tailscale")
+    discover.add_argument("--timeout", type=int, default=8)
+    discover.add_argument("--tailscale-port", type=int, default=DEFAULT_TAILSCALE_PORT)
+    discover.add_argument("--no-self", action="store_true")
+    discover.add_argument("--json", action="store_true")
+    discover.set_defaults(func=cmd_discover_tailscale)
     return parser
 
 

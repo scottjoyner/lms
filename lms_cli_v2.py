@@ -267,8 +267,21 @@ def registry_quick_args(argv: List[str]) -> Optional[List[str]]:
     parser.add_argument("--registry-name", action="append", default=[])
     parser.add_argument("--tags", default=None)
     parser.add_argument("--all-endpoints", action="store_true")
+    parser.add_argument("--discover-tailscale", action="store_true")
+    parser.add_argument("--tailscale-port", type=int, default=lms_endpoint_registry.DEFAULT_TAILSCALE_PORT)
+    parser.add_argument("--tailscale-timeout", type=int, default=8)
+    parser.add_argument("--no-self", action="store_true")
     parsed, remainder = parser.parse_known_args(argv)
-    registry = lms_endpoint_registry.load_registry(lms_endpoint_registry.registry_path(parsed.registry))
+    registry_path = lms_endpoint_registry.registry_path(parsed.registry)
+    discover_env = os.environ.get("LMS_DISCOVER_TAILSCALE", "").strip().lower() in {"1", "true", "yes", "on"}
+    if parsed.discover_tailscale or discover_env:
+        lms_endpoint_registry.refresh_tailscale_registry(
+            registry_path,
+            port=parsed.tailscale_port,
+            timeout=parsed.tailscale_timeout,
+            include_self=not parsed.no_self,
+        )
+    registry = lms_endpoint_registry.load_registry(registry_path)
     endpoints = lms_endpoint_registry.select_endpoints(
         registry,
         parsed.registry_name,

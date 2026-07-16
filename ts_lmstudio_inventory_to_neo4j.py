@@ -22,9 +22,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import requests
 from neo4j import GraphDatabase
@@ -106,6 +109,44 @@ RAW_DEVICES = [
         "os": "Linux 6.8.0-41-generic",
     },
 ]
+
+DEFAULT_REGISTRY_PATH = Path(os.environ.get("LMS_BENCH_ENDPOINTS", "~/.config/lms-bench/endpoints.json")).expanduser()
+
+
+def load_devices_from_registry(registry_path: Path) -> List[Dict[str, Any]]:
+    """Load discovered tailnet LM Studio endpoints from the local registry."""
+    try:
+        payload = json.loads(registry_path.read_text())
+    except FileNotFoundError:
+        return []
+    except Exception:
+        return []
+
+    devices: List[Dict[str, Any]] = []
+    for entry in payload.get("endpoints", []):
+        if not isinstance(entry, dict):
+            continue
+        base_url = str(entry.get("base_url") or "").strip()
+        if not base_url:
+            continue
+        parsed = urlparse(base_url)
+        ts_ip = parsed.hostname
+        if not ts_ip:
+            continue
+        name = str(entry.get("name") or "")
+        ts_name = name.removeprefix("tailscale-") if name else ts_ip
+        devices.append({
+            "ts_name": ts_name,
+            "user_email": entry.get("user_email"),
+            "ts_ip": ts_ip,
+            "ts_version": entry.get("ts_version"),
+            "os": entry.get("os"),
+            "source": "registry",
+            "registry_name": name or None,
+            "notes": entry.get("notes"),
+        })
+
+    return devices
 
 
 @dataclass
@@ -344,6 +385,7 @@ def main() -> int:
     ap.add_argument("--neo4j-user", default=None)
     ap.add_argument("--neo4j-password", default=None)
     ap.add_argument("--neo4j-db", default="neo4j")
+    ap.add_argument("--registry-path", default=str(DEFAULT_REGISTRY_PATH), help="Registry JSON to load discovered endpoints from")
     ap.add_argument("--no-schema", action="store_true", help="Skip constraint/index creation")
 
     args = ap.parse_args()
@@ -365,7 +407,10 @@ def main() -> int:
         ok = 0
         fail = 0
 
-        for host in RAW_DEVICES:
+        devices = load_devices_from_registry(Path(args.registry_path)) or RAW_DEVICES
+        print(f"Using {len(devices)} device records from {'registry' if devices is not RAW_DEVICES else 'static fallback'}")
+
+        for host in devices:
             base_url = build_base_url(args.scheme, host["ts_ip"], args.port, args.api_root)
             probe = fetch_models_openai_compatible(
                 base_url=base_url,

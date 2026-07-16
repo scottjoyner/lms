@@ -63,6 +63,14 @@ lms probe --endpoint http://100.64.0.10:1234/v1 --endpoint http://100.64.0.11:12
 lms probe --json
 ```
 
+For tailnet-backed fleets, keep the registry fresh first:
+
+```bash
+lms-bench-endpoints discover-tailscale
+lms-bench quick --from-registry --discover-tailscale
+LMS_DISCOVER_TAILSCALE=1 lms-bench quick --from-registry
+```
+
 ### `lms inventory`
 
 Creates the inventory CSV expected by the benchmark runner.
