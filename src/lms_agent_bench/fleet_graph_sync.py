@@ -33,13 +33,14 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fcntl
 import json
 import os
 import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TextIO
 
 from lms_agent_bench.neo4j import NEO4J_DB, get_driver
 
@@ -310,7 +311,38 @@ def latest_snapshot_id(driver, db: str) -> Optional[str]:
         return rec["id"] if rec else None
 
 
-def cmd_publish(args: argparse.Namespace) -> int:
+def _acquire_fleet_lock(timeout_sec: int = 30) -> Optional[TextIO]:
+    """Acquire exclusive flock on /tmp/fleet-enrich.lock (shared with fleet-enrich.py)."""
+    lock_path = "/tmp/fleet-enrich.lock"
+    try:
+        lock_fd = open(lock_path, "w")
+        deadline = time.time() + timeout_sec
+        while True:
+            try:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return lock_fd
+            except BlockingIOError:
+                if time.time() >= deadline:
+                    print("[warn] fleet_graph_sync: could not acquire lock after {}s; skipping publish".format(timeout_sec), file=sys.stderr)
+                    lock_fd.close()
+                    return None
+                time.sleep(2)
+    except OSError as exc:
+        print(f"[error] fleet_graph_sync: failed to open lockfile {lock_path}: {exc}", file=sys.stderr)
+        return None
+
+
+def _release_fleet_lock(lock_fd: Optional[TextIO]) -> None:
+    if not lock_fd:
+        return
+    try:
+        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        lock_fd.close()
+    except OSError as exc:
+        print(f"[warn] fleet_graph_sync: failed to release lock: {exc}", file=sys.stderr)
+
+
+def cmd_publish(args: argparse.Namespace, lock_fd: Optional[TextIO] = None) -> int:
 
     snap = build_snapshot(args.router_url)
     if not snap["node_states"]:
@@ -334,11 +366,21 @@ def cmd_publish(args: argparse.Namespace) -> int:
 
 
 def cmd_watch(args: argparse.Namespace) -> int:
+    # Acquire lock once per watch loop iteration — graph_sync owns the lock while publishing,
+    # fleet-enrich.py waits for it before deleting CAN_EMBED edges.
     while True:
-        rc = cmd_publish(args)
-        if rc != 0:
-            print("[watch] publish failed; retrying", file=sys.stderr)
-        print(f"[watch] next publish in {args.sleep}s", flush=True)
+        lock_fd = _acquire_fleet_lock(timeout_sec=30)
+        if not lock_fd:
+            print("[watch] skipping publish (lock unavailable)", file=sys.stderr)
+        
+        try:
+            rc = cmd_publish(args, lock_fd)
+            if rc != 0:
+                print("[watch] publish failed; retrying", file=sys.stderr)
+            print(f"[watch] next publish in {args.sleep}s", flush=True)
+        finally:
+            _release_fleet_lock(lock_fd)
+        
         time.sleep(args.sleep)
     return 0
 
