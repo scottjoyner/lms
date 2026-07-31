@@ -34,7 +34,7 @@ lmsbench = "lms_agent_bench.lms_cli_v2:main"
 lms-bench-endpoints = "lms_agent_bench.lms_endpoint_registry:main"
 lmstudio-bridge = "lms_agent_bench.lmstudio_cli_bridge:main"
 lms-fleet = "lms_agent_bench.fleet_loadout:main"
-lms-fleet-bench = "lms_agent_bench.fleet_bench_plan:main"
+lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
