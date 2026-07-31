@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.20.0"
+version = "0.21.0"
 description = "Agent-facing CLI for profiling and benchmarking local LM Studio nodes"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,8 @@ lms-bench-endpoints = "lms_agent_bench.lms_endpoint_registry:main"
 lmstudio-bridge = "lms_agent_bench.lmstudio_cli_bridge:main"
 lms-fleet = "lms_agent_bench.fleet_loadout:main"
 lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
+lms-fleet-models = "lms_agent_bench.fleet_models:main"
+lms-fleet-rollout = "lms_agent_bench.fleet_rollout:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
