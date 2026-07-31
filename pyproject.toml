@@ -37,6 +37,7 @@ lms-fleet = "lms_agent_bench.fleet_loadout:main"
 lms-fleet-bench = "lms_agent_bench.fleet_bench_plan:main"
 
 [tool.setuptools]
+package-dir = {"" = "src"}
 packages = ["lms_agent_bench"]
 
 [tool.setuptools.package-data]
