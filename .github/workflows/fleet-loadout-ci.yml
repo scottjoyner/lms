@@ -24,28 +24,40 @@ jobs:
             src/lms_agent_bench/fleet_loadout.py \
             src/lms_agent_bench/fleet_bench_plan.py \
             src/lms_agent_bench/fleet_bench_entrypoint.py \
+            src/lms_agent_bench/fleet_models.py \
+            src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/benchmark_entrypoint.py
       - name: Run focused tests
         run: |
           python -m pytest -q \
             tests/test_fleet_loadout.py \
             tests/test_fleet_bench_plan.py \
+            tests/test_fleet_models.py \
+            tests/test_fleet_rollout.py \
             tests/test_packaged_entrypoints.py
       - name: Validate packaged artifacts
         run: |
           python -m json.tool src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json >/dev/null
+          python -m json.tool src/lms_agent_bench/schemas/fleet_model_inventory.v1.schema.json >/dev/null
+          python -m json.tool examples/fleet-rollout.v1.example.json >/dev/null
           python - <<'PY'
           from pathlib import Path
           from jsonschema import Draft202012Validator
           import json
-          schema = json.loads(Path("src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json").read_text())
-          Draft202012Validator.check_schema(schema)
+          for name in (
+              "fleet_loadout.v1.schema.json",
+              "fleet_model_inventory.v1.schema.json",
+          ):
+              schema = json.loads((Path("src/lms_agent_bench/schemas") / name).read_text())
+              Draft202012Validator.check_schema(schema)
           PY
       - name: Smoke-test installed commands
         run: |
           lms-agent --help >/dev/null
           lms-fleet --help >/dev/null
           lms-fleet-bench --help >/dev/null
+          lms-fleet-models --help >/dev/null
+          lms-fleet-rollout --help >/dev/null
       - name: Build wheel and source distribution
         run: python -m build
