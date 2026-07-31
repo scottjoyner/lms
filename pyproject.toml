@@ -39,6 +39,14 @@ lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["lms_agent_bench"]
+py-modules = [
+  "lms_artifact_validate",
+  "lms_run_audit",
+  "lms_skill_export",
+  "lms_config",
+  "lms_decide",
+  "lms_eval",
+]
 
 [tool.setuptools.package-data]
 "lms_agent_bench" = ["benchmarks/*.json", "schemas/*.json"]
