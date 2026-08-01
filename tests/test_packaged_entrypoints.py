@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
+import lms_agent_bench
 from lms_agent_bench import benchmark_entrypoint, lms_eval
 from lms_agent_bench.fleet_bench_entrypoint import (
     default_suite_file,
@@ -25,3 +27,10 @@ def test_benchmark_entrypoint_uses_real_package_evaluator():
     assert sys.modules["lms_eval"] is lms_eval
     assert runner.evaluate_output is lms_eval.evaluate_output
     assert benchmark_entrypoint.main is runner.main
+
+
+def test_importable_version_matches_project_metadata():
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'(?m)^version = "([^"]+)"$', pyproject)
+    assert match is not None
+    assert lms_agent_bench.__version__ == match.group(1)
