@@ -32,7 +32,7 @@ chmod 600 ~/.config/lms-fleet/tier1.env
 $EDITOR ~/.config/lms-fleet/tier1.env
 ```
 
-Fill every blank value with the exact SSH target, `lms` checkout path, and model root for that node. Keep the completed file outside the repository.
+Fill every blank value with the exact SSH target, absolute remote `lms` checkout path, and absolute or home-relative model root for that node. Keep the completed file outside the repository.
 
 ## 3. Resolve and validate the complete Tier-1 configuration
 
@@ -45,7 +45,7 @@ lms-fleet-rollout validate \
   --out rollout/tier1-validate/report.json
 ```
 
-Validation fails before SSH when a variable is blank, a path is not remote-absolute/home-relative, a model root is duplicated, or an endpoint mapping is not loopback-local.
+Validation fails before SSH when a variable is blank, a repository path is not absolute, a Python value is neither a command name nor an absolute remote path, a model root is ambiguous or duplicated, or an endpoint mapping is not loopback-local.
 
 ## 4. Render and inspect the observation scripts
 
@@ -171,7 +171,7 @@ lms-fleet-gate \
   --out rollout/x1-370-sweep-1/release-gate.json
 ```
 
-Sweep mode additionally requires loopback-only execution, an eligible selected candidate, every hard benchmark gate, and one full selected-model SHA-256. A passing result is ready for reviewed profile import; it still does not admit or route the runtime.
+Sweep mode additionally requires loopback-only execution, an eligible selected candidate, every hard benchmark gate, and exactly one full-hash model record matching the selected candidate among the otherwise quick inventory records. A passing result is ready for reviewed profile import; it still does not admit or route the runtime.
 
 ## 9. Promotion order
 
@@ -181,4 +181,4 @@ Sweep mode additionally requires loopback-only execution, an eligible selected c
 4. Import successful sweep evidence into `fleet-llm-profiles`.
 5. Independently verify runtime identity, private-path behavior, shared capacity, sustained stability, and rollback before live admission.
 
-Keep all four pull requests draft until these physical gates are recorded.
+Keep all four pull requests unmerged until these physical gates are recorded. Progress is tracked in issue #7.
