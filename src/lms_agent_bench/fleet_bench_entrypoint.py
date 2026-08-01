@@ -1,13 +1,22 @@
-"""Installed entrypoint for safe fleet plan execution."""
+"""Installed entrypoint for safe fleet plan execution.
+
+The wrapper also owns dry-run semantics. A dry run must render candidate intent
+without requiring an installed runtime or an endpoint mapping, and it must exit
+successfully when rendering itself succeeds.
+"""
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from lms_agent_bench import fleet_bench_plan as _base
+
+_ORIGINAL_EXECUTE_CANDIDATE = _base.execute_candidate
 
 
 def default_suite_file() -> str:
@@ -70,9 +79,123 @@ def run_lms_suite(
     return int(proc.returncode)
 
 
+def _dry_run_base(candidate: Mapping[str, Any], candidate_dir: Path) -> Dict[str, Any]:
+    return {
+        "candidate_id": str(candidate["candidate_id"]),
+        "engine": candidate.get("engine"),
+        "backend": candidate.get("backend"),
+        "model_id": candidate.get("model", {}).get("id", ""),
+        "base_url": "",
+        "ok_rate": "",
+        "eval_ok_rate": "",
+        "eval_score_avg": "",
+        "tps_med": "",
+        "ttft_med": "",
+        "memory_peak_bytes": "",
+        "memory_headroom_ratio": "",
+        "concurrency_ok": "",
+        "streaming_ok": "",
+        "cancellation_ok": "",
+        "crash_count": 0,
+        "benchmark_exit_code": 0,
+        "error": "",
+        "candidate_dir": str(candidate_dir),
+        "dry_run": True,
+    }
+
+
+def execute_candidate(
+    candidate: Mapping[str, Any],
+    args: Any,
+    endpoint_map: Mapping[str, str],
+    help_cache: Dict[str, str],
+) -> Dict[str, Any]:
+    """Render dry runs safely; delegate real execution to the base engine."""
+    if not args.dry_run:
+        return _ORIGINAL_EXECUTE_CANDIDATE(candidate, args, endpoint_map, help_cache)
+
+    candidate_id = str(candidate["candidate_id"])
+    candidate_dir = Path(args.output_dir) / _base.safe_slug(candidate_id)
+    candidate_dir.mkdir(parents=True, exist_ok=True)
+    result = _dry_run_base(candidate, candidate_dir)
+    try:
+        mapped_url = endpoint_map.get(candidate_id)
+        if mapped_url:
+            result.update(
+                {
+                    "base_url": _base.normalize_base_url(mapped_url),
+                    "launch_mode": "mapped_existing_endpoint",
+                    "requires_endpoint_map": False,
+                }
+            )
+        elif candidate.get("engine") == "llama.cpp":
+            configured_binary = (
+                args.llama_server_bin
+                or os.environ.get("LLAMA_SERVER_BIN")
+                or shutil.which("llama-server")
+                or "llama-server"
+            )
+            available_binary = (
+                str(configured_binary)
+                if Path(str(configured_binary)).exists()
+                else shutil.which(str(configured_binary))
+            )
+            help_text = (
+                help_cache.setdefault(
+                    str(configured_binary),
+                    _base.command_supported(str(configured_binary)),
+                )
+                if available_binary
+                else ""
+            )
+            launch_command = _base.build_llama_server_command(
+                candidate,
+                str(configured_binary),
+                help_text=help_text,
+            )
+            launch = {
+                "candidate_id": candidate_id,
+                "command": launch_command,
+                "binary_available": bool(available_binary),
+                "environment_overrides": candidate.get("environment", {}),
+                "created_at_utc": _base.utc_now_iso(),
+                "dry_run": True,
+            }
+            _base.write_json(str(candidate_dir / "launch.json"), launch)
+            result.update(
+                {
+                    "launch_mode": "ephemeral_loopback_only",
+                    "launch_command": launch_command,
+                    "binary_available": bool(available_binary),
+                    "requires_endpoint_map": False,
+                }
+            )
+        else:
+            result.update(
+                {
+                    "launch_mode": "existing_or_adapter",
+                    "requires_endpoint_map": True,
+                    "render_note": (
+                        "real execution requires --endpoint-map "
+                        f"{candidate_id}=URL"
+                    ),
+                }
+            )
+    except Exception as exc:
+        result.update(
+            {
+                "benchmark_exit_code": 1,
+                "error": repr(exc),
+            }
+        )
+    _base.write_json(str(candidate_dir / "result.json"), result)
+    return result
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     actual_argv = list(sys.argv[1:] if argv is None else argv)
     _base.run_lms_suite = run_lms_suite
+    _base.execute_candidate = execute_candidate
     return _base.main(inject_default_suite(actual_argv))
 
 
