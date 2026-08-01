@@ -81,11 +81,13 @@ jobs:
           assert report['admission']['admitted'] is False
           assert 'unresolved environment variable' in report['error']
           PY
-      - name: Reject private network data in public templates
+      - name: Reject private network identities in public rollout files
         run: |
-          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|\.ts\.net|tailnet' \
+          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|[A-Za-z0-9-]+\.ts\.net' \
             examples/fleet-rollout.tier1.template.json \
-            examples/fleet-rollout.tier1.env.example
+            examples/fleet-rollout.tier1.env.example \
+            docs/PHYSICAL_FLEET_ROLLOUT.md \
+            docs/TIER1_ROLLOUT_CHECKPOINT.md
       - name: Smoke-test installed commands
         run: |
           lms-agent --help >/dev/null
