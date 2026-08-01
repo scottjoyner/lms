@@ -7,4 +7,4 @@ profile evidence generation. Live runtime admission remains external.
 
 from __future__ import annotations
 
-__version__ = "0.20.0"
+__version__ = "0.23.0"
