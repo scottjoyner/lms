@@ -29,6 +29,7 @@ jobs:
             src/lms_agent_bench/fleet_provenance.py \
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
+            src/lms_agent_bench/fleet_rollout_command.py \
             src/lms_agent_bench/fleet_gate.py \
             src/lms_agent_bench/fleet_gate_entrypoint.py \
             src/lms_agent_bench/benchmark_entrypoint.py
@@ -42,6 +43,7 @@ jobs:
             tests/test_fleet_provenance.py \
             tests/test_fleet_rollout.py \
             tests/test_fleet_rollout_entrypoint.py \
+            tests/test_fleet_rollout_command.py \
             tests/test_fleet_failure_safety.py \
             tests/test_fleet_gate.py \
             tests/test_packaged_entrypoints.py
