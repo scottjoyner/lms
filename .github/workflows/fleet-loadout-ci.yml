@@ -26,6 +26,7 @@ jobs:
             src/lms_agent_bench/fleet_bench_plan.py \
             src/lms_agent_bench/fleet_bench_entrypoint.py \
             src/lms_agent_bench/fleet_models.py \
+            src/lms_agent_bench/fleet_provenance.py \
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
             src/lms_agent_bench/fleet_gate.py \
@@ -38,6 +39,7 @@ jobs:
             tests/test_fleet_fair_planning.py \
             tests/test_fleet_bench_plan.py \
             tests/test_fleet_models.py \
+            tests/test_fleet_provenance.py \
             tests/test_fleet_rollout.py \
             tests/test_fleet_rollout_entrypoint.py \
             tests/test_fleet_failure_safety.py \
@@ -97,5 +99,6 @@ jobs:
           lms-fleet-rollout --help >/dev/null
           lms-fleet-rollout validate --help >/dev/null
           lms-fleet-gate --help >/dev/null
+          python -m lms_agent_bench.fleet_provenance --help >/dev/null
       - name: Build wheel and source distribution
         run: python -m build
