@@ -28,6 +28,7 @@ jobs:
             src/lms_agent_bench/fleet_models.py \
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
+            src/lms_agent_bench/fleet_gate.py \
             src/lms_agent_bench/benchmark_entrypoint.py
       - name: Run focused tests
         run: |
@@ -39,13 +40,16 @@ jobs:
             tests/test_fleet_rollout.py \
             tests/test_fleet_rollout_entrypoint.py \
             tests/test_fleet_failure_safety.py \
+            tests/test_fleet_gate.py \
             tests/test_packaged_entrypoints.py
       - name: Validate packaged artifacts
         run: |
           python -m json.tool src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_model_inventory.v1.schema.json >/dev/null
+          python -m json.tool src/lms_agent_bench/schemas/fleet_release_gate.v1.schema.json >/dev/null
           python -m json.tool examples/fleet-rollout.v1.example.json >/dev/null
+          python -m json.tool examples/fleet-rollout.tier1.template.json >/dev/null
           python - <<'PY'
           from pathlib import Path
           from jsonschema import Draft202012Validator
@@ -53,9 +57,28 @@ jobs:
           for name in (
               "fleet_loadout.v1.schema.json",
               "fleet_model_inventory.v1.schema.json",
+              "fleet_release_gate.v1.schema.json",
           ):
               schema = json.loads((Path("src/lms_agent_bench/schemas") / name).read_text())
               Draft202012Validator.check_schema(schema)
+          PY
+      - name: Validate Tier-1 template fails closed when unresolved
+        run: |
+          set +e
+          lms-fleet-rollout validate \
+            --config examples/fleet-rollout.tier1.template.json \
+            --env-file examples/fleet-rollout.tier1.env.example \
+            --all-nodes \
+            --out /tmp/tier1-validation.json
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          python - <<'PY'
+          import json
+          report = json.load(open('/tmp/tier1-validation.json'))
+          assert report['ready_for_observation'] is False
+          assert report['admission']['admitted'] is False
+          assert 'unresolved environment variable' in report['error']
           PY
       - name: Smoke-test installed commands
         run: |
@@ -65,5 +88,6 @@ jobs:
           lms-fleet-models --help >/dev/null
           lms-fleet-rollout --help >/dev/null
           lms-fleet-rollout validate --help >/dev/null
+          lms-fleet-gate --help >/dev/null
       - name: Build wheel and source distribution
         run: python -m build
