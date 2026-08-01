@@ -1,22 +1,24 @@
 """Installed entrypoint for safe fleet plan execution.
 
-The wrapper also owns dry-run semantics. A dry run must render candidate intent
-without requiring an installed runtime or an endpoint mapping, and it must exit
-successfully when rendering itself succeeds.
+The wrapper owns dry-run semantics and enforces that mapped physical benchmark
+endpoints are loopback-local, matching the execution manifest's isolation claim.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
+from urllib.parse import urlsplit
 
 from lms_agent_bench import fleet_bench_plan as _base
 
 _ORIGINAL_EXECUTE_CANDIDATE = _base.execute_candidate
+_ORIGINAL_PARSE_ENDPOINT_MAP = _base.parse_endpoint_map
 
 
 def default_suite_file() -> str:
@@ -34,6 +36,37 @@ def inject_default_suite(argv: List[str]) -> List[str]:
     if "--suite-file" in argv:
         return list(argv)
     return [*argv, "--suite-file", default_suite_file()]
+
+
+def is_loopback_url(value: str) -> bool:
+    parsed = urlsplit(value)
+    hostname = parsed.hostname
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        return False
+    if hostname.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def parse_endpoint_map(values: Sequence[str]) -> Dict[str, str]:
+    parsed = _ORIGINAL_PARSE_ENDPOINT_MAP(values)
+    remote = {
+        candidate_id: url
+        for candidate_id, url in parsed.items()
+        if not is_loopback_url(url)
+    }
+    if remote:
+        rendered = ", ".join(
+            f"{candidate_id}={url}" for candidate_id, url in sorted(remote.items())
+        )
+        raise ValueError(
+            "physical plan execution accepts loopback endpoint mappings only; "
+            f"rejected: {rendered}"
+        )
+    return parsed
 
 
 def run_lms_suite(
@@ -79,7 +112,9 @@ def run_lms_suite(
     return int(proc.returncode)
 
 
-def _dry_run_base(candidate: Mapping[str, Any], candidate_dir: Path) -> Dict[str, Any]:
+def _dry_run_base(
+    candidate: Mapping[str, Any], candidate_dir: Path
+) -> Dict[str, Any]:
     return {
         "candidate_id": str(candidate["candidate_id"]),
         "engine": candidate.get("engine"),
@@ -112,7 +147,9 @@ def execute_candidate(
 ) -> Dict[str, Any]:
     """Render dry runs safely; delegate real execution to the base engine."""
     if not args.dry_run:
-        return _ORIGINAL_EXECUTE_CANDIDATE(candidate, args, endpoint_map, help_cache)
+        return _ORIGINAL_EXECUTE_CANDIDATE(
+            candidate, args, endpoint_map, help_cache
+        )
 
     candidate_id = str(candidate["candidate_id"])
     candidate_dir = Path(args.output_dir) / _base.safe_slug(candidate_id)
@@ -121,6 +158,10 @@ def execute_candidate(
     try:
         mapped_url = endpoint_map.get(candidate_id)
         if mapped_url:
+            if not is_loopback_url(mapped_url):
+                raise ValueError(
+                    f"mapped endpoint is not loopback-local: {mapped_url}"
+                )
             result.update(
                 {
                     "base_url": _base.normalize_base_url(mapped_url),
@@ -176,7 +217,7 @@ def execute_candidate(
                     "launch_mode": "existing_or_adapter",
                     "requires_endpoint_map": True,
                     "render_note": (
-                        "real execution requires --endpoint-map "
+                        "real execution requires a loopback --endpoint-map "
                         f"{candidate_id}=URL"
                     ),
                 }
@@ -196,6 +237,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     actual_argv = list(sys.argv[1:] if argv is None else argv)
     _base.run_lms_suite = run_lms_suite
     _base.execute_candidate = execute_candidate
+    _base.parse_endpoint_map = parse_endpoint_map
     return _base.main(inject_default_suite(actual_argv))
 
 
