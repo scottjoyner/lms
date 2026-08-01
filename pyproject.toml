@@ -36,7 +36,7 @@ lmstudio-bridge = "lms_agent_bench.lmstudio_cli_bridge:main"
 lms-fleet = "lms_agent_bench.fleet_loadout_entrypoint:main"
 lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
 lms-fleet-models = "lms_agent_bench.fleet_models:main"
-lms-fleet-rollout = "lms_agent_bench.fleet_rollout_entrypoint:main"
+lms-fleet-rollout = "lms_agent_bench.fleet_rollout_command:main"
 lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
 
 [tool.setuptools]
