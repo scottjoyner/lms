@@ -99,26 +99,32 @@ def _remove_legacy_packaging(script: str) -> str:
 
 
 def _route_hardened_entrypoints(script: str) -> str:
-    replacements = {
+    required_replacements = {
         "lms_agent_bench.fleet_loadout discover": (
             "lms_agent_bench.fleet_loadout_entrypoint discover"
         ),
         "lms_agent_bench.fleet_loadout plan": (
             "lms_agent_bench.fleet_loadout_entrypoint plan"
         ),
-        "lms_agent_bench.fleet_loadout select": (
-            "lms_agent_bench.fleet_loadout_entrypoint select"
-        ),
         "lms_agent_bench.fleet_bench_plan": (
             "lms_agent_bench.fleet_bench_entrypoint"
         ),
     }
-    for original, hardened in replacements.items():
+    for original, hardened in required_replacements.items():
         if original not in script:
             raise RuntimeError(
                 f"rollout script no longer contains expected command: {original}"
             )
         script = script.replace(original, hardened)
+
+    optional_replacements = {
+        "lms_agent_bench.fleet_loadout select": (
+            "lms_agent_bench.fleet_loadout_entrypoint select"
+        )
+    }
+    for original, hardened in optional_replacements.items():
+        if original in script:
+            script = script.replace(original, hardened)
     return script
 
 
@@ -143,9 +149,7 @@ def build_remote_script(
         raise RuntimeError(
             "rollout script no longer exposes the artifact-directory marker"
         )
-    return script.replace(
-        marker, marker + _exit_packaging_snippet(), 1
-    )
+    return script.replace(marker, marker + _exit_packaging_snippet(), 1)
 
 
 def execute_remote(
@@ -169,9 +173,7 @@ def execute_remote(
 
     remote_tar = _base.remote_artifact_path(node, run_id) + ".tar.gz"
     collect_dir.mkdir(parents=True, exist_ok=True)
-    local_tar = collect_dir / (
-        f"{_base.safe_slug(str(node['node_id']))}.tar.gz"
-    )
+    local_tar = collect_dir / f"{_base.safe_slug(str(node['node_id']))}.tar.gz"
     scp = subprocess.run(
         _base.scp_command(
             str(node["ssh_target"]),
@@ -269,8 +271,8 @@ def expand_config_value(
 
 def load_rollout_config(path: str, env_file: Optional[str]) -> Dict[str, Any]:
     raw = _ORIGINAL_LOAD_JSON(path)
-    variables: MutableMapping[str, str] = load_env_file(env_file)
-    variables.update(os.environ)
+    variables: MutableMapping[str, str] = dict(os.environ)
+    variables.update(load_env_file(env_file))
     expanded = expand_config_value(raw, variables)
     if not isinstance(expanded, dict):
         raise ValueError("rollout configuration must be a JSON object")
@@ -286,6 +288,7 @@ def validate_resolved_config(config: Mapping[str, Any]) -> List[Dict[str, Any]]:
         warnings: List[str] = []
         ssh_target = str(node.get("ssh_target") or "")
         repo_dir = str(node.get("repo_dir") or "")
+        python_bin = str(node.get("python") or "python3")
         model_roots = [str(item) for item in node.get("model_roots", [])]
         endpoint_map = {
             str(key): str(value)
@@ -293,8 +296,12 @@ def validate_resolved_config(config: Mapping[str, Any]) -> List[Dict[str, Any]]:
         }
         if any(ch.isspace() for ch in ssh_target):
             errors.append("ssh_target contains whitespace")
-        if not repo_dir.startswith(("/", "~")):
-            errors.append("repo_dir must be an absolute or home-relative remote path")
+        if not repo_dir.startswith("/"):
+            errors.append("repo_dir must be an absolute remote path")
+        if "/" in python_bin and not python_bin.startswith("/"):
+            errors.append(
+                "python must be a command name or an absolute remote path"
+            )
         if len(model_roots) != len(set(model_roots)):
             errors.append("model_roots contains duplicates")
         for root in model_roots:
