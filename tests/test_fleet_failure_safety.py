@@ -3,7 +3,7 @@ from argparse import Namespace
 import pytest
 
 from lms_agent_bench import fleet_bench_entrypoint
-from lms_agent_bench import fleet_rollout_entrypoint
+from lms_agent_bench import fleet_rollout_command
 
 
 def test_unmapped_non_llama_dry_run_is_rendered_not_failed(tmp_path):
@@ -66,7 +66,7 @@ def test_endpoint_maps_must_be_loopback_local():
         )
 
 
-def test_rollout_script_packages_artifacts_once_and_streams_hashes():
+def test_rollout_script_uses_hardened_commands_and_single_packaging_pass():
     node = {
         "node_id": "x1-370",
         "ssh_target": "scott@x1-370",
@@ -75,13 +75,32 @@ def test_rollout_script_packages_artifacts_once_and_streams_hashes():
         "model_roots": ["/models"],
         "contexts": [4096, 8192],
     }
-    script = fleet_rollout_entrypoint.build_remote_script(node, "run-1")
+    script = fleet_rollout_command.build_remote_script(node, "run-1")
+    assert "lms_agent_bench.fleet_loadout_entrypoint discover" in script
+    assert "lms_agent_bench.fleet_loadout_entrypoint plan" in script
+    assert "lms_agent_bench.fleet_bench_entrypoint" in script
+    assert "lms_agent_bench.fleet_bench_plan" not in script
     assert "trap lms_fleet_package_artifacts EXIT" in script
     assert "remote_exit_code" in script
     assert "rm -f \"$ARTIFACT_DIR/bundle_manifest.json\"" in script
     assert "handle.read(8 * 1024 * 1024)" in script
     assert "path.read_bytes()" not in script
     assert script.count('tar -C "$ARTIFACT_DIR"') == 1
-    assert 'status=$package_status' in script
+    assert "status=$package_status" in script
     assert "exit \"$status\"" in script
     assert "--dry-run" in script
+
+
+def test_execution_script_routes_selection_through_hardened_entrypoint():
+    node = {
+        "node_id": "x1-370",
+        "ssh_target": "scott@x1-370",
+        "repo_dir": "/home/scott/git/lms",
+        "branch": "full-auto-reconciliation-20260730",
+        "model_roots": ["/models"],
+        "contexts": [4096, 8192],
+    }
+    script = fleet_rollout_command.build_remote_script(
+        node, "run-2", execute_candidates=["candidate-1"]
+    )
+    assert "lms_agent_bench.fleet_loadout_entrypoint select" in script
