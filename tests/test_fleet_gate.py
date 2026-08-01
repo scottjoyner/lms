@@ -4,7 +4,7 @@ import json
 import tarfile
 from pathlib import Path
 
-from lms_agent_bench import fleet_gate
+from lms_agent_bench import fleet_gate_entrypoint
 
 OBSERVATION_FP = "sha256:" + "1" * 64
 PLAN_FP = "sha256:" + "2" * 64
@@ -32,7 +32,11 @@ def bundle_files(mode="observe"):
                     {
                         "id": "model.gguf",
                         "path": "/models/model.gguf",
-                    }
+                    },
+                    {
+                        "id": "other.gguf",
+                        "path": "/models/other.gguf",
+                    },
                 ]
             }
         ),
@@ -40,7 +44,12 @@ def bundle_files(mode="observe"):
             {
                 "observation_fingerprint": OBSERVATION_FP,
                 "plan_fingerprint": PLAN_FP,
-                "candidates": [{"candidate_id": "candidate-1"}],
+                "candidates": [
+                    {
+                        "candidate_id": "candidate-1",
+                        "model": {"id": "model.gguf"},
+                    }
+                ],
                 "rejected_candidates": [],
             }
         ),
@@ -63,6 +72,10 @@ def bundle_files(mode="observe"):
                             "candidate_id": "candidate-1",
                             "eligible": True,
                             "hard_failures": [],
+                            "candidate": {
+                                "candidate_id": "candidate-1",
+                                "model": {"id": "model.gguf"},
+                            },
                             "gates": {
                                 "completion": True,
                                 "streaming": True,
@@ -81,7 +94,12 @@ def bundle_files(mode="observe"):
                                 "id": "model.gguf",
                                 "fingerprint_mode": "full",
                                 "content_sha256": MODEL_FP,
-                            }
+                            },
+                            {
+                                "id": "other.gguf",
+                                "fingerprint_mode": "quick",
+                                "quick_fingerprint": "sha256:" + "6" * 64,
+                            },
                         ]
                     }
                 ),
@@ -144,7 +162,7 @@ def test_observation_gate_verifies_collected_archive(tmp_path):
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="observe")
     write_results(results, archive)
-    report = fleet_gate.evaluate_rollout(
+    report = fleet_gate_entrypoint.evaluate_rollout(
         results, ["x1-370"], mode="observe"
     )
     assert report["passed"] is True
@@ -153,17 +171,18 @@ def test_observation_gate_verifies_collected_archive(tmp_path):
     assert report["nodes"][0]["archive"]["observation"]["candidate_count"] == 1
 
 
-def test_sweep_gate_requires_full_selected_model_evidence(tmp_path):
+def test_sweep_gate_accepts_one_full_hash_among_quick_inventory_records(tmp_path):
     archive = tmp_path / "x1-370.tar.gz"
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="sweep")
     write_results(results, archive)
-    report = fleet_gate.evaluate_rollout(
+    report = fleet_gate_entrypoint.evaluate_rollout(
         results, ["x1-370"], mode="sweep"
     )
     assert report["passed"] is True
     sweep = report["nodes"][0]["archive"]["sweep"]
     assert sweep["candidate_id"] == "candidate-1"
+    assert sweep["model_id"] == "model.gguf"
     assert sweep["model_content_sha256"] == MODEL_FP
     assert report["next_stage"] == "profile_import_review"
 
@@ -173,7 +192,7 @@ def test_gate_rejects_tampered_bundle_member(tmp_path):
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="observe", bad_hash=True)
     write_results(results, archive)
-    report = fleet_gate.evaluate_rollout(
+    report = fleet_gate_entrypoint.evaluate_rollout(
         results, ["x1-370"], mode="observe"
     )
     assert report["passed"] is False
@@ -185,7 +204,7 @@ def test_gate_rejects_nonzero_remote_result_even_with_archive(tmp_path):
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="observe")
     write_results(results, archive, returncode=1)
-    report = fleet_gate.evaluate_rollout(
+    report = fleet_gate_entrypoint.evaluate_rollout(
         results, ["x1-370"], mode="observe"
     )
     assert report["passed"] is False
