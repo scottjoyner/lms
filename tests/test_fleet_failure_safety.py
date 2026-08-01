@@ -1,5 +1,7 @@
 from argparse import Namespace
 
+import pytest
+
 from lms_agent_bench import fleet_bench_entrypoint
 from lms_agent_bench import fleet_rollout_entrypoint
 
@@ -49,6 +51,19 @@ def test_llama_dry_run_does_not_require_installed_binary(tmp_path):
     assert result["benchmark_exit_code"] == 0
     assert result["binary_available"] is False
     assert result["launch_command"][0] == "definitely-not-installed-llama-server"
+
+
+def test_endpoint_maps_must_be_loopback_local():
+    assert fleet_bench_entrypoint.parse_endpoint_map(
+        ["candidate=http://127.0.0.1:1236/v1"]
+    )["candidate"] == "http://127.0.0.1:1236/v1"
+    assert fleet_bench_entrypoint.parse_endpoint_map(
+        ["candidate=http://localhost:1236"]
+    )["candidate"] == "http://localhost:1236/v1"
+    with pytest.raises(ValueError, match="loopback"):
+        fleet_bench_entrypoint.parse_endpoint_map(
+            ["candidate=http://100.64.43.123:1236/v1"]
+        )
 
 
 def test_rollout_script_packages_artifacts_on_exit():
