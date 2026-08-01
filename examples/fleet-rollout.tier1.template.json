@@ -6,8 +6,12 @@
       "ssh_target": "${LMS_X1_SSH_TARGET}",
       "repo_dir": "${LMS_X1_REPO_DIR}",
       "branch": "full-auto-reconciliation-20260730",
+      "expected_commit": "${LMS_EXPECTED_COMMIT}",
       "python": "${LMS_X1_PYTHON}",
       "artifact_root": "~/.local/state/lms-fleet",
+      "lock_root": "~/.local/state/lms-fleet/locks",
+      "remote_timeout_seconds": 7200,
+      "scp_timeout_seconds": 300,
       "model_roots": [
         "${LMS_X1_MODEL_ROOT}"
       ],
@@ -37,8 +41,12 @@
       "ssh_target": "${LMS_XWING_SSH_TARGET}",
       "repo_dir": "${LMS_XWING_REPO_DIR}",
       "branch": "full-auto-reconciliation-20260730",
+      "expected_commit": "${LMS_EXPECTED_COMMIT}",
       "python": "${LMS_XWING_PYTHON}",
       "artifact_root": "~/.local/state/lms-fleet",
+      "lock_root": "~/.local/state/lms-fleet/locks",
+      "remote_timeout_seconds": 7200,
+      "scp_timeout_seconds": 300,
       "model_roots": [
         "${LMS_XWING_MODEL_ROOT}"
       ],
@@ -66,8 +74,12 @@
       "ssh_target": "${LMS_AIR_SSH_TARGET}",
       "repo_dir": "${LMS_AIR_REPO_DIR}",
       "branch": "full-auto-reconciliation-20260730",
+      "expected_commit": "${LMS_EXPECTED_COMMIT}",
       "python": "${LMS_AIR_PYTHON}",
       "artifact_root": "~/.local/state/lms-fleet",
+      "lock_root": "~/.local/state/lms-fleet/locks",
+      "remote_timeout_seconds": 7200,
+      "scp_timeout_seconds": 300,
       "model_roots": [
         "${LMS_AIR_MODEL_ROOT}"
       ],
