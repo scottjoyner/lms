@@ -37,6 +37,7 @@ jobs:
             tests/test_fleet_bench_plan.py \
             tests/test_fleet_models.py \
             tests/test_fleet_rollout.py \
+            tests/test_fleet_rollout_entrypoint.py \
             tests/test_fleet_failure_safety.py \
             tests/test_packaged_entrypoints.py
       - name: Validate packaged artifacts
@@ -63,5 +64,6 @@ jobs:
           lms-fleet-bench --help >/dev/null
           lms-fleet-models --help >/dev/null
           lms-fleet-rollout --help >/dev/null
+          lms-fleet-rollout validate --help >/dev/null
       - name: Build wheel and source distribution
         run: python -m build
