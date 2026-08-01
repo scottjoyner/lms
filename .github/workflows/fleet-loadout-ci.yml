@@ -29,6 +29,7 @@ jobs:
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
             src/lms_agent_bench/fleet_gate.py \
+            src/lms_agent_bench/fleet_gate_entrypoint.py \
             src/lms_agent_bench/benchmark_entrypoint.py
       - name: Run focused tests
         run: |
