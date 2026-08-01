@@ -5,20 +5,50 @@ import tarfile
 from pathlib import Path
 
 from lms_agent_bench import fleet_gate_entrypoint
+from lms_agent_bench.fleet_loadout import canonical_hash
 
 OBSERVATION_FP = "sha256:" + "1" * 64
 PLAN_FP = "sha256:" + "2" * 64
 EXECUTION_FP = "sha256:" + "3" * 64
 SELECTION_FP = "sha256:" + "4" * 64
 MODEL_FP = "sha256:" + "5" * 64
+COMMIT = "a" * 40
+RUN_ID = "run-1"
 
 
 def encoded(value):
     return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
 
 
-def bundle_files(mode="observe"):
+def source_artifact(tampered=False):
+    core = {
+        "node_id": "x1-370",
+        "run_id": RUN_ID,
+        "expected_branch": "full-auto-reconciliation-20260730",
+        "actual_branch": "full-auto-reconciliation-20260730",
+        "expected_commit": COMMIT,
+        "actual_commit": COMMIT,
+        "dirty": False,
+        "origin_fingerprint": "sha256:" + "7" * 64,
+        "python_version": "3.12.0",
+        "package_version": "0.23.0",
+    }
+    artifact = {
+        "schema_version": "fleet_source_control.v1",
+        "artifact_type": "source_control_provenance",
+        "captured_at_utc": "2026-08-01T00:00:00+00:00",
+        **core,
+        "source_fingerprint": canonical_hash(core),
+        "admission": {"admitted": False},
+    }
+    if tampered:
+        artifact["package_version"] = "tampered"
+    return artifact
+
+
+def bundle_files(mode="observe", tampered_source=False):
     files = {
+        "source_control.json": encoded(source_artifact(tampered_source)),
         "machine_observation.json": encoded(
             {
                 "observation_fingerprint": OBSERVATION_FP,
@@ -108,8 +138,13 @@ def bundle_files(mode="observe"):
     return files
 
 
-def write_bundle(path: Path, mode="observe", bad_hash=False):
-    files = bundle_files(mode)
+def write_bundle(
+    path: Path,
+    mode="observe",
+    bad_hash=False,
+    tampered_source=False,
+):
+    files = bundle_files(mode, tampered_source=tampered_source)
     entries = []
     for name, content in sorted(files.items()):
         digest = hashlib.sha256(content).hexdigest()
@@ -122,12 +157,19 @@ def write_bundle(path: Path, mode="observe", bad_hash=False):
                 "sha256": "sha256:" + digest,
             }
         )
+    source_fp = source_artifact()["source_fingerprint"]
+    core = {
+        "schema_version": "fleet_artifact_bundle.v1",
+        "node_id": "x1-370",
+        "run_id": RUN_ID,
+        "remote_exit_code": 0,
+        "source_fingerprint": source_fp,
+        "files": entries,
+    }
     manifest = encoded(
         {
-            "schema_version": "fleet_artifact_bundle.v1",
-            "node_id": "x1-370",
-            "remote_exit_code": 0,
-            "files": entries,
+            **core,
+            "bundle_fingerprint": canonical_hash(core),
         }
     )
     with tarfile.open(path, "w:gz") as archive:
@@ -137,19 +179,33 @@ def write_bundle(path: Path, mode="observe", bad_hash=False):
             archive.addfile(info, io.BytesIO(content))
 
 
-def write_results(path: Path, archive: Path, returncode=0):
+def file_hash(path: Path):
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def write_results(
+    path: Path,
+    archive: Path,
+    returncode=0,
+    archive_hash=None,
+):
     path.write_text(
         json.dumps(
             {
                 "schema_version": "fleet_rollout.v1",
                 "artifact_type": "fleet_rollout_results",
-                "run_id": "run-1",
+                "run_id": RUN_ID,
                 "results": [
                     {
                         "node_id": "x1-370",
                         "returncode": returncode,
+                        "timed_out": False,
                         "scp_returncode": 0,
+                        "scp_timed_out": False,
                         "collected_artifact": str(archive),
+                        "collected_artifact_size_bytes": archive.stat().st_size,
+                        "collected_artifact_sha256": archive_hash
+                        or file_hash(archive),
                     }
                 ],
             }
@@ -157,7 +213,7 @@ def write_results(path: Path, archive: Path, returncode=0):
     )
 
 
-def test_observation_gate_verifies_collected_archive(tmp_path):
+def test_observation_gate_verifies_collected_archive_and_source(tmp_path):
     archive = tmp_path / "x1-370.tar.gz"
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="observe")
@@ -168,7 +224,10 @@ def test_observation_gate_verifies_collected_archive(tmp_path):
     assert report["passed"] is True
     assert report["next_stage"] == "candidate_review"
     assert report["admission"]["admitted"] is False
-    assert report["nodes"][0]["archive"]["observation"]["candidate_count"] == 1
+    summary = report["nodes"][0]["archive"]
+    assert summary["observation"]["candidate_count"] == 1
+    assert summary["source"]["commit"] == COMMIT
+    assert summary["archive_sha256"] == file_hash(archive)
 
 
 def test_sweep_gate_accepts_one_full_hash_among_quick_inventory_records(tmp_path):
@@ -197,6 +256,32 @@ def test_gate_rejects_tampered_bundle_member(tmp_path):
     )
     assert report["passed"] is False
     assert "hash mismatch" in report["nodes"][0]["errors"][0]
+
+
+def test_gate_rejects_tampered_source_provenance(tmp_path):
+    archive = tmp_path / "x1-370.tar.gz"
+    results = tmp_path / "rollout_results.json"
+    write_bundle(archive, mode="observe", tampered_source=True)
+    write_results(results, archive)
+    report = fleet_gate_entrypoint.evaluate_rollout(
+        results, ["x1-370"], mode="observe"
+    )
+    assert report["passed"] is False
+    assert "source provenance fingerprint mismatch" in report["nodes"][0][
+        "errors"
+    ][0]
+
+
+def test_gate_rejects_outer_archive_digest_mismatch(tmp_path):
+    archive = tmp_path / "x1-370.tar.gz"
+    results = tmp_path / "rollout_results.json"
+    write_bundle(archive, mode="observe")
+    write_results(results, archive, archive_hash="sha256:" + "0" * 64)
+    report = fleet_gate_entrypoint.evaluate_rollout(
+        results, ["x1-370"], mode="observe"
+    )
+    assert report["passed"] is False
+    assert "archive SHA-256" in report["nodes"][0]["errors"][0]
 
 
 def test_gate_rejects_nonzero_remote_result_even_with_archive(tmp_path):
