@@ -18,7 +18,7 @@ Copy the checked-in templates to private locations:
 
 ```bash
 mkdir -p ~/.config/lms-fleet rollout
-cp examples/fleet-rollout.tier1.example.json ~/.config/lms-fleet/tier1.json
+cp examples/fleet-rollout.tier1.template.json ~/.config/lms-fleet/tier1.json
 cp examples/fleet-rollout.tier1.env.example ~/.config/lms-fleet/tier1.env
 chmod 600 ~/.config/lms-fleet/tier1.env
 ```
@@ -29,7 +29,7 @@ Fill every value in `tier1.env` with the exact SSH target, repository path, Pyth
 2. `xwing`
 3. `scotts-macbook-air`
 
-Do not commit the populated environment file, private filesystem paths, credentials, or unredacted Tailscale exports.
+Do not commit the populated environment file, private filesystem paths, credentials, private hostnames, or unredacted Tailscale exports.
 
 ## 2. Resolve and validate configuration before SSH
 
