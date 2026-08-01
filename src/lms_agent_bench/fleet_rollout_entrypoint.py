@@ -1,8 +1,8 @@
 """Installed entrypoint for guarded physical fleet rollout.
 
-The wrapper guarantees best-effort artifact packaging on every remote exit and
-attempts artifact collection even when the remote run fails. The original exit
-status is preserved so failures remain visible to operators and automation.
+The wrapper guarantees one failure-safe artifact packaging pass on remote exit
+and attempts collection even when the remote benchmark fails. Benchmark and
+packaging failures remain visible to operators and automation.
 """
 from __future__ import annotations
 
@@ -19,21 +19,31 @@ _ORIGINAL_EXECUTE_REMOTE = _base.execute_remote
 def _exit_packaging_snippet() -> str:
     return r'''lms_fleet_package_artifacts() {
   status=$?
+  package_status=0
   trap - EXIT
   set +e
   if [ -n "${ARTIFACT_DIR:-}" ] && [ -d "$ARTIFACT_DIR" ]; then
     rm -f "$ARTIFACT_DIR/bundle_manifest.json"
-    "$PYTHON_BIN" - "$ARTIFACT_DIR" "$status" <<'PY'
+    "$PYTHON_BIN" - "$ARTIFACT_DIR" "$status" <<'PY' || package_status=$?
 import hashlib, json, os, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 remote_exit_code = int(sys.argv[2])
 files = []
-for path in sorted(p for p in root.rglob('*') if p.is_file() and p.name != 'bundle_manifest.json'):
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+for path in sorted(
+    p for p in root.rglob('*')
+    if p.is_file() and p.name != 'bundle_manifest.json'
+):
+    digest = hashlib.sha256()
+    with path.open('rb') as handle:
+        while True:
+            chunk = handle.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
     files.append({
         'path': str(path.relative_to(root)),
         'size_bytes': path.stat().st_size,
-        'sha256': 'sha256:' + digest,
+        'sha256': 'sha256:' + digest.hexdigest(),
     })
 manifest = {
     'schema_version': 'fleet_artifact_bundle.v1',
@@ -46,13 +56,35 @@ manifest = {
     encoding='utf-8',
 )
 PY
-    tar -C "$ARTIFACT_DIR" -czf "$ARTIFACT_DIR.tar.gz" .
-    echo "LMS_FLEET_ARTIFACT=$ARTIFACT_DIR.tar.gz"
+    if [ "$package_status" -eq 0 ]; then
+      tar -C "$ARTIFACT_DIR" -czf "$ARTIFACT_DIR.tar.gz" . || package_status=$?
+    fi
+    if [ "$package_status" -eq 0 ]; then
+      echo "LMS_FLEET_ARTIFACT=$ARTIFACT_DIR.tar.gz"
+    else
+      echo "LMS fleet artifact packaging failed with code $package_status" >&2
+    fi
+  fi
+  if [ "$status" -eq 0 ] && [ "$package_status" -ne 0 ]; then
+    status=$package_status
   fi
   exit "$status"
 }
 trap lms_fleet_package_artifacts EXIT
 '''
+
+
+def _remove_legacy_packaging(script: str) -> str:
+    marker = (
+        '$PYTHON_BIN - "$ARTIFACT_DIR" <<\'PY\'\n'
+        "import hashlib, json, os, pathlib, sys\n"
+    )
+    index = script.rfind(marker)
+    if index < 0:
+        raise RuntimeError(
+            "rollout script no longer exposes the legacy packaging block"
+        )
+    return script[:index].rstrip() + "\n"
 
 
 def build_remote_script(
@@ -69,10 +101,15 @@ def build_remote_script(
         update_code=update_code,
         dry_run_limit=dry_run_limit,
     )
+    script = _remove_legacy_packaging(script)
     marker = 'mkdir -p "$ARTIFACT_DIR"\n'
     if marker not in script:
-        raise RuntimeError("rollout script no longer exposes the artifact-directory marker")
-    return script.replace(marker, marker + _exit_packaging_snippet(), 1)
+        raise RuntimeError(
+            "rollout script no longer exposes the artifact-directory marker"
+        )
+    return script.replace(
+        marker, marker + _exit_packaging_snippet(), 1
+    )
 
 
 def execute_remote(
@@ -96,7 +133,9 @@ def execute_remote(
 
     remote_tar = _base.remote_artifact_path(node, run_id) + ".tar.gz"
     collect_dir.mkdir(parents=True, exist_ok=True)
-    local_tar = collect_dir / f"{_base.safe_slug(str(node['node_id']))}.tar.gz"
+    local_tar = collect_dir / (
+        f"{_base.safe_slug(str(node['node_id']))}.tar.gz"
+    )
     scp = subprocess.run(
         _base.scp_command(
             str(node["ssh_target"]),
