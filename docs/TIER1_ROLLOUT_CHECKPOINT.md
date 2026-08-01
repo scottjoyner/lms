@@ -4,13 +4,13 @@ This checkpoint advances `x1-370`, `xwing`, and `scotts-macbook-air` from reposi
 
 ## Tier-1 roles
 
-| Node | Tailscale identity | Initial role | First-pass scope |
-|---|---|---|---|
-| `x1-370` | `x1-370.tailcb8954.ts.net` / `100.64.43.123` | heavy local reasoning | Linux CPU/Vulkan/available accelerator candidates, LM Studio, and XDNA2 endpoint observation |
-| `xwing` | `xwing.tailcb8954.ts.net` / `100.108.99.47` | default development worker | Linux CPU/GPU candidates and the currently available large local models |
-| `scotts-macbook-air` | `scotts-macbook-air.tailcb8954.ts.net` / `100.85.64.117` | fast small-model scout | Metal and CPU candidates for short low-latency work; do not schedule heavy fleet jobs initially |
+| Node | Initial role | First-pass scope |
+|---|---|---|
+| `x1-370` | heavy local reasoning | Linux CPU/Vulkan/available accelerator candidates, LM Studio, and XDNA2 endpoint observation |
+| `xwing` | default development worker | Linux CPU/GPU candidates and the currently available large local models |
+| `scotts-macbook-air` | fast small-model scout | Metal and CPU candidates for short low-latency work; do not schedule heavy fleet jobs initially |
 
-The template does not guess SSH usernames, repository locations, Python environments, or model directories. Those values must be supplied explicitly.
+The public template intentionally contains no private IP addresses, tailnet DNS suffixes, SSH usernames, repository locations, Python environments, or model directories. Supply those values only through the private environment file.
 
 ## 1. Prepare the control checkout
 
@@ -32,7 +32,7 @@ chmod 600 ~/.config/lms-fleet/tier1.env
 $EDITOR ~/.config/lms-fleet/tier1.env
 ```
 
-Fill every blank value with the exact SSH target, absolute remote `lms` checkout path, and absolute or home-relative model root for that node. Keep the completed file outside the repository.
+Fill every blank value with the exact SSH target, absolute remote `lms` checkout path, absolute remote Python executable, and absolute or home-relative model root for that node. Keep the completed file outside the repository.
 
 ## 3. Resolve and validate the complete Tier-1 configuration
 
