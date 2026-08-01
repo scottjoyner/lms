@@ -66,7 +66,7 @@ def test_endpoint_maps_must_be_loopback_local():
         )
 
 
-def test_rollout_script_packages_artifacts_on_exit():
+def test_rollout_script_packages_artifacts_once_and_streams_hashes():
     node = {
         "node_id": "x1-370",
         "ssh_target": "scott@x1-370",
@@ -79,5 +79,9 @@ def test_rollout_script_packages_artifacts_on_exit():
     assert "trap lms_fleet_package_artifacts EXIT" in script
     assert "remote_exit_code" in script
     assert "rm -f \"$ARTIFACT_DIR/bundle_manifest.json\"" in script
+    assert "handle.read(8 * 1024 * 1024)" in script
+    assert "path.read_bytes()" not in script
+    assert script.count('tar -C "$ARTIFACT_DIR"') == 1
+    assert 'status=$package_status' in script
     assert "exit \"$status\"" in script
     assert "--dry-run" in script
