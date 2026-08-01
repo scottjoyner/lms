@@ -3,7 +3,7 @@ from argparse import Namespace
 import pytest
 
 from lms_agent_bench import fleet_bench_entrypoint
-from lms_agent_bench import fleet_rollout_command
+from lms_agent_bench import fleet_rollout_entrypoint
 
 
 def test_unmapped_non_llama_dry_run_is_rendered_not_failed(tmp_path):
@@ -75,7 +75,7 @@ def test_rollout_script_uses_hardened_commands_and_single_packaging_pass():
         "model_roots": ["/models"],
         "contexts": [4096, 8192],
     }
-    script = fleet_rollout_command.build_remote_script(node, "run-1")
+    script = fleet_rollout_entrypoint.build_remote_script(node, "run-1")
     assert "lms_agent_bench.fleet_loadout_entrypoint discover" in script
     assert "lms_agent_bench.fleet_loadout_entrypoint plan" in script
     assert "lms_agent_bench.fleet_bench_entrypoint" in script
@@ -100,7 +100,7 @@ def test_execution_script_routes_selection_through_hardened_entrypoint():
         "model_roots": ["/models"],
         "contexts": [4096, 8192],
     }
-    script = fleet_rollout_command.build_remote_script(
+    script = fleet_rollout_entrypoint.build_remote_script(
         node, "run-2", execute_candidates=["candidate-1"]
     )
     assert "lms_agent_bench.fleet_loadout_entrypoint select" in script
