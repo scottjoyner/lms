@@ -1,0 +1,98 @@
+{
+  "schema_version": "fleet_rollout.v1",
+  "nodes": [
+    {
+      "node_id": "x1-370",
+      "ssh_target": "${LMS_X1_SSH_TARGET}",
+      "repo_dir": "${LMS_X1_REPO_DIR}",
+      "branch": "full-auto-reconciliation-20260730",
+      "python": "python3",
+      "artifact_root": "~/.local/state/lms-fleet",
+      "model_roots": [
+        "${LMS_X1_MODEL_ROOT}"
+      ],
+      "endpoints": [
+        "http://127.0.0.1:1234/v1",
+        "http://127.0.0.1:1236/v1"
+      ],
+      "contexts": [
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "default_max_context": 32768,
+      "max_candidates": 48,
+      "suite_file": "src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json",
+      "endpoint_map": {},
+      "metadata": {
+        "tailscale_dns": "x1-370.tailcb8954.ts.net",
+        "tailscale_ip": "100.64.43.123",
+        "os_family": "linux",
+        "fleet_role": "heavy-local-reasoning",
+        "priority": 1
+      }
+    },
+    {
+      "node_id": "xwing",
+      "ssh_target": "${LMS_XWING_SSH_TARGET}",
+      "repo_dir": "${LMS_XWING_REPO_DIR}",
+      "branch": "full-auto-reconciliation-20260730",
+      "python": "python3",
+      "artifact_root": "~/.local/state/lms-fleet",
+      "model_roots": [
+        "${LMS_XWING_MODEL_ROOT}"
+      ],
+      "endpoints": [
+        "http://127.0.0.1:1234/v1"
+      ],
+      "contexts": [
+        4096,
+        8192,
+        16384,
+        32768
+      ],
+      "default_max_context": 32768,
+      "max_candidates": 48,
+      "suite_file": "src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json",
+      "endpoint_map": {},
+      "metadata": {
+        "tailscale_dns": "xwing.tailcb8954.ts.net",
+        "tailscale_ip": "100.108.99.47",
+        "os_family": "linux",
+        "fleet_role": "default-dev-worker",
+        "priority": 2
+      }
+    },
+    {
+      "node_id": "scotts-macbook-air",
+      "ssh_target": "${LMS_AIR_SSH_TARGET}",
+      "repo_dir": "${LMS_AIR_REPO_DIR}",
+      "branch": "full-auto-reconciliation-20260730",
+      "python": "python3",
+      "artifact_root": "~/.local/state/lms-fleet",
+      "model_roots": [
+        "${LMS_AIR_MODEL_ROOT}"
+      ],
+      "endpoints": [
+        "http://127.0.0.1:1234/v1"
+      ],
+      "contexts": [
+        4096,
+        8192,
+        16384
+      ],
+      "default_max_context": 16384,
+      "max_candidates": 32,
+      "suite_file": "src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json",
+      "endpoint_map": {},
+      "metadata": {
+        "tailscale_dns": "scotts-macbook-air.tailcb8954.ts.net",
+        "tailscale_ip": "100.85.64.117",
+        "os_family": "macos",
+        "fleet_role": "fast-small-scout",
+        "priority": 3
+      }
+    }
+  ]
+}
