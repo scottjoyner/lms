@@ -116,9 +116,15 @@ def execute_trial_attempt(*args: Any, **kwargs: Any) -> Dict[str, Any]:
     manifest_path = attempt_dir / "trial_manifest.json"
     manifest = dict(result["manifest"])
     if manifest.get("valid") is True:
-        manifest["sample_outputs"] = sample_output_artifacts(
-            output_dir, result.get("rows")
-        )
+        try:
+            manifest["sample_outputs"] = sample_output_artifacts(
+                output_dir, result.get("rows")
+            )
+        except (OSError, ValueError, json.JSONDecodeError, csv.Error) as exc:
+            manifest["valid"] = False
+            manifest.setdefault("errors", []).append(str(exc))
+            manifest["failure_class"] = "artifact_integrity"
+            manifest["sample_outputs"] = []
     else:
         manifest["sample_outputs"] = []
     sealed = _seal_manifest(manifest_path, manifest)
@@ -193,30 +199,34 @@ def _verify_resumable_manifest(
 def existing_valid_trial(
     trial_root: Path, input_fp: str
 ) -> Optional[Dict[str, Any]]:
-    for manifest_path in sorted(trial_root.glob("attempt_*/trial_manifest.json")):
-        try:
-            manifest = _base.read_json(manifest_path)
-            rows = _verify_resumable_manifest(
-                manifest_path, manifest, input_fp
-            )
-        except (
-            OSError,
-            ValueError,
-            TypeError,
-            json.JSONDecodeError,
-            csv.Error,
-        ):
-            continue
-        output_dir = manifest_path.parent / "output"
-        return {
-            "trial_index": int(manifest.get("trial_index")),
-            "attempt_index": int(manifest.get("attempt_index")),
-            "manifest": manifest,
-            "rows": rows,
-            "output_dir": str(output_dir),
-            "resumed": True,
-        }
-    return None
+    manifest_paths = sorted(trial_root.glob("attempt_*/trial_manifest.json"))
+    # Reusing a trial with earlier failed attempts would hide its retry rate from
+    # the resumed aggregate. Only a clean first-attempt success is reusable.
+    if len(manifest_paths) != 1:
+        return None
+    manifest_path = manifest_paths[0]
+    try:
+        manifest = _base.read_json(manifest_path)
+        if int(manifest.get("attempt_index")) != 1:
+            return None
+        rows = _verify_resumable_manifest(manifest_path, manifest, input_fp)
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        json.JSONDecodeError,
+        csv.Error,
+    ):
+        return None
+    output_dir = manifest_path.parent / "output"
+    return {
+        "trial_index": int(manifest.get("trial_index")),
+        "attempt_index": int(manifest.get("attempt_index")),
+        "manifest": manifest,
+        "rows": rows,
+        "output_dir": str(output_dir),
+        "resumed": True,
+    }
 
 
 def main(argv: Optional[List[str]] = None) -> int:
