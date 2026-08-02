@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 
 from lms_agent_bench import benchmark_protocol
 
@@ -218,12 +217,11 @@ def test_non_streaming_accepts_valid_completion(monkeypatch):
         "post",
         lambda *args, **kwargs: response,
     )
+    ticks = iter([0.0, 1.0])
     monkeypatch.setattr(
         benchmark_protocol._legacy,
         "now_s",
-        SimpleNamespace(
-            __call__=lambda self: 0.0
-        ),
+        lambda: next(ticks),
     )
     metrics = benchmark_protocol.call_chat_completions_once(
         "http://127.0.0.1:1234/v1",
@@ -237,4 +235,5 @@ def test_non_streaming_accepts_valid_completion(monkeypatch):
     assert metrics.ok is True
     assert metrics.output_text == "READY"
     assert metrics.completion_tokens == 1
+    assert metrics.tokens_per_sec == 1.0
     assert metrics.finish_reason == "stop"
