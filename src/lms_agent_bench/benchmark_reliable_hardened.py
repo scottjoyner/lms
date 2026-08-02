@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from lms_agent_bench import benchmark_reliable as _base
 
+_ORIGINAL_VALIDATE_TRIAL_ARTIFACTS = _base.validate_trial_artifacts
 _ORIGINAL_EXECUTE_TRIAL_ATTEMPT = _base.execute_trial_attempt
 _MANIFEST_FINGERPRINT_FIELD = "trial_manifest_fingerprint"
 
@@ -79,7 +80,7 @@ def validate_trial_artifacts(
     output_dir: Path,
     expected_keys: set[Tuple[str, str, str, int]],
 ) -> Tuple[bool, List[str], List[Dict[str, str]]]:
-    valid, errors, rows = _base.validate_trial_artifacts(
+    valid, errors, rows = _ORIGINAL_VALIDATE_TRIAL_ARTIFACTS(
         output_dir, expected_keys
     )
     if errors:
