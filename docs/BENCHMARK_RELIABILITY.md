@@ -2,7 +2,7 @@
 
 The benchmark system is designed to answer a stricter question than “did this model respond once?” It must determine whether one exact runtime and model produce repeatable, complete, protocol-correct results under a reviewed loadout.
 
-A fast result is not selectable when it is incomplete, unstable, heavily retried, produced by a different model, or missing its raw evidence.
+A fast result is not selectable when it is incomplete, unstable, heavily retried, produced by a different model, missing raw evidence, or resumed from evidence whose integrity no longer verifies.
 
 ## Measurement layers
 
@@ -13,16 +13,17 @@ A physical candidate passes through these layers:
 3. **Warmup stabilization** — three successful warmup requests are required by default. Their wall-time coefficient of variation must not exceed the configured threshold.
 4. **Strict protocol measurement** — streaming responses must use event-stream content, contain valid JSON chunks, produce text, and terminate with `[DONE]`. Non-streaming responses must contain a valid textual choice.
 5. **Complete trial** — one trial must contain every expected endpoint, case, and repeat key exactly once. Duplicate, missing, or unexpected samples invalidate the entire trial.
-6. **Post-trial health** — the exact model must remain exposed and pass another deterministic canary.
-7. **Repeated trials** — three valid complete trials are required by default.
-8. **Reliability aggregation** — the runner computes confidence, dispersion, completeness, success, and retry measurements before a candidate can be selected.
-9. **Release verification** — `lms-fleet-gate` recomputes the standalone reliability fingerprint and matches it to the selected loadout.
+6. **Raw output verification** — every successful CSV row must reference one unique, non-empty output file inside the trial sidecar directory. The file size and SHA-256 are retained in the trial manifest.
+7. **Post-trial health** — the exact model must remain exposed and pass another deterministic canary.
+8. **Repeated trials** — three valid complete trials are required by default.
+9. **Reliability aggregation** — the runner computes confidence, dispersion, completeness, success, and retry measurements before a candidate can be selected.
+10. **Release verification** — `lms-fleet-gate` recomputes the standalone reliability fingerprint and matches it to the selected loadout.
 
 ## Whole-trial retries only
 
 The runner does not retry individual failed prompts and then keep only their successful replacements. That would bias the evidence toward success and hide intermittent endpoint behavior.
 
-A failed or incomplete trial remains preserved as diagnostic evidence. The system may start a new complete trial attempt when a process times out, required artifacts are incomplete, endpoint health changes, or the trial runner fails. The retry rate is itself a hard reliability metric.
+A failed or incomplete trial remains preserved as diagnostic evidence. The system may start a new complete trial attempt when a process times out, required artifacts are incomplete, a raw output is missing, endpoint health changes, or the trial runner fails. The retry rate is itself a hard reliability metric.
 
 Defaults:
 
@@ -47,7 +48,7 @@ This reduces fixed-order bias from:
 - first-request initialization;
 - systematic placement of long-context cases.
 
-The input fingerprint binds the inventory, suite bytes, expanded case keys, benchmark parameters, reliability thresholds, and seed. Resumed trials are accepted only when this fingerprint matches exactly.
+The input fingerprint binds the inventory, suite bytes, expanded case keys, benchmark parameters, reliability thresholds, and seed.
 
 ## Required statistics
 
@@ -88,6 +89,7 @@ trial retry rate                     > 0.25
 warmup stability                     failed
 post-trial exact-model health        failed
 strict protocol validation           failed
+raw output evidence                  missing, empty, duplicate, or unsafe
 ```
 
 The existing execution gates still apply: completion, streaming, concurrency, memory headroom, sustained stability, no crash, and successful benchmark process exit.
@@ -120,7 +122,7 @@ benchmark/<candidate>/
         sidecars/
 ```
 
-Trial manifests record command, deterministic seed, timeout, return code, environment snapshots, post-trial health, artifact hashes, and failure classification. Failed attempts remain in the bundle.
+Trial manifests record command, deterministic seed, timeout, return code, environment snapshots, post-trial health, aggregate artifact hashes, each successful sample output’s size and SHA-256, and failure classification. The manifest is sealed with a canonical `trial_manifest_fingerprint`. Failed attempts remain in the bundle.
 
 ## Reliability fingerprint
 
@@ -148,7 +150,18 @@ On outer timeout, the complete benchmark process group is terminated, then kille
 
 ## Resuming interrupted work
 
-Pass `--resume` to the reliability runner to reuse a previously valid trial only when its input fingerprint matches. Invalid, partial, differently configured, or differently seeded trials are never promoted by resume.
+Pass `--resume` to reuse a previously completed trial only when all of these conditions hold:
+
+- the input fingerprint matches exactly;
+- the trial succeeded on its first attempt;
+- there are no earlier failed attempts in that trial directory;
+- the trial manifest fingerprint recomputes;
+- the runner log hash matches;
+- all aggregate artifact sizes and hashes match;
+- every successful raw output still exists, is non-empty, and matches its retained size and SHA-256;
+- post-trial endpoint health passed.
+
+A trial with earlier failed attempts is rerun rather than resumed because reusing only the successful attempt would hide its retry rate from the aggregate. Unsealed legacy manifests are not resumable.
 
 Resume is intended for controller or node interruption recovery. It is not a mechanism for replacing failed samples inside a trial.
 
