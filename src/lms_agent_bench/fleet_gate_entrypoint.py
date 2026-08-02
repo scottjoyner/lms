@@ -1,4 +1,4 @@
-"""Installed release gate with provenance and outer-archive verification."""
+"""Installed release gate with provenance, reliability, and archive verification."""
 from __future__ import annotations
 
 import hashlib
@@ -11,6 +11,31 @@ from lms_agent_bench.fleet_loadout import canonical_hash
 from lms_agent_bench.fleet_provenance import verify_source_control
 
 _SOURCE_ARTIFACT = "source_control.json"
+_REQUIRED_RELIABILITY_GATES = set(_base.REQUIRED_SELECTION_GATES) | {
+    "measurement_reliability"
+}
+_RELIABILITY_METRICS = (
+    "reliability_score",
+    "valid_trials",
+    "required_trials",
+    "trial_attempts",
+    "trial_retry_rate",
+    "sample_completeness",
+    "success_wilson_lower_95",
+    "trial_tps_cv",
+    "trial_ttft_cv",
+    "tps_relative_mad",
+    "ttft_relative_mad",
+    "tps_p10",
+    "tps_p90",
+    "ttft_p90",
+    "tps_median_ci95_low",
+    "tps_median_ci95_high",
+    "ttft_median_ci95_low",
+    "ttft_median_ci95_high",
+    "warmup_cv",
+    "warmup_stable",
+)
 
 
 def _hash_file(path: Path) -> str:
@@ -22,6 +47,122 @@ def _hash_file(path: Path) -> str:
                 break
             digest.update(chunk)
     return "sha256:" + digest.hexdigest()
+
+
+def _safe_slug(value: str) -> str:
+    slug = "".join(
+        character if character.isalnum() or character in "-_." else "-"
+        for character in value
+    ).strip("-")
+    return slug or "candidate"
+
+
+def _int_value(value: Any, label: str) -> int:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is missing or invalid") from exc
+
+
+def _normalized(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float):
+        return f"{value:.12g}"
+    return str(value).strip().lower()
+
+
+def verify_reliability_artifact(
+    archive: tarfile.TarFile,
+    members: Mapping[str, tarfile.TarInfo],
+    candidate_id: str,
+    selected_model_id: str,
+    selected_metrics: Mapping[str, Any],
+) -> Dict[str, Any]:
+    path = (
+        f"benchmark/{_safe_slug(candidate_id)}/suite/reliability.json"
+    )
+    report = _base.read_member_json(archive, members, path)
+    if report.get("schema_version") != "reliable_benchmark.v1":
+        raise ValueError("unsupported benchmark reliability schema")
+    if report.get("artifact_type") != "benchmark_reliability":
+        raise ValueError("invalid benchmark reliability artifact type")
+    if report.get("passed") is not True:
+        raise ValueError("benchmark reliability report did not pass")
+    admission = report.get("admission")
+    if not isinstance(admission, Mapping) or admission.get("admitted") is not False:
+        raise ValueError("benchmark reliability report must remain non-admitted")
+
+    fingerprint = str(report.get("reliability_fingerprint") or "").lower()
+    if not _base.SHA256_RE.fullmatch(fingerprint):
+        raise ValueError("benchmark reliability fingerprint is invalid")
+    core = {
+        key: value
+        for key, value in report.items()
+        if key not in {"created_at_utc", "reliability_fingerprint"}
+    }
+    if fingerprint != canonical_hash(core):
+        raise ValueError("benchmark reliability fingerprint mismatch")
+    if str(selected_metrics.get("reliability_fingerprint") or "").lower() != fingerprint:
+        raise ValueError(
+            "selected metrics reference a different reliability report"
+        )
+    if not _base._boolean(selected_metrics.get("reliability_pass")):
+        raise ValueError("selected metrics do not record reliability pass")
+
+    valid_trials = _int_value(report.get("valid_trials"), "valid_trials")
+    requested_trials = _int_value(
+        report.get("requested_trials"), "requested_trials"
+    )
+    trial_attempts = _int_value(
+        report.get("trial_attempts"), "trial_attempts"
+    )
+    if valid_trials < 3 or requested_trials < 3:
+        raise ValueError("benchmark reliability requires at least three trials")
+    if valid_trials > requested_trials or trial_attempts < valid_trials:
+        raise ValueError("benchmark reliability trial counts are inconsistent")
+
+    summaries = report.get("summaries")
+    if not isinstance(summaries, list) or len(summaries) != 1:
+        raise ValueError(
+            "candidate reliability report must contain exactly one summary"
+        )
+    summary = summaries[0]
+    if not isinstance(summary, Mapping):
+        raise ValueError("benchmark reliability summary must be an object")
+    if summary.get("reliability_pass") is not True:
+        raise ValueError("benchmark reliability summary did not pass")
+    if str(summary.get("model_key") or "") != selected_model_id:
+        raise ValueError(
+            "benchmark reliability model does not match selected model"
+        )
+    if _int_value(summary.get("valid_trials"), "summary valid_trials") != valid_trials:
+        raise ValueError("benchmark reliability valid-trial count mismatch")
+    if _int_value(summary.get("trial_attempts"), "summary trial_attempts") != trial_attempts:
+        raise ValueError("benchmark reliability attempt count mismatch")
+
+    for field in _RELIABILITY_METRICS:
+        if field not in summary or field not in selected_metrics:
+            raise ValueError(f"benchmark reliability metric is missing: {field}")
+        if _normalized(summary[field]) != _normalized(selected_metrics[field]):
+            raise ValueError(
+                f"selected reliability metric does not match report: {field}"
+            )
+    failures = summary.get("reliability_failures")
+    if failures not in (None, [], "", "[]"):
+        raise ValueError("benchmark reliability summary contains failures")
+    return {
+        "artifact": path,
+        "reliability_fingerprint": fingerprint,
+        "model_id": selected_model_id,
+        "valid_trials": valid_trials,
+        "requested_trials": requested_trials,
+        "trial_attempts": trial_attempts,
+        "reliability_score": summary.get("reliability_score"),
+        "sample_completeness": summary.get("sample_completeness"),
+        "trial_tps_cv": summary.get("trial_tps_cv"),
+        "trial_ttft_cv": summary.get("trial_ttft_cv"),
+    }
 
 
 def verify_sweep_artifacts(
@@ -77,7 +218,7 @@ def verify_sweep_artifacts(
         raise ValueError("selected candidate contains no gate results")
     failed_gates = sorted(
         gate
-        for gate in _base.REQUIRED_SELECTION_GATES
+        for gate in _REQUIRED_RELIABILITY_GATES
         if not _base._boolean(gates.get(gate))
     )
     if failed_gates:
@@ -88,6 +229,16 @@ def verify_sweep_artifacts(
     admission = selection.get("admission")
     if not isinstance(admission, Mapping) or admission.get("admitted") is not False:
         raise ValueError("selection artifact must remain non-admitted")
+    selected_metrics = selected.get("metrics")
+    if not isinstance(selected_metrics, Mapping):
+        raise ValueError("selected candidate contains no benchmark metrics")
+    reliability = verify_reliability_artifact(
+        archive,
+        members,
+        candidate_id,
+        selected_model_id,
+        selected_metrics,
+    )
 
     inventory_models = selected_inventory.get("models")
     if not isinstance(inventory_models, list) or not inventory_models:
@@ -120,6 +271,7 @@ def verify_sweep_artifacts(
         "candidate_id": candidate_id,
         "model_id": selected_model_id,
         "model_content_sha256": model_hash,
+        "reliability": reliability,
     }
 
 
