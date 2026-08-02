@@ -21,6 +21,10 @@ jobs:
       - name: Compile new runtime modules
         run: |
           python -m py_compile \
+            src/lms_agent_bench/benchmark_protocol.py \
+            src/lms_agent_bench/benchmark_raw_entrypoint.py \
+            src/lms_agent_bench/benchmark_reliable.py \
+            src/lms_agent_bench/benchmark_entrypoint.py \
             src/lms_agent_bench/fleet_loadout.py \
             src/lms_agent_bench/fleet_loadout_entrypoint.py \
             src/lms_agent_bench/fleet_bench_plan.py \
@@ -31,11 +35,13 @@ jobs:
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
             src/lms_agent_bench/fleet_rollout_command.py \
             src/lms_agent_bench/fleet_gate.py \
-            src/lms_agent_bench/fleet_gate_entrypoint.py \
-            src/lms_agent_bench/benchmark_entrypoint.py
+            src/lms_agent_bench/fleet_gate_entrypoint.py
       - name: Run focused tests
         run: |
           python -m pytest -q \
+            tests/test_benchmark_protocol.py \
+            tests/test_benchmark_reliable.py \
+            tests/test_benchmark_reliability_selection.py \
             tests/test_fleet_loadout.py \
             tests/test_fleet_fair_planning.py \
             tests/test_fleet_bench_plan.py \
@@ -101,6 +107,8 @@ jobs:
           lms-fleet-rollout --help >/dev/null
           lms-fleet-rollout validate --help >/dev/null
           lms-fleet-gate --help >/dev/null
+          python -m lms_agent_bench.benchmark_entrypoint --help >/dev/null
+          python -m lms_agent_bench.benchmark_raw_entrypoint --help >/dev/null
           python -m lms_agent_bench.fleet_provenance --help >/dev/null
       - name: Build wheel and source distribution
         run: python -m build
