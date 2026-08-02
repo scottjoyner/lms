@@ -31,7 +31,7 @@ def source_artifact(tampered=False):
         "dirty": False,
         "origin_fingerprint": "sha256:" + "7" * 64,
         "python_version": "3.12.0",
-        "package_version": "0.23.0",
+        "package_version": "0.24.0",
     }
     artifact = {
         "schema_version": "fleet_source_control.v1",
@@ -46,7 +46,83 @@ def source_artifact(tampered=False):
     return artifact
 
 
-def bundle_files(mode="observe", tampered_source=False):
+def reliability_summary():
+    return {
+        "host_name": "x1-370",
+        "model_key": "model.gguf",
+        "reliability_pass": True,
+        "reliability_score": "0.980000",
+        "valid_trials": 3,
+        "required_trials": 3,
+        "trial_attempts": 3,
+        "trial_retry_rate": "0.000000",
+        "sample_completeness": "1.000000",
+        "success_wilson_lower_95": "0.900000",
+        "trial_tps_cv": "0.030000",
+        "trial_ttft_cv": "0.040000",
+        "tps_relative_mad": "0.020000",
+        "ttft_relative_mad": "0.020000",
+        "tps_p10": "19.000",
+        "tps_p90": "21.000",
+        "ttft_p90": "0.450",
+        "tps_median_ci95_low": "19.500",
+        "tps_median_ci95_high": "20.500",
+        "ttft_median_ci95_low": "0.390",
+        "ttft_median_ci95_high": "0.410",
+        "warmup_cv": "0.020000",
+        "warmup_stable": True,
+        "reliability_failures": [],
+    }
+
+
+def reliability_artifact(tampered=False):
+    core = {
+        "schema_version": "reliable_benchmark.v1",
+        "artifact_type": "benchmark_reliability",
+        "input_fingerprint": "sha256:" + "8" * 64,
+        "requested_trials": 3,
+        "valid_trials": 3,
+        "trial_attempts": 3,
+        "passed": True,
+        "summaries": [reliability_summary()],
+        "admission": {"admitted": False},
+    }
+    artifact = {
+        **core,
+        "created_at_utc": "2026-08-01T00:30:00+00:00",
+        "reliability_fingerprint": canonical_hash(core),
+    }
+    if tampered:
+        artifact["trial_attempts"] = 4
+    return artifact
+
+
+def selected_metrics(reliability):
+    summary = reliability["summaries"][0]
+    metrics = {
+        "ok_rate": "1.0",
+        "eval_ok_rate": "1.0",
+        "eval_score_avg": "1.0",
+        "tps_med": "20.0",
+        "ttft_med": "0.4",
+        "memory_headroom_ratio": "0.25",
+        "concurrency_ok": "true",
+        "streaming_ok": "true",
+        "crash_count": "0",
+        "benchmark_exit_code": "0",
+        "reliability_pass": True,
+        "reliability_fingerprint": reliability["reliability_fingerprint"],
+    }
+    for field in fleet_gate_entrypoint._RELIABILITY_METRICS:
+        metrics[field] = summary[field]
+    return metrics
+
+
+def bundle_files(
+    mode="observe",
+    tampered_source=False,
+    tampered_reliability=False,
+):
     files = {
         "source_control.json": encoded(source_artifact(tampered_source)),
         "machine_observation.json": encoded(
@@ -85,6 +161,7 @@ def bundle_files(mode="observe", tampered_source=False):
         ),
     }
     if mode == "sweep":
+        reliability = reliability_artifact(tampered=tampered_reliability)
         files.update(
             {
                 "benchmark/execution_manifest.json": encoded(
@@ -94,6 +171,9 @@ def bundle_files(mode="observe", tampered_source=False):
                         "candidate_ids": ["candidate-1"],
                         "loopback_only": True,
                     }
+                ),
+                "benchmark/candidate-1/suite/reliability.json": encoded(
+                    reliability
                 ),
                 "selected_loadout.json": encoded(
                     {
@@ -106,12 +186,14 @@ def bundle_files(mode="observe", tampered_source=False):
                                 "candidate_id": "candidate-1",
                                 "model": {"id": "model.gguf"},
                             },
+                            "metrics": selected_metrics(reliability),
                             "gates": {
                                 "completion": True,
                                 "streaming": True,
                                 "concurrency": True,
                                 "memory_headroom": True,
                                 "sustained_stability": True,
+                                "measurement_reliability": True,
                             },
                         },
                         "admission": {"admitted": False},
@@ -143,8 +225,13 @@ def write_bundle(
     mode="observe",
     bad_hash=False,
     tampered_source=False,
+    tampered_reliability=False,
 ):
-    files = bundle_files(mode, tampered_source=tampered_source)
+    files = bundle_files(
+        mode,
+        tampered_source=tampered_source,
+        tampered_reliability=tampered_reliability,
+    )
     entries = []
     for name, content in sorted(files.items()):
         digest = hashlib.sha256(content).hexdigest()
@@ -230,7 +317,7 @@ def test_observation_gate_verifies_collected_archive_and_source(tmp_path):
     assert summary["archive_sha256"] == file_hash(archive)
 
 
-def test_sweep_gate_accepts_one_full_hash_among_quick_inventory_records(tmp_path):
+def test_sweep_gate_verifies_model_and_reliability_evidence(tmp_path):
     archive = tmp_path / "x1-370.tar.gz"
     results = tmp_path / "rollout_results.json"
     write_bundle(archive, mode="sweep")
@@ -243,7 +330,25 @@ def test_sweep_gate_accepts_one_full_hash_among_quick_inventory_records(tmp_path
     assert sweep["candidate_id"] == "candidate-1"
     assert sweep["model_id"] == "model.gguf"
     assert sweep["model_content_sha256"] == MODEL_FP
+    assert sweep["reliability"]["valid_trials"] == 3
+    assert sweep["reliability"]["reliability_fingerprint"].startswith(
+        "sha256:"
+    )
     assert report["next_stage"] == "profile_import_review"
+
+
+def test_gate_rejects_tampered_reliability_report(tmp_path):
+    archive = tmp_path / "x1-370.tar.gz"
+    results = tmp_path / "rollout_results.json"
+    write_bundle(archive, mode="sweep", tampered_reliability=True)
+    write_results(results, archive)
+    report = fleet_gate_entrypoint.evaluate_rollout(
+        results, ["x1-370"], mode="sweep"
+    )
+    assert report["passed"] is False
+    assert "reliability fingerprint mismatch" in report["nodes"][0][
+        "errors"
+    ][0]
 
 
 def test_gate_rejects_tampered_bundle_member(tmp_path):
