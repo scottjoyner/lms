@@ -5,7 +5,12 @@ import sys
 from pathlib import Path
 
 import lms_agent_bench
-from lms_agent_bench import benchmark_entrypoint, lms_eval
+from lms_agent_bench import (
+    benchmark_entrypoint,
+    benchmark_raw_entrypoint,
+    benchmark_reliable,
+    lms_eval,
+)
 from lms_agent_bench.fleet_bench_entrypoint import (
     default_suite_file,
     inject_default_suite,
@@ -21,12 +26,13 @@ def test_default_suite_is_packaged_and_injected():
     assert inject_default_suite(explicit) == explicit
 
 
-def test_benchmark_entrypoint_uses_real_package_evaluator():
+def test_benchmark_entrypoints_use_real_evaluator_and_reliable_orchestration():
     import lms_agent_bench.benchmark_lmstudio_cross_machine_models as runner
 
     assert sys.modules["lms_eval"] is lms_eval
     assert runner.evaluate_output is lms_eval.evaluate_output
-    assert benchmark_entrypoint.main is runner.main
+    assert benchmark_raw_entrypoint.main is runner.main
+    assert benchmark_entrypoint.main is benchmark_reliable.main
 
 
 def test_importable_version_matches_project_metadata():
