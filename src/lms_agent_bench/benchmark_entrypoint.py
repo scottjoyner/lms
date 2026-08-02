@@ -1,19 +1,13 @@
-"""Installed-package entrypoint for the canonical benchmark runner.
+"""Installed reliability-first benchmark entrypoint.
 
-The historical runner imports ``lms_eval`` as a top-level module. An installed
-src-layout package does not expose that name, so register the package evaluator
-explicitly before importing the runner. This prevents the runner's permissive
-fallback evaluator from silently marking every output as valid.
+The historical runner is retained as an isolated single-trial measurement
+engine. The public entrypoint adds strict identity checks, deterministic
+multi-trial execution, whole-trial retries, resumability, robust statistics,
+and explicit confidence and stability gates.
 """
 from __future__ import annotations
 
-import sys
-
-from lms_agent_bench import lms_eval as _lms_eval
-
-sys.modules["lms_eval"] = _lms_eval
-
-from lms_agent_bench.benchmark_lmstudio_cross_machine_models import main
+from lms_agent_bench.benchmark_reliable import main
 
 __all__ = ["main"]
 
