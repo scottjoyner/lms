@@ -1,10 +1,11 @@
-"""lms_agent_bench — local and fleet inference benchmarking toolkit.
+"""lms_agent_bench — reliable local and fleet inference benchmarking.
 
-The package provides agent-facing endpoint discovery, deterministic capability
-benchmarks, hardware/loadout planning, safe ephemeral candidate execution, and
-profile evidence generation. Live runtime admission remains external.
+The package provides agent-facing endpoint discovery, strict protocol checks,
+deterministic multi-trial benchmarks, conservative hardware/loadout planning,
+safe ephemeral candidate execution, and cryptographically linked profile
+evidence. Live runtime admission remains external.
 """
 
 from __future__ import annotations
 
-__version__ = "0.23.0"
+__version__ = "0.24.0"
