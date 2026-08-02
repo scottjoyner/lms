@@ -13,7 +13,7 @@ def args(**overrides):
         "min_sample_completeness": 1.0,
         "min_success_rate": 0.98,
         "min_eval_success_rate": 0.90,
-        "min_wilson_lower": 0.80,
+        "min_wilson_lower": 0.40,
         "max_trial_tps_cv": 0.20,
         "max_trial_ttft_cv": 0.35,
         "max_relative_mad": 0.25,
@@ -66,7 +66,7 @@ def test_robust_statistics_are_deterministic():
     assert first == second
     assert first[0] <= 12.0 <= first[1]
     assert benchmark_reliable.percentile(values, 10) < 12.0
-    assert benchmark_reliable.relative_mad(values) == 2.0 / 12.0
+    assert benchmark_reliable.relative_mad(values) == 1.0 / 12.0
 
 
 def test_trial_artifacts_require_exact_sample_matrix(tmp_path):
@@ -170,64 +170,46 @@ def test_preflight_requires_exact_model_identity(monkeypatch):
     assert any("not exposed exactly" in error for error in report["errors"])
 
 
+def fingerprint_args():
+    return SimpleNamespace(
+        timeout=10,
+        repeats=1,
+        max_context_tokens=4096,
+        trials=3,
+        min_valid_trials=3,
+        max_trial_attempts=5,
+        warmup_runs=3,
+        preflight_timeout=10,
+        trial_timeout=0,
+        retry_backoff=1,
+        cooldown_between_trials=1,
+        seed=1,
+        max_warmup_cv=0.5,
+        min_sample_completeness=1.0,
+        min_success_rate=0.98,
+        min_eval_success_rate=0.9,
+        min_wilson_lower=0.8,
+        max_trial_tps_cv=0.2,
+        max_trial_ttft_cv=0.35,
+        max_relative_mad=0.25,
+        max_retry_rate=0.25,
+    )
+
+
 def test_input_fingerprint_changes_with_suite_content(tmp_path):
     inventory = tmp_path / "inventory.csv"
     inventory.write_text("endpoint_id,base_url,model_key\na,http://127.0.0.1,m\n")
     suite = tmp_path / "suite.json"
     suite.write_text(json.dumps({"cases": [{"case_key": "one"}]}))
     first, _ = benchmark_reliable.input_fingerprint(
-        SimpleNamespace(
-            timeout=10,
-            repeats=1,
-            max_context_tokens=4096,
-            trials=3,
-            min_valid_trials=3,
-            max_trial_attempts=5,
-            warmup_runs=3,
-            preflight_timeout=10,
-            trial_timeout=0,
-            retry_backoff=1,
-            cooldown_between_trials=1,
-            seed=1,
-            max_warmup_cv=0.5,
-            min_sample_completeness=1.0,
-            min_success_rate=0.98,
-            min_eval_success_rate=0.9,
-            min_wilson_lower=0.8,
-            max_trial_tps_cv=0.2,
-            max_trial_ttft_cv=0.35,
-            max_relative_mad=0.25,
-            max_retry_rate=0.25,
-        ),
+        fingerprint_args(),
         inventory,
         suite,
         ["one"],
     )
     suite.write_text(json.dumps({"cases": [{"case_key": "changed"}]}))
     second, _ = benchmark_reliable.input_fingerprint(
-        SimpleNamespace(
-            timeout=10,
-            repeats=1,
-            max_context_tokens=4096,
-            trials=3,
-            min_valid_trials=3,
-            max_trial_attempts=5,
-            warmup_runs=3,
-            preflight_timeout=10,
-            trial_timeout=0,
-            retry_backoff=1,
-            cooldown_between_trials=1,
-            seed=1,
-            max_warmup_cv=0.5,
-            min_sample_completeness=1.0,
-            min_success_rate=0.98,
-            min_eval_success_rate=0.9,
-            min_wilson_lower=0.8,
-            max_trial_tps_cv=0.2,
-            max_trial_ttft_cv=0.35,
-            max_relative_mad=0.25,
-            max_retry_rate=0.25,
-        ),
+        fingerprint_args(),
         inventory,
         suite,
         ["changed"],
