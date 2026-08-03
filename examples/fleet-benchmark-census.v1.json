@@ -1,0 +1,74 @@
+{
+  "schema_version": "fleet_benchmark_census.v1",
+  "snapshot_at_utc": "2026-08-03T15:35:00Z",
+  "source": "operator-provided Tailscale fleet export; private identifiers redacted",
+  "devices": [
+    {
+      "node_id": "destroyer",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "general-linux-worker"
+    },
+    {
+      "node_id": "raspberrypi",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "small-model-utility-worker"
+    },
+    {
+      "node_id": "beelink-ryzen-7-mini-pc",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "general-linux-worker"
+    },
+    {
+      "node_id": "deathstar-xps-8920",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-gpu-worker"
+    },
+    {
+      "node_id": "iphone-12-pro-max",
+      "os_family": "ios",
+      "benchmark_policy": "unsupported",
+      "benchmark_class": "mobile-non-server",
+      "reason": "The current benchmark runner requires a remotely executable OpenAI-compatible inference runtime and filesystem evidence collection; the iOS node does not provide that controller interface."
+    },
+    {
+      "node_id": "scott-lenovo-ideapad-330s-15ikb",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-light-worker"
+    },
+    {
+      "node_id": "scott-optiplex-9030-aio",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-light-worker"
+    },
+    {
+      "node_id": "scotts-macbook-air",
+      "os_family": "macos",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "apple-silicon-metal-worker"
+    },
+    {
+      "node_id": "scotts-macbook-pro-2",
+      "os_family": "macos",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "macos-worker-pending-hardware-observation"
+    },
+    {
+      "node_id": "x1-370",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "strix-halo-primary-worker"
+    },
+    {
+      "node_id": "xwing",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "accelerated-linux-worker"
+    }
+  ]
+}
