@@ -10,8 +10,6 @@ from lms_agent_bench import fleet_rollout_command as _command
 from lms_agent_bench import fleet_rollout_entrypoint as _entrypoint
 from lms_agent_bench.fleet_coverage import validate_rollout_coverage
 
-_ORIGINAL_LOAD_ROLLOUT_CONFIG = _entrypoint.load_rollout_config
-
 
 def _option_value(argv: Sequence[str], name: str) -> Optional[str]:
     values = list(argv)
@@ -55,9 +53,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     env_file = _option_value(actual_argv, "--env-file")
     command_name = actual_argv[0] if actual_argv else ""
     captured: Dict[str, Any] = {}
+    active_loader = _entrypoint.load_rollout_config
 
     def covered_load(path: str, selected_env_file: Optional[str]):
-        config = _ORIGINAL_LOAD_ROLLOUT_CONFIG(path, selected_env_file)
+        config = active_loader(path, selected_env_file)
         coverage = validate_rollout_coverage(config, path)
         captured["coverage"] = coverage
         if command_name != "validate" and not coverage.get("ready"):
@@ -73,7 +72,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     try:
         returncode = _command.main(actual_argv)
     finally:
-        _entrypoint.load_rollout_config = _ORIGINAL_LOAD_ROLLOUT_CONFIG
+        _entrypoint.load_rollout_config = active_loader
 
     if command_name == "validate":
         output_path = _option_value(actual_argv, "--out")
@@ -82,7 +81,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             return _write_validation_coverage(output_path, coverage, returncode)
         if config_path:
             try:
-                config = _ORIGINAL_LOAD_ROLLOUT_CONFIG(config_path, env_file)
+                config = active_loader(config_path, env_file)
                 coverage = validate_rollout_coverage(config, config_path)
             except (OSError, ValueError, json.JSONDecodeError):
                 return 1
