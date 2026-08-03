@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.26.0"
-description = "Agent-facing CLI for reliable, census-complete profiling and benchmarking of local inference nodes"
+version = "0.27.0"
+description = "Exact-loadout throughput and Hermes agent intelligence benchmarking for local inference fleets"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -39,6 +39,8 @@ lms-fleet-models = "lms_agent_bench.fleet_models:main"
 lms-fleet-rollout = "lms_agent_bench.fleet_rollout_complete:main"
 lms-fleet-operator = "lms_agent_bench.fleet_operator:main"
 lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
+lms-loadout-matrix = "lms_agent_bench.model_loadout:main"
+lms-hermes-bench = "lms_agent_bench.hermes_agent_bench:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
