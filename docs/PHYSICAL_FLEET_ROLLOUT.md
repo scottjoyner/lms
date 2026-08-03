@@ -2,9 +2,65 @@
 
 This runbook moves the loadout system from repository validation to physical-node evidence without enabling persistent services or live routing.
 
+## Fleet scope
+
+The canonical controller configuration is now:
+
+```text
+examples/fleet-rollout.full-fleet.template.json
+examples/fleet-rollout.full-fleet.env.example
+examples/fleet-benchmark-census.v1.json
+```
+
+The census contains 11 devices. Ten are required benchmark nodes:
+
+1. `destroyer`
+2. `raspberrypi`
+3. `beelink-ryzen-7-mini-pc`
+4. `deathstar-xps-8920`
+5. `scott-lenovo-ideapad-330s-15ikb`
+6. `scott-optiplex-9030-aio`
+7. `scotts-macbook-air`
+8. `scotts-macbook-pro-2`
+9. `x1-370`
+10. `xwing`
+
+`iphone-12-pro-max` remains in the census with an explicit `unsupported` policy. The current runner requires a remotely executable OpenAI-compatible inference runtime plus filesystem evidence collection, which the iOS device does not expose. It is accounted for rather than silently omitted.
+
+The older Tier-1 template is marked `coverage_mode=partial`. It remains useful for proving the physical workflow on `x1-370`, `xwing`, and `scotts-macbook-air`, but it is not the complete fleet benchmark definition.
+
+## Coverage enforcement
+
+`lms-fleet-rollout` validates the rollout against the census before rendering or contacting any node.
+
+For `coverage_mode=full`, validation fails when:
+
+- a `benchmark_required` census node is absent from the configuration;
+- a configured rollout node is absent from the census;
+- an `unsupported` device is incorrectly configured as a benchmark node;
+- the census has duplicate nodes or an invalid policy;
+- an unsupported device has no recorded reason.
+
+The validation report contains:
+
+```text
+coverage.fleet_device_count
+coverage.benchmark_required_count
+coverage.configured_benchmark_count
+coverage.accounted_device_count
+coverage.missing_required_node_ids
+coverage.unsupported_node_ids
+coverage.coverage_complete
+coverage.ready
+```
+
+A complete current configuration reports 11 fleet devices, 10 required benchmark nodes, 10 configured benchmark nodes, 11 accounted devices, and one unsupported device.
+
+A full configuration may still be executed one node at a time with `--node`. Coverage is evaluated against the complete configuration before node selection, so staged execution does not weaken the fleet source of truth.
+
 ## Safety boundary
 
-`lms-fleet-rollout` defaults to observation, model inventory, fair candidate planning, and dry-run launch rendering. It does not install packages, switch branches, load persistent services, modify routers, or admit endpoints.
+`lms-fleet-rollout` defaults to observation, model inventory, fair candidate planning, and dry-run launch rendering. It does not install packages, switch branches unless explicitly requested, load persistent services, modify routers, or admit endpoints.
 
 A real inference sweep requires an exact `NODE_ID=CANDIDATE_ID` argument. Ephemeral llama.cpp candidates and mapped existing endpoints must be loopback-local. Candidate process groups are stopped after evidence capture.
 
@@ -12,152 +68,222 @@ Every remote exit attempts to package evidence, including failed benchmarks and 
 
 `lms-fleet-gate` verifies collected rollout results and archives before candidate review or profile import. It never deploys or admits a runtime.
 
-## 1. Prepare the Tier-1 controller configuration
+## 1. Prepare the full-fleet controller configuration
 
 Copy the checked-in templates to private locations:
 
 ```bash
 mkdir -p ~/.config/lms-fleet rollout
-cp examples/fleet-rollout.tier1.template.json ~/.config/lms-fleet/tier1.json
-cp examples/fleet-rollout.tier1.env.example ~/.config/lms-fleet/tier1.env
-chmod 600 ~/.config/lms-fleet/tier1.env
+cp examples/fleet-rollout.full-fleet.template.json \
+  ~/.config/lms-fleet/full-fleet.json
+cp examples/fleet-rollout.full-fleet.env.example \
+  ~/.config/lms-fleet/full-fleet.env
+cp examples/fleet-benchmark-census.v1.json \
+  ~/.config/lms-fleet/fleet-benchmark-census.v1.json
+chmod 600 ~/.config/lms-fleet/full-fleet.env
 ```
 
-Fill every value in `tier1.env` with the exact SSH target, repository path, Python executable, and model root on each machine. Repository and Python paths must be absolute. Keep each physical machine under its full canonical node ID:
+Because the template references the census by a relative path, keep the copied census beside the copied rollout JSON or update `census_file` to the correct private path.
 
-1. `x1-370`
-2. `xwing`
-3. `scotts-macbook-air`
+Fill every environment value with the exact SSH target, repository path, Python executable, and model root on each machine. Repository and Python paths must be absolute. Do not commit the populated environment file, private filesystem paths, credentials, private hostnames, Tailscale IP addresses, tailnet DNS names, or device identifiers.
 
-Do not commit the populated environment file, private filesystem paths, credentials, private hostnames, or unredacted Tailscale exports.
+Pin every node to the same reviewed source commit:
 
-## 2. Resolve and validate configuration before SSH
+```bash
+LMS_EXPECTED_COMMIT=THE_REVIEWED_40_CHARACTER_COMMIT
+```
+
+Every remote checkout must be on `full-auto-reconciliation-20260730`, at that exact commit, with no tracked, staged, or untracked changes.
+
+## 2. Resolve and validate the complete fleet before SSH
 
 ```bash
 lms-fleet-rollout validate \
-  --config ~/.config/lms-fleet/tier1.json \
-  --env-file ~/.config/lms-fleet/tier1.env \
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
   --all-nodes \
-  --out rollout/tier1-validation.json
+  --out rollout/full-fleet-validation.json
 ```
 
-The command rejects unresolved variables, duplicate model roots, relative repository/Python paths, whitespace in SSH targets, and non-loopback endpoint mappings. A successful report sets `ready_for_observation=true` and always retains `admission.admitted=false`.
+A successful report must include:
 
-Validate one node while correcting paths:
+```text
+ready_for_observation=true
+coverage.ready=true
+coverage.coverage_complete=true
+coverage.fleet_device_count=11
+coverage.benchmark_required_count=10
+coverage.configured_benchmark_count=10
+coverage.accounted_device_count=11
+admission.admitted=false
+```
+
+The command also rejects unresolved variables, duplicate model roots, relative repository paths, invalid Python paths, whitespace in SSH targets, invalid timeouts, and non-loopback endpoint mappings.
+
+Validation may target one node while retaining full coverage enforcement:
 
 ```bash
 lms-fleet-rollout validate \
-  --config ~/.config/lms-fleet/tier1.json \
-  --env-file ~/.config/lms-fleet/tier1.env \
-  --node x1-370 \
-  --out rollout/x1-validation.json
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --node raspberrypi \
+  --out rollout/raspberrypi-validation.json
 ```
 
-## 3. Render and inspect the remote script
+## 3. Render and inspect remote scripts
+
+Render all scripts without contacting any node:
 
 ```bash
 lms-fleet-rollout render \
-  --config ~/.config/lms-fleet/tier1.json \
-  --env-file ~/.config/lms-fleet/tier1.env \
-  --node x1-370 \
-  --output-dir rollout/x1-render
-
-less rollout/x1-render/scripts/x1-370.sh
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --all-nodes \
+  --dry-run-limit 4 \
+  --output-dir rollout/full-fleet-render
 ```
 
-Without `--update-code`, the generated script refuses to run unless the remote repository is already on the configured branch. This avoids silently changing a machine during discovery.
+Inspect representative scripts from every hardware class:
 
-Confirm that the script invokes the hardened `fleet_loadout_entrypoint` and `fleet_bench_entrypoint` modules, binds candidates only to loopback, and contains no persistent service or routing changes.
+```bash
+less rollout/full-fleet-render/scripts/x1-370.sh
+less rollout/full-fleet-render/scripts/deathstar-xps-8920.sh
+less rollout/full-fleet-render/scripts/raspberrypi.sh
+less rollout/full-fleet-render/scripts/scotts-macbook-pro-2.sh
+```
 
-## 4. Run observation and dry-run planning
+Without `--update-code`, each generated script refuses to run unless the remote repository is already on the configured branch and exact commit. The provenance step also rejects any dirty working tree.
+
+## 4. Collect observation evidence from every benchmark node
+
+The safest first physical pass is one node at a time, preserving the full configuration:
 
 ```bash
 lms-fleet-rollout run \
-  --config ~/.config/lms-fleet/tier1.json \
-  --env-file ~/.config/lms-fleet/tier1.env \
-  --node x1-370 \
-  --output-dir rollout/x1-observe
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --node destroyer \
+  --output-dir rollout/observe-destroyer
 ```
 
-The collected archive contains:
+Repeat for all ten benchmark-required nodes. Once controller and network behavior are proven, all-node observation can be run with failure isolation:
 
+```bash
+lms-fleet-rollout run \
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --all-nodes \
+  --continue-on-error \
+  --dry-run-limit 4 \
+  --output-dir rollout/full-fleet-observe
+```
+
+This stage performs no candidate inference. Each node collects:
+
+- `source_control.json`;
 - `machine_observation.json`;
-- `model_inventory.json` with quick planning fingerprints;
-- `benchmark_plan.json` with round-robin coverage across model/backend groups;
-- rendered launch intent for a limited candidate sample;
-- `bundle_manifest.json` with the remote exit code and per-file SHA-256 values.
+- quick `model_inventory.json`;
+- a fair model/backend `benchmark_plan.json`;
+- rendered candidate intent;
+- `bundle_manifest.json` with source, run, file, and bundle fingerprints.
 
-No candidate performs inference in this stage. A missing llama-server binary is recorded in the rendered intent instead of failing a dry run. Non-llama candidates are rendered with the exact endpoint mapping they will require.
+A node with no available models or no usable runtime is expected to produce explicit diagnostic evidence rather than disappear from coverage.
 
-Gate the observation archive before reviewing candidates:
+## 5. Gate complete observation coverage
+
+For the combined observation run, require all ten benchmark nodes:
 
 ```bash
 lms-fleet-gate \
-  --rollout-results rollout/x1-observe/rollout_results.json \
+  --rollout-results rollout/full-fleet-observe/rollout_results.json \
   --mode observe \
+  --required-node destroyer \
+  --required-node raspberrypi \
+  --required-node beelink-ryzen-7-mini-pc \
+  --required-node deathstar-xps-8920 \
+  --required-node scott-lenovo-ideapad-330s-15ikb \
+  --required-node scott-optiplex-9030-aio \
+  --required-node scotts-macbook-air \
+  --required-node scotts-macbook-pro-2 \
   --required-node x1-370 \
-  --out rollout/x1-observe-gate.json
+  --required-node xwing \
+  --out rollout/full-fleet-observe/release-gate.json
 ```
 
-The gate verifies the remote and collection return codes, archive paths, bundle manifest, per-file sizes and hashes, node identity, required observation artifacts, model inventory, and plan references.
+The observation gate verifies remote and collection success, archive integrity, bundle identity, source provenance, node identity, machine observation, model inventory, candidate planning, and non-admission.
 
-## 5. Review candidate IDs
+A node that cannot yet produce a benchmark plan remains a tracked remediation item. Do not remove it from the census or full configuration to make the gate green.
 
-Inspect the collected `benchmark_plan.json` and choose a deliberately small first sweep. Start with one model and conservative context/slot combinations.
+## 6. Review candidate matrices by hardware class
 
-```bash
-python - <<'PY'
-import json
-p = json.load(open('benchmark_plan.json'))
-for item in p['candidates']:
-    print(item['candidate_id'], item['backend'], item['model']['id'], item['context_tokens'], item['parallel_slots'])
-PY
-```
+Use observation evidence to select conservative initial candidates:
 
-For an existing endpoint such as the XDNA2 NPU server, add the chosen candidate ID to that node's private `endpoint_map`. The URL must be loopback-local, such as `http://127.0.0.1:1236/v1`; LAN and Tailscale mappings are rejected so the execution manifest can truthfully assert loopback isolation.
+- `x1-370`: Vulkan/CPU/available accelerator and XDNA2 candidates;
+- `xwing`: accelerated and CPU development-worker candidates;
+- `scotts-macbook-air`: Metal and CPU candidates;
+- `scotts-macbook-pro-2`: hardware-observation-driven Metal or CPU candidates;
+- `deathstar-xps-8920`: supported GPU backend versus CPU;
+- `destroyer` and `beelink-ryzen-7-mini-pc`: accelerated backend when observed, otherwise CPU;
+- Lenovo and OptiPlex: small-model utility candidates;
+- Raspberry Pi: only models and contexts that the observation and planner prove feasible.
 
-## 6. Execute exact candidates
+Do not force identical model sizes or contexts onto every machine. Fleet completeness means every machine is measured within its viable capability, not that every machine receives the same workload.
+
+For mapped existing endpoints, add only reviewed candidate IDs to a private `endpoint_map`. URLs must remain loopback-local.
+
+## 7. Run reliability-qualified sweeps
+
+Run an exact reviewed candidate for one node:
 
 ```bash
 lms-fleet-rollout run \
-  --config ~/.config/lms-fleet/tier1.json \
-  --env-file ~/.config/lms-fleet/tier1.env \
-  --node x1-370 \
-  --execute-candidate x1-370=THE_REVIEWED_CANDIDATE_ID \
-  --output-dir rollout/x1-sweep-1
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --node raspberrypi \
+  --execute-candidate raspberrypi=THE_REVIEWED_CANDIDATE_ID \
+  --output-dir rollout/raspberrypi-sweep-1
 ```
 
-This stage runs readiness, streaming, concurrency, optional cancellation policy, deterministic task quality, throughput, latency, process memory, system headroom, and crash checks. It then selects an eligible loadout and computes a full content SHA-256 only for the selected model artifact.
+Each selected candidate must pass the reliability contract documented in `docs/BENCHMARK_RELIABILITY.md`, including three complete valid trials, exact sample accounting, raw output integrity, confidence and dispersion gates, bounded retries, and post-trial exact-model health.
 
-A nonzero remote exit still triggers artifact packaging and collection. Preserve that archive for diagnosis, but do not attempt profile import from it.
+A nonzero remote exit still triggers diagnostic packaging. Preserve the archive but do not import it.
 
-Gate the successful sweep before profile import:
+## 8. Gate every successful sweep
 
 ```bash
 lms-fleet-gate \
-  --rollout-results rollout/x1-sweep-1/rollout_results.json \
+  --rollout-results rollout/raspberrypi-sweep-1/rollout_results.json \
   --mode sweep \
-  --required-node x1-370 \
-  --out rollout/x1-sweep-1-gate.json
+  --required-node raspberrypi \
+  --out rollout/raspberrypi-sweep-1/release-gate.json
 ```
 
-Sweep mode additionally requires the execution manifest, selected loadout, all hard selection gates, loopback isolation, an actually executed candidate, and exactly one fully fingerprinted selected model. The report remains non-admitted.
+Sweep mode requires the execution manifest, selected loadout, full selected-model hash, standalone reliability artifact, recomputed reliability fingerprint, matching reliability metrics, loopback isolation, and all hard selection gates.
 
-## 7. Import desired state
+Full fleet qualification is complete only when every one of the ten required benchmark nodes has either:
 
-Use `tools/import_lms_bundle.py` from `fleet-llm-profiles` with:
+- a passing reliability-qualified candidate and sweep gate; or
+- an explicit reviewed remediation record explaining why no viable candidate exists yet.
+
+A remediation record is not an admission profile and must not be converted into routable capacity.
+
+## 9. Import reliability-preserving desired state
+
+Use `tools/import_lms_bundle_reliable.py` from `fleet-llm-profiles` with:
 
 - `bundle_manifest.json`;
-- the observation;
+- `source_control.json`;
+- machine observation;
 - benchmark plan;
 - execution manifest;
 - selected loadout;
 - `model_inventory.selected.json`;
+- the selected candidate's `suite/reliability.json`;
 - explicit physical-instance, access-path, service-manager, and rollback values.
 
-The importer recomputes every artifact fingerprint, verifies every bundle file hash, requires a successful remote exit and all hard benchmark gates, and always writes `admission.enabled=false`.
+The importer recomputes every artifact fingerprint, verifies every bundle file hash, independently reapplies reliability thresholds, and always writes `admission.enabled=false`.
 
-## 8. Promotion gates
+## 10. Promotion gates
 
 A profile remains unadmitted until all of these are recorded independently:
 
@@ -166,7 +292,7 @@ A profile remains unadmitted until all of these are recorded independently:
 - LAN and Tailscale path behavior without double-counting capacity;
 - declared slot count and shared admission proof;
 - sustained thermal and memory stability;
-- rollback canary;
-- observation and benchmark evidence that has not expired.
+- evidence freshness;
+- rollback canary.
 
-Only the external live authority may admit or route the runtime. Cross-repository rollout progress is tracked in LMS issue #7.
+Only the external live authority may admit or route a runtime. Cross-repository rollout progress is tracked in LMS issue #7.
