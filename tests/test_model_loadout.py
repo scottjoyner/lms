@@ -51,6 +51,19 @@ def test_kv_cache_is_separate_from_weight_quantization_and_fingerprinted():
     assert dense["derived"]["estimated_kv_cache_bytes"] == 536_870_912
 
 
+def test_candidate_labels_do_not_change_loadout_identity():
+    original = validate_manifest(example_bases()[0])
+    relabeled = copy.deepcopy(original)
+    relabeled.pop("loadout_fingerprint")
+    relabeled.pop("derived")
+    relabeled.pop("admission")
+    relabeled["candidate_id"] = "human-readable-review-label"
+    relabeled = validate_manifest(relabeled)
+
+    assert original["candidate_id"] != relabeled["candidate_id"]
+    assert original["loadout_fingerprint"] == relabeled["loadout_fingerprint"]
+
+
 def test_moe_requires_active_parameter_and_expert_metadata():
     manifest = example_bases()[1]
     manifest = copy.deepcopy(manifest)
