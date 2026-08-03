@@ -30,9 +30,9 @@
     {
       "node_id": "iphone-12-pro-max",
       "os_family": "ios",
-      "benchmark_policy": "unsupported",
-      "benchmark_class": "mobile-non-server",
-      "reason": "The current benchmark runner requires a remotely executable OpenAI-compatible inference runtime and filesystem evidence collection; the iOS node does not provide that controller interface."
+      "benchmark_policy": "adapter_required",
+      "benchmark_class": "mobile-local-inference",
+      "reason": "The device remains in fleet benchmark scope, but the current SSH and filesystem evidence runner cannot control an iOS-local inference runtime. A signed mobile benchmark agent or equivalent controller adapter is required before qualification can complete."
     },
     {
       "node_id": "scott-lenovo-ideapad-330s-15ikb",
