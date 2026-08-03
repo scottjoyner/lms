@@ -8,6 +8,7 @@ from typing import Any, Dict, Mapping
 CENSUS_SCHEMA_VERSION = "fleet_benchmark_census.v1"
 _ALLOWED_POLICIES = {
     "benchmark_required",
+    "benchmark_deferred",
     "adapter_required",
     "unsupported",
 }
@@ -27,9 +28,7 @@ def _resolve_census_path(config_path: str, census_value: str) -> Path:
 
 def validate_census(census: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
     if census.get("schema_version") != CENSUS_SCHEMA_VERSION:
-        raise ValueError(
-            f"fleet census schema must be {CENSUS_SCHEMA_VERSION}"
-        )
+        raise ValueError(f"fleet census schema must be {CENSUS_SCHEMA_VERSION}")
     devices = census.get("devices")
     if not isinstance(devices, list) or not devices:
         raise ValueError("fleet census requires a non-empty devices list")
@@ -51,10 +50,8 @@ def validate_census(census: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
         if not os_family:
             raise ValueError(f"fleet census node {node_id} has no os_family")
         reason = str(raw.get("reason") or "").strip()
-        if policy in {"adapter_required", "unsupported"} and not reason:
-            raise ValueError(
-                f"{policy} fleet census node {node_id} requires a reason"
-            )
+        if policy != "benchmark_required" and not reason:
+            raise ValueError(f"{policy} fleet census node {node_id} requires a reason")
         by_id[node_id] = dict(raw)
     return by_id
 
@@ -80,8 +77,10 @@ def validate_rollout_coverage(
             "coverage_enforced": False,
             "coverage_complete": False,
             "benchmark_interface_complete": False,
+            "current_execution_scope_complete": False,
             "configured_node_ids": sorted(configured),
             "benchmark_required_node_ids": [],
+            "benchmark_deferred_node_ids": [],
             "adapter_required_node_ids": [],
             "unsupported_node_ids": [],
             "missing_required_node_ids": [],
@@ -89,6 +88,7 @@ def validate_rollout_coverage(
             "non_rollout_configured_node_ids": [],
             "fleet_device_count": None,
             "benchmark_required_count": None,
+            "benchmark_deferred_count": None,
             "adapter_required_count": None,
             "unsupported_count": None,
             "configured_benchmark_count": len(configured),
@@ -114,6 +114,11 @@ def validate_rollout_coverage(
         for node_id, item in by_id.items()
         if item["benchmark_policy"] == "benchmark_required"
     }
+    deferred = {
+        node_id
+        for node_id, item in by_id.items()
+        if item["benchmark_policy"] == "benchmark_deferred"
+    }
     adapter_required = {
         node_id
         for node_id, item in by_id.items()
@@ -124,7 +129,7 @@ def validate_rollout_coverage(
         for node_id, item in by_id.items()
         if item["benchmark_policy"] == "unsupported"
     }
-    non_rollout = adapter_required | unsupported
+    non_rollout = deferred | adapter_required | unsupported
     missing = required - configured
     unexpected = configured - all_ids
     non_rollout_configured = configured & non_rollout
@@ -140,9 +145,11 @@ def validate_rollout_coverage(
         "coverage_enforced": True,
         "coverage_complete": complete,
         "benchmark_interface_complete": not adapter_required,
+        "current_execution_scope_complete": not deferred,
         "census_file": str(census_path),
         "configured_node_ids": sorted(configured),
         "benchmark_required_node_ids": sorted(required),
+        "benchmark_deferred_node_ids": sorted(deferred),
         "adapter_required_node_ids": sorted(adapter_required),
         "unsupported_node_ids": sorted(unsupported),
         "missing_required_node_ids": sorted(missing),
@@ -150,6 +157,7 @@ def validate_rollout_coverage(
         "non_rollout_configured_node_ids": sorted(non_rollout_configured),
         "fleet_device_count": len(all_ids),
         "benchmark_required_count": len(required),
+        "benchmark_deferred_count": len(deferred),
         "adapter_required_count": len(adapter_required),
         "unsupported_count": len(unsupported),
         "configured_benchmark_count": len(configured & required),
@@ -157,11 +165,19 @@ def validate_rollout_coverage(
         "ready": ready,
         "admission": {"admitted": False},
     }
+    blockers = []
+    if deferred:
+        blockers.append(
+            "benchmark deferred until node returns online: "
+            + ", ".join(sorted(deferred))
+        )
     if adapter_required:
-        report["qualification_blockers"] = [
+        blockers.append(
             "benchmark adapter required for: "
             + ", ".join(sorted(adapter_required))
-        ]
+        )
+    if blockers:
+        report["qualification_blockers"] = blockers
     if not ready:
         reasons = []
         if missing and mode == "full":
@@ -175,8 +191,7 @@ def validate_rollout_coverage(
             )
         if non_rollout_configured:
             reasons.append(
-                "devices requiring another benchmark interface were included "
-                "as SSH rollout nodes: "
+                "non-runnable census devices were included as SSH rollout nodes: "
                 + ", ".join(sorted(non_rollout_configured))
             )
         report["errors"] = reasons
