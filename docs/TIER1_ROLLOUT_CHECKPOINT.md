@@ -11,7 +11,7 @@ examples/fleet-rollout.full-fleet.env.example
 docs/PHYSICAL_FLEET_ROLLOUT.md
 ```
 
-The Tier-1 template is marked `coverage_mode=partial`. Validation reports `coverage_complete=false` and lists the seven required benchmark nodes deferred from this tranche. A successful Tier-1 run must never be represented as complete fleet qualification.
+The Tier-1 template is marked `coverage_mode=partial`. Validation reports `coverage_complete=false` and lists the seven required remote-runner nodes deferred from this tranche. A successful Tier-1 run must never be represented as complete fleet qualification.
 
 ## Tier-1 roles
 
@@ -59,9 +59,11 @@ coverage.coverage_mode=partial
 coverage.coverage_complete=false
 coverage.configured_benchmark_count=3
 coverage.benchmark_required_count=10
+coverage.adapter_required_count=1
+coverage.adapter_required_node_ids=[iphone-12-pro-max]
 ```
 
-This is expected and prevents the three-node tranche from being confused with full coverage.
+This prevents the three-node tranche from being confused with full configuration coverage or full benchmark qualification.
 
 ## Render and inspect scripts
 
@@ -129,6 +131,6 @@ Tier-1 is complete only when the three-node evidence flow is understood and repr
 - `scott-optiplex-9030-aio`
 - `scotts-macbook-pro-2`
 
-The iPhone remains explicitly census-accounted and unsupported by the current remote benchmark runner.
+The iPhone remains census-accounted as `adapter_required`; issue #9 must produce a physical mobile reliability artifact before `benchmark_interface_complete` can become true.
 
-No runtime may be admitted or routed merely because the Tier-1 tranche passed. Full fleet coverage, profile import, live identity, path behavior, capacity, freshness, and rollback remain separate gates.
+No runtime may be admitted or routed merely because the Tier-1 tranche passed. Full remote-runner coverage, mobile adapter qualification, profile import, live identity, path behavior, capacity, freshness, and rollback remain separate gates.
