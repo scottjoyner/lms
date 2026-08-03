@@ -166,6 +166,9 @@ def test_public_validate_command_adds_coverage_to_report(tmp_path, monkeypatch):
     write_json(config_path, config)
 
     def fake_command(argv):
+        fleet_rollout_complete._entrypoint.load_rollout_config(
+            str(config_path), None
+        )
         output_path.write_text(
             json.dumps(
                 {
@@ -181,8 +184,8 @@ def test_public_validate_command_adds_coverage_to_report(tmp_path, monkeypatch):
 
     monkeypatch.setattr(fleet_rollout_complete._command, "main", fake_command)
     monkeypatch.setattr(
-        fleet_rollout_complete,
-        "_ORIGINAL_LOAD_ROLLOUT_CONFIG",
+        fleet_rollout_complete._entrypoint,
+        "load_rollout_config",
         lambda path, env_file: config,
     )
 
@@ -222,8 +225,8 @@ def test_public_render_fails_before_execution_on_incomplete_full_coverage(
 
     monkeypatch.setattr(fleet_rollout_complete._command, "main", fake_command)
     monkeypatch.setattr(
-        fleet_rollout_complete,
-        "_ORIGINAL_LOAD_ROLLOUT_CONFIG",
+        fleet_rollout_complete._entrypoint,
+        "load_rollout_config",
         lambda path, env_file: config,
     )
 
