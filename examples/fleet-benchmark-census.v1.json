@@ -1,19 +1,13 @@
 {
   "schema_version": "fleet_benchmark_census.v1",
-  "snapshot_at_utc": "2026-08-03T15:35:00Z",
-  "source": "operator-provided Tailscale fleet export; private identifiers redacted",
+  "snapshot_at_utc": "2026-08-03T17:56:00Z",
+  "source": "operator-confirmed fleet scope; private identifiers redacted",
   "devices": [
     {
       "node_id": "destroyer",
       "os_family": "linux",
       "benchmark_policy": "benchmark_required",
       "benchmark_class": "general-linux-worker"
-    },
-    {
-      "node_id": "raspberrypi",
-      "os_family": "linux",
-      "benchmark_policy": "benchmark_required",
-      "benchmark_class": "small-model-utility-worker"
     },
     {
       "node_id": "beelink-ryzen-7-mini-pc",
@@ -28,11 +22,11 @@
       "benchmark_class": "legacy-gpu-worker"
     },
     {
-      "node_id": "iphone-12-pro-max",
-      "os_family": "ios",
-      "benchmark_policy": "adapter_required",
-      "benchmark_class": "mobile-local-inference",
-      "reason": "The device remains in fleet benchmark scope, but the current SSH and filesystem evidence runner cannot control an iOS-local inference runtime. A signed mobile benchmark agent or equivalent controller adapter is required before qualification can complete."
+      "node_id": "joyner",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_deferred",
+      "benchmark_class": "general-linux-worker",
+      "reason": "The physical node remains part of the fleet but is currently powered off. It must be promoted back to benchmark_required when it returns online."
     },
     {
       "node_id": "scott-lenovo-ideapad-330s-15ikb",
