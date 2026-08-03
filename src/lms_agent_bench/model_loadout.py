@@ -106,7 +106,7 @@ def identity_core(manifest: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         key: copy.deepcopy(value)
         for key, value in manifest.items()
-        if key not in {"loadout_fingerprint", "derived", "admission"}
+        if key not in {"candidate_id", "loadout_fingerprint", "derived", "admission"}
     }
 
 
