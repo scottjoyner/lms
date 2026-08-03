@@ -49,7 +49,7 @@ examples/fleet-rollout.full-fleet.env.example
 docs/PHYSICAL_FLEET_ROLLOUT.md
 ```
 
-The current census accounts for 11 devices. Ten are required benchmark nodes:
+The current census accounts for all 11 devices. Ten use the existing remote benchmark runner:
 
 - `destroyer`
 - `raspberrypi`
@@ -62,7 +62,7 @@ The current census accounts for 11 devices. Ten are required benchmark nodes:
 - `x1-370`
 - `xwing`
 
-`iphone-12-pro-max` remains census-accounted with an explicit unsupported policy because the current runner requires a remotely executable OpenAI-compatible runtime and filesystem evidence collection.
+`iphone-12-pro-max` remains in benchmark scope as `adapter_required`. The current SSH/filesystem runner cannot control an iOS-local inference runtime, so `benchmark_interface_complete=false` remains a qualification blocker until issue #9 produces a physical mobile reliability artifact. The device is not silently omitted or permanently waived.
 
 The older Tier-1 template contains only `x1-370`, `xwing`, and `scotts-macbook-air`. It is marked `coverage_mode=partial` and must not be treated as complete fleet qualification.
 
@@ -78,20 +78,25 @@ lms-fleet-rollout validate \
   --out rollout/full-fleet-validation.json
 ```
 
-A complete report contains:
+A resolved remote-runner configuration contains:
 
 ```text
 ready_for_observation=true
 coverage.ready=true
 coverage.coverage_complete=true
+coverage.benchmark_interface_complete=false
 coverage.fleet_device_count=11
 coverage.benchmark_required_count=10
+coverage.adapter_required_count=1
 coverage.configured_benchmark_count=10
 coverage.accounted_device_count=11
+coverage.adapter_required_node_ids=[iphone-12-pro-max]
 admission.admitted=false
 ```
 
-Full coverage validation fails when a required benchmark node disappears, an unknown node is added, or an unsupported device is incorrectly configured as a benchmark target.
+`coverage_complete=true` means the ten-node SSH rollout fully matches the census and every non-SSH device is explicitly accounted for. It does **not** claim that all 11 devices are benchmark-qualified; `benchmark_interface_complete=false` preserves the unresolved mobile adapter requirement.
+
+Coverage validation fails when a required benchmark node disappears, an unknown node is added, or an adapter-required/unsupported device is incorrectly configured as an SSH rollout target.
 
 A complete configuration may still be executed one node at a time with `--node`; coverage is evaluated before node selection.
 
@@ -200,8 +205,8 @@ A normal agent benchmark creates a self-contained run directory with endpoint pr
 
 The toolkit should answer:
 
-1. Which devices are in the fleet, and which are benchmark-eligible?
-2. What hardware and acceleration backends are currently available on every eligible machine?
+1. Which devices are in the fleet, and what controller interface does each require?
+2. What hardware and acceleration backends are currently available on every device?
 3. What local models and quantizations are present?
 4. Which model/loadout combinations fit safely?
 5. What can each combination do reliably at measured latency and throughput?
@@ -210,8 +215,8 @@ The toolkit should answer:
 
 ## Safety and authority rules
 
-- Do not silently remove weak, offline, model-less, or misconfigured machines from fleet coverage.
-- Record unsupported devices and remediation states explicitly.
+- Do not silently remove weak, offline, model-less, misconfigured, or adapter-pending devices from fleet coverage.
+- Record adapter requirements, unsupported states, and remediation states explicitly.
 - Do not require cloud services or internet access during benchmark execution.
 - Do not leak prompts, credentials, model output, private paths, device IDs, or private network identities outside retained evidence.
 - Keep physical candidate endpoints loopback-local.
