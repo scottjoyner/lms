@@ -1,25 +1,21 @@
 # LMS Agent Benchmarking Toolkit
 
-LMS is an agent-facing toolkit for profiling and benchmarking local or Tailscale-reachable LM Studio and OpenAI-compatible inference nodes. It produces deterministic benchmark evidence, hardware-aware model planning, guarded physical candidate execution, census-complete fleet coverage, and non-admitted runtime recommendations.
+LMS profiles and benchmarks local or Tailscale-reachable OpenAI-compatible inference nodes. It produces deterministic benchmark evidence, guarded physical execution, census validation, and non-admitted runtime recommendations.
 
-> **Command ownership:** this package intentionally does **not** install a command named `lms`. That command belongs to LM Studio's official CLI and is used for Link-aware observation. The agent-facing command is `lms-agent`.
+> The package intentionally does not install a command named `lms`; that name belongs to LM Studio's official CLI.
 
 ## Installed commands
 
 ```text
-lms-agent             Main agent-facing doctor/probe/profile/quick/route CLI
+lms-agent             Agent-facing doctor/probe/profile/quick/route CLI
 lms-bench             Manifest-driven benchmark CLI
-lmsbench               Alias for lms-bench
-lms-bench-endpoints    Endpoint registry and discovery
-lmstudio-bridge        LM Studio CLI bridge
-lms-fleet              Hardware observation, fair planning, and selection
-lms-fleet-models       Local model inventory and selected-model hashing
+lms-fleet              Hardware observation, planning, and selection
 lms-fleet-bench        Guarded loopback-only candidate execution
-lms-fleet-rollout      Census-validated SSH rollout rendering and execution
-lms-fleet-gate         Collected-archive observation and sweep release gate
+lms-fleet-models       Model inventory and selected-model hashing
+lms-fleet-rollout      Low-level census-validated SSH rollout
+lms-fleet-operator     Deterministic preflight/render/observe/gate workflow
+lms-fleet-gate         Collected-archive release gate
 ```
-
-The canonical implementation lives in `src/lms_agent_bench/`. Root compatibility modules re-export package implementations where historical imports still require them.
 
 ## Install
 
@@ -27,202 +23,112 @@ The canonical implementation lives in `src/lms_agent_bench/`. Root compatibility
 python3 -m pip install -e '.[test]'
 ```
 
-Confirm the command surface:
+## Current fleet scope
 
-```bash
-lms-agent --help
-lms-fleet --help
-lms-fleet-bench --help
-lms-fleet-models --help
-lms-fleet-rollout --help
-lms-fleet-gate --help
+The operator-confirmed fleet contains ten nodes. Nine are runnable now:
+
+```text
+destroyer
+beelink-ryzen-7-mini-pc
+deathstar-xps-8920
+scott-lenovo-ideapad-330s-15ikb
+scott-optiplex-9030-aio
+scotts-macbook-air
+scotts-macbook-pro-2
+x1-370
+xwing
 ```
 
-## Complete fleet benchmark scope
+`joyner` remains in the census as `benchmark_deferred` because it is powered off. It is not silently deleted and must return to `benchmark_required` when it comes online.
 
-The canonical controller files are:
+The Raspberry Pi and iPhone are not fleet inference nodes and are not part of this census or rollout.
+
+Canonical files:
 
 ```text
 examples/fleet-benchmark-census.v1.json
 examples/fleet-rollout.full-fleet.template.json
 examples/fleet-rollout.full-fleet.env.example
-docs/PHYSICAL_FLEET_ROLLOUT.md
+docs/DETERMINISTIC_FLEET_OPERATOR.md
 ```
 
-The current census accounts for all 11 devices. Ten use the existing remote benchmark runner:
+## Private setup
 
-- `destroyer`
-- `raspberrypi`
-- `beelink-ryzen-7-mini-pc`
-- `deathstar-xps-8920`
-- `scott-lenovo-ideapad-330s-15ikb`
-- `scott-optiplex-9030-aio`
-- `scotts-macbook-air`
-- `scotts-macbook-pro-2`
-- `x1-370`
-- `xwing`
-
-`iphone-12-pro-max` remains in benchmark scope as `adapter_required`. The current SSH/filesystem runner cannot control an iOS-local inference runtime, so `benchmark_interface_complete=false` remains a qualification blocker until issue #9 produces a physical mobile reliability artifact. The device is not silently omitted or permanently waived.
-
-The older Tier-1 template contains only `x1-370`, `xwing`, and `scotts-macbook-air`. It is marked `coverage_mode=partial` and must not be treated as complete fleet qualification.
-
-## Validate full fleet coverage
-
-Prepare a private environment file outside the repository, then run:
+Create the private configuration outside the repository:
 
 ```bash
-lms-fleet-rollout validate \
-  --config examples/fleet-rollout.full-fleet.template.json \
-  --env-file ~/.config/lms-fleet/full-fleet.env \
-  --all-nodes \
-  --out rollout/full-fleet-validation.json
+mkdir -p ~/.config/lms-fleet ~/lms-fleet-runs
+cp examples/fleet-rollout.full-fleet.template.json \
+  ~/.config/lms-fleet/full-fleet.json
+cp examples/fleet-benchmark-census.v1.json \
+  ~/.config/lms-fleet/fleet-benchmark-census.v1.json
+cp examples/fleet-rollout.full-fleet.env.example \
+  ~/.config/lms-fleet/full-fleet.env
+chmod 600 ~/.config/lms-fleet/full-fleet.env
+$EDITOR ~/.config/lms-fleet/full-fleet.env
 ```
 
-A resolved remote-runner configuration contains:
+The environment file contains only:
 
 ```text
-ready_for_observation=true
-coverage.ready=true
-coverage.coverage_complete=true
-coverage.benchmark_interface_complete=false
-coverage.fleet_device_count=11
-coverage.benchmark_required_count=10
-coverage.adapter_required_count=1
-coverage.configured_benchmark_count=10
-coverage.accounted_device_count=11
-coverage.adapter_required_node_ids=[iphone-12-pro-max]
-admission.admitted=false
+LMS_EXPECTED_COMMIT
+LMS_FLEET_SSH_USER
+LMS_LINUX_REPO_DIR
+LMS_LINUX_PYTHON
+LMS_LINUX_MODEL_ROOT
+LMS_MACOS_REPO_DIR
+LMS_MACOS_PYTHON
+LMS_MACOS_MODEL_ROOT
 ```
 
-`coverage_complete=true` means the ten-node SSH rollout fully matches the census and every non-SSH device is explicitly accounted for. It does **not** claim that all 11 devices are benchmark-qualified; `benchmark_interface_complete=false` preserves the unresolved mobile adapter requirement.
+Node SSH targets are generated as `<user>@<canonical-node-id>`; operators do not manually compose nine target strings.
 
-Coverage validation fails when a required benchmark node disappears, an unknown node is added, or an adapter-required/unsupported device is incorrectly configured as an SSH rollout target.
+## One-command observation run
 
-A complete configuration may still be executed one node at a time with `--node`; coverage is evaluated before node selection.
-
-## Physical observation and sweep flow
-
-Render without contacting a node:
+After filling the private environment file, run exactly:
 
 ```bash
-lms-fleet-rollout render \
-  --config examples/fleet-rollout.full-fleet.template.json \
+lms-fleet-operator observe \
+  --config ~/.config/lms-fleet/full-fleet.json \
   --env-file ~/.config/lms-fleet/full-fleet.env \
-  --all-nodes \
-  --output-dir rollout/full-fleet-render
+  --workspace ~/lms-fleet-runs \
+  --update-code
 ```
 
-Collect observation evidence from one node:
+The operator performs, in order:
+
+1. Complete census and configuration validation.
+2. A fixed non-interactive Tailscale SSH preflight against all nine nodes.
+3. Remote repository, Python, model-root, and clean-working-tree checks.
+4. Rendered-script generation.
+5. Observation-only rollout and artifact collection.
+6. A release gate requiring successful evidence from every runnable node.
+7. A durable `operator-state.json` plus per-stage logs.
+
+Any unexpected preflight failure stops the rollout before remote observation begins. During collection, failures are retained diagnostically, but the final gate still fails unless every required node produced valid evidence.
+
+Use a preflight-only pass when correcting paths:
 
 ```bash
-lms-fleet-rollout run \
-  --config examples/fleet-rollout.full-fleet.template.json \
+lms-fleet-operator preflight \
+  --config ~/.config/lms-fleet/full-fleet.json \
   --env-file ~/.config/lms-fleet/full-fleet.env \
-  --node raspberrypi \
-  --output-dir rollout/observe-raspberrypi
+  --workspace ~/lms-fleet-runs \
+  --update-code
 ```
 
-Observation mode performs no candidate inference. It collects source provenance, machine observation, model inventory, a fair benchmark plan, rendered candidate intent, and a cryptographically linked archive.
+`--update-code` permits the guarded rollout to fast-forward the reviewed branch. Without it, every remote checkout must already be on the exact configured branch and commit. A dirty remote checkout is always rejected.
 
-Real inference requires an exact reviewed candidate ID:
+## Reliability contract
 
-```bash
-lms-fleet-rollout run \
-  --config examples/fleet-rollout.full-fleet.template.json \
-  --env-file ~/.config/lms-fleet/full-fleet.env \
-  --node raspberrypi \
-  --execute-candidate raspberrypi=REVIEWED_CANDIDATE_ID \
-  --output-dir rollout/raspberrypi-sweep-1
+A selectable candidate requires exact model identity, strict streaming completion, complete sample accounting, unique retained raw outputs, at least three valid complete trials, bounded retries, Wilson confidence, bounded TPS/TTFT dispersion, post-trial health, memory headroom, and no observed crash.
+
+All evidence remains non-admitted. No operator command modifies routers, registries, persistent services, or live admission.
+
+See:
+
+```text
+docs/DETERMINISTIC_FLEET_OPERATOR.md
+docs/BENCHMARK_RELIABILITY.md
+docs/PHYSICAL_FLEET_ROLLOUT.md
 ```
-
-Physical endpoint mappings must remain loopback-local.
-
-## Reliability-first benchmark contract
-
-A selectable physical candidate must prove:
-
-- exact planned model identity;
-- cold-load and stabilized warmup canaries;
-- strict OpenAI-compatible streaming completion;
-- complete endpoint/case/repeat sample accounting;
-- one unique non-empty raw output per successful sample;
-- three valid complete trials by default;
-- whole-trial retries only;
-- request success of at least 98%;
-- evaluator success of at least 90%;
-- a 95% Wilson request-success lower bound of at least 0.80;
-- TPS trial coefficient of variation no greater than 0.20;
-- TTFT trial coefficient of variation no greater than 0.35;
-- TPS and TTFT relative MAD no greater than 0.25;
-- retry rate no greater than 0.25;
-- post-trial exact-model health;
-- at least 10% system-memory headroom;
-- no observed crash.
-
-Valid trial manifests retain aggregate artifact hashes, raw sample size/SHA-256 evidence, and a canonical manifest fingerprint. Resume verifies all retained evidence and only reuses a clean first-attempt success, preventing hidden retry history.
-
-See `docs/BENCHMARK_RELIABILITY.md`.
-
-## Release gates
-
-Observation archives:
-
-```bash
-lms-fleet-gate \
-  --mode observe \
-  --rollout-results rollout/observe-raspberrypi/rollout_results.json \
-  --required-node raspberrypi \
-  --out rollout/observe-raspberrypi/release-gate.json
-```
-
-Sweep archives:
-
-```bash
-lms-fleet-gate \
-  --mode sweep \
-  --rollout-results rollout/raspberrypi-sweep-1/rollout_results.json \
-  --required-node raspberrypi \
-  --out rollout/raspberrypi-sweep-1/release-gate.json
-```
-
-Sweep mode verifies source provenance, archive and bundle integrity, loopback-only execution, selected-model full SHA-256, the standalone reliability fingerprint, matching selected reliability metrics, and every hard selection gate.
-
-## Agent benchmark quick start
-
-```bash
-lms-agent doctor
-lms-agent probe
-lms-agent quick
-lms-agent show latest --task coding
-lms-agent route latest --task structured_output
-```
-
-The default endpoint is `http://127.0.0.1:1234/v1`, unless `LMS_BASE_URL` or `LMSTUDIO_BASE_URL` is set.
-
-A normal agent benchmark creates a self-contained run directory with endpoint probes, machine profile, inventory, raw benchmark results, summaries, recommendations, routing rules, and sidecars.
-
-## Product objective
-
-The toolkit should answer:
-
-1. Which devices are in the fleet, and what controller interface does each require?
-2. What hardware and acceleration backends are currently available on every device?
-3. What local models and quantizations are present?
-4. Which model/loadout combinations fit safely?
-5. What can each combination do reliably at measured latency and throughput?
-6. Where are its context, memory, stability, and instruction-following limits?
-7. Which reviewed desired loadout should proceed to external identity, path, capacity, freshness, and rollback gates?
-
-## Safety and authority rules
-
-- Do not silently remove weak, offline, model-less, misconfigured, or adapter-pending devices from fleet coverage.
-- Record adapter requirements, unsupported states, and remediation states explicitly.
-- Do not require cloud services or internet access during benchmark execution.
-- Do not leak prompts, credentials, model output, private paths, device IDs, or private network identities outside retained evidence.
-- Keep physical candidate endpoints loopback-local.
-- Treat LAN, Tailscale, loopback, and LM Studio Link URLs as access paths to one physical capacity record.
-- Execute only explicitly reviewed candidate IDs.
-- Preserve failed archives for diagnosis, but never import or admit them.
-- Treat deterministic evaluation as authoritative for hard gates.
-- Make every recommendation traceable to immutable benchmark evidence.
-- Keep profile output and selection artifacts non-admitted until the external live authority verifies runtime identity, model SHA-256, shared capacity, path behavior, sustained stability, freshness, and rollback.
