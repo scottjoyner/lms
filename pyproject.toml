@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.25.0"
+version = "0.26.0"
 description = "Agent-facing CLI for reliable, census-complete profiling and benchmarking of local inference nodes"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,6 +37,7 @@ lms-fleet = "lms_agent_bench.fleet_loadout_entrypoint:main"
 lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
 lms-fleet-models = "lms_agent_bench.fleet_models:main"
 lms-fleet-rollout = "lms_agent_bench.fleet_rollout_complete:main"
+lms-fleet-operator = "lms_agent_bench.fleet_operator:main"
 lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
 
 [tool.setuptools]
