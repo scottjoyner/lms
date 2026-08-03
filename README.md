@@ -1,77 +1,138 @@
 # LMS Agent Benchmarking Toolkit
 
-LMS is an agent-facing command line toolkit for profiling and benchmarking local or Tailscale-reachable LM Studio nodes. It gives agents a simple way to test the machine they are running on, discover available local models, run repeatable benchmark tasks, score outputs with deterministic evaluators, and produce task-specific routing recommendations.
+LMS is an agent-facing toolkit for profiling and benchmarking local or Tailscale-reachable LM Studio and OpenAI-compatible inference nodes. It provides deterministic benchmark evidence, hardware-aware model planning, guarded physical candidate execution, and non-admitted runtime recommendations.
 
-Current installed CLI entrypoints (see `pyproject.toml`):
+> **Command ownership:** this package intentionally does **not** install a command named `lms`. That command belongs to LM Studio's official CLI and is used for Link-aware observation. The agent-facing command is `lms-agent`.
 
-```toml
-lms                   = "lms_agent_bench.cli:main"
-lms-bench            = "lms_agent_bench.lms_cli_v2:main"
-lmsbench             = "lms_agent_bench.lms_cli_v2:main"
-lms-bench-endpoints  = "lms_agent_bench.lms_endpoint_registry:main"
-lmstudio-bridge       = "lms_agent_bench.lmstudio_cli_bridge:main"
+## Installed commands
+
+```text
+lms-agent             Main agent-facing doctor/probe/profile/quick/route CLI
+lms-bench             Manifest-driven benchmark CLI
+lmsbench               Alias for lms-bench
+lms-bench-endpoints    Endpoint registry and discovery
+lmstudio-bridge        LM Studio CLI bridge
+lms-fleet              Hardware observation, fair planning, and selection
+lms-fleet-models       Local model inventory and selected-model hashing
+lms-fleet-bench        Guarded loopback-only candidate execution
+lms-fleet-rollout      Validated SSH rollout rendering and execution
+lms-fleet-gate         Collected-archive observation and sweep release gate
 ```
 
-The canonical implementation now lives in the `lms_agent_bench` package
-(`src/lms_agent_bench/`). Root `*.py` files are backwards-compatible shims that
-re-export from the package (docs/LLD_UNIFIED_FLEET.md §3.6, W-67).
+The canonical implementation lives in `src/lms_agent_bench/`. Root compatibility modules re-export package implementations where historical imports still require them.
 
-## Fast start for agents
-
-Install locally from the repository:
+## Install
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install -e '.[test]'
 ```
 
-Then use the simple CLI:
+Confirm the command surface:
+
+```bash
+lms-agent --help
+lms-fleet --help
+lms-fleet-bench --help
+lms-fleet-models --help
+lms-fleet-rollout --help
+lms-fleet-gate --help
+```
+
+## Fast start for agent benchmarks
 
 ```bash
 # Check local scripts and the default LM Studio endpoint.
-lms doctor
+lms-agent doctor
 
 # List models from local LM Studio server mode.
-lms probe
+lms-agent probe
 
 # Run profile + manifest benchmark + recommendations.
-lms quick
+lms-agent quick
 
-# Benchmark a Tailscale or LAN LM Studio node.
-lms quick --endpoint http://100.64.0.10:1234/v1
+# Benchmark an explicitly reachable endpoint.
+lms-agent quick --endpoint http://100.64.0.10:1234/v1
 
-# Limit a quick run to one or more known model IDs.
-lms quick --models "qwen/qwen3-coder-30b,openai/gpt-oss-20b"
+# Limit a quick run to known model IDs.
+lms-agent quick --models 'qwen/qwen3-coder-30b,openai/gpt-oss-20b'
 
-# Inspect the latest run and select a task-specific route.
-lms show latest --task coding
-lms route latest --task structured_output
-lms route latest --task long_context --json
+# Inspect and route from the latest evidence.
+lms-agent show latest --task coding
+lms-agent route latest --task structured_output
+lms-agent route latest --task long_context --json
 ```
 
-No config file is required. By default the CLI uses `http://127.0.0.1:1234/v1`, or `LMS_BASE_URL` / `LMSTUDIO_BASE_URL` when set.
+The default endpoint is `http://127.0.0.1:1234/v1`, unless `LMS_BASE_URL` or `LMSTUDIO_BASE_URL` is set.
 
-## CLI commands
+## Tier-1 physical rollout
 
-### `lms doctor`
+The first controlled physical rollout targets:
 
-Checks that the local LMS scripts exist and probes endpoint reachability.
+- `x1-370`
+- `xwing`
+- `scotts-macbook-air`
+
+Use these retained artifacts:
+
+```text
+examples/fleet-rollout.tier1.template.json
+examples/fleet-rollout.tier1.env.example
+docs/TIER1_ROLLOUT_CHECKPOINT.md
+```
+
+Prepare the private environment file outside the repository, validate it before SSH, render and inspect the generated scripts, run observation-only collection, and verify the archives:
 
 ```bash
-lms doctor
-lms doctor --endpoint http://127.0.0.1:1234/v1
+lms-fleet-rollout validate \
+  --config examples/fleet-rollout.tier1.template.json \
+  --env-file ~/.config/lms-fleet/tier1.env \
+  --all-nodes \
+  --out rollout/tier1-validate/report.json
+
+lms-fleet-rollout run \
+  --config examples/fleet-rollout.tier1.template.json \
+  --env-file ~/.config/lms-fleet/tier1.env \
+  --all-nodes \
+  --update-code \
+  --continue-on-error \
+  --dry-run-limit 6 \
+  --output-dir rollout/tier1-observe
+
+lms-fleet-gate \
+  --mode observe \
+  --rollout-results rollout/tier1-observe/rollout_results.json \
+  --required-node x1-370 \
+  --required-node xwing \
+  --required-node scotts-macbook-air \
+  --out rollout/tier1-observe/release-gate.json
 ```
 
-### `lms probe`
+Observation mode performs no inference. Real inference requires exact reviewed `NODE_ID=CANDIDATE_ID` values. Physical benchmark endpoint mappings must be loopback-local.
 
-Lists models available from one or more LM Studio OpenAI-compatible endpoints.
+Cross-repository rollout progress is tracked in GitHub issue #7.
+
+## Agent CLI commands
+
+### `lms-agent doctor`
+
+Checks local scripts and probes endpoint reachability.
 
 ```bash
-lms probe
-lms probe --endpoint http://100.64.0.10:1234/v1 --endpoint http://100.64.0.11:1234/v1
-lms probe --json
+lms-agent doctor
+lms-agent doctor --endpoint http://127.0.0.1:1234/v1
 ```
 
-For tailnet-backed fleets, keep the registry fresh first:
+### `lms-agent probe`
+
+Lists models available from one or more OpenAI-compatible endpoints.
+
+```bash
+lms-agent probe
+lms-agent probe --endpoint http://100.64.0.10:1234/v1
+lms-agent probe --json
+```
+
+For tailnet-backed registries:
 
 ```bash
 lms-bench-endpoints discover-tailscale
@@ -79,115 +140,69 @@ lms-bench quick --from-registry --discover-tailscale
 LMS_DISCOVER_TAILSCALE=1 lms-bench quick --from-registry
 ```
 
-### `lms inventory`
+### `lms-agent inventory`
 
-Creates the inventory CSV expected by the benchmark runner.
+Creates the benchmark inventory CSV.
 
 ```bash
-lms inventory --out lmstudio_inventory.csv
-lms inventory --endpoint http://100.64.0.10:1234/v1 --max-models 3
+lms-agent inventory --out lmstudio_inventory.csv
+lms-agent inventory --endpoint http://100.64.0.10:1234/v1 --max-models 3
 ```
 
-The CSV columns are:
+Columns:
 
 ```csv
 host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
 ```
 
-### `lms profile`
+### `lms-agent profile`
 
-Collects machine and endpoint information without running a full benchmark.
+Collects machine and endpoint information without a full benchmark.
 
 ```bash
-lms profile --output-dir runs/profile-local
-lms profile --endpoint http://100.64.0.10:1234/v1 --output-dir runs/profile-xwing
+lms-agent profile --output-dir runs/profile-local
+lms-agent profile --endpoint http://100.64.0.10:1234/v1 --output-dir runs/profile-xwing
 ```
 
-Outputs:
-
-```text
-machine_profile.json
-machine_synopsis.md
-```
-
-### `lms quick`
+### `lms-agent quick`
 
 Runs the default agent workflow:
 
-1. Probe LM Studio endpoint(s).
-2. Write `lmstudio_inventory.csv`.
-3. Collect `machine_profile.json` and `machine_synopsis.md`.
-4. Run the manifest-aware benchmark runner with `benchmarks/agent_skill_suite.v1.json`.
-5. Apply deterministic evaluators during benchmark execution.
-6. Generate `run_results.csv`, `run_summary.csv`, and `task_summary.csv`.
-7. Generate `capability_matrix.csv`, `agent_recommendations.md`, and routing rules.
+1. Probe endpoints.
+2. Write the inventory.
+3. Collect machine profile artifacts.
+4. Run the packaged agent skill suite.
+5. Apply deterministic evaluators.
+6. Produce run and task summaries.
+7. Produce capability and routing recommendations.
 
 ```bash
-lms quick
-lms quick --endpoint http://100.64.0.10:1234/v1 --max-models 2 --repeats 1
-lms quick --max-context-tokens 16384
-lms quick --suite-file benchmarks/agent_skill_suite.v1.json
-lms quick --profile-only
+lms-agent quick
+lms-agent quick --endpoint http://100.64.0.10:1234/v1 --max-models 2 --repeats 1
+lms-agent quick --max-context-tokens 16384
+lms-agent quick --profile-only
 ```
 
-### `lms runs`
-
-Lists known run directories.
+### Evidence inspection and routing
 
 ```bash
-lms runs
-lms runs --runs-dir runs --limit 10
+lms-agent runs
+lms-agent show latest --task coding
+lms-agent route latest --task structured_output
+lms-agent route latest --task repo_work --write
+lms-agent recommend latest
 ```
 
-### `lms show`
-
-Shows a compact run summary, including task-family scores when `task_summary.csv` exists.
+### Deterministic evaluation
 
 ```bash
-lms show latest
-lms show latest --task coding
-lms show runs/20260530T120000Z --task long_context
-```
-
-### `lms route`
-
-Prints the best route for an agent task from `capability_matrix.csv`. It uses task-specific rows when available and falls back to general rows when needed.
-
-```bash
-lms route latest --task coding
-lms route latest --task structured_output
-lms route latest --task long_context --json
-lms route latest --task repo_work --write
-```
-
-`--write` emits:
-
-```text
-routing_rules.yaml
-routing_rules.json
-```
-
-### `lms recommend`
-
-Regenerates recommendations from an existing run directory.
-
-```bash
-lms recommend latest
-lms recommend runs/<run_id>
-```
-
-### `lms eval`
-
-Runs deterministic evaluators against a model output file or stdin.
-
-```bash
-echo '{"status":"ok"}' | lms eval --evaluators-json '[{"type":"json_parse"}]' --pretty
-lms eval --output-file raw.txt --evaluators-file evals.json
+echo '{"status":"ok"}' | \
+  lms-agent eval --evaluators-json '[{"type":"json_parse"}]' --pretty
 ```
 
 ## Output contract
 
-Every `lms quick` run creates a self-contained run directory:
+A normal agent benchmark creates a self-contained run directory:
 
 ```text
 runs/<run_id>/
@@ -206,277 +221,60 @@ runs/<run_id>/
   routing_rules.json
   agent_skill_suite.v1.json
   sidecars/
-    run_<epoch>/
-      INDEX.md
-      MODEL__<host>__<model>.md
-      outputs/
 ```
 
-### `run_results.csv`
+The fleet rollout path additionally creates immutable node archives containing observations, model inventory, candidate plans, execution manifests, selected loadouts, selected-model fingerprints, and a per-file SHA-256 bundle manifest.
 
-Per-model, per-case, per-repeat benchmark rows. Important columns:
+## Deterministic benchmark evidence
 
-```csv
-run_id,created_at_utc,phase,host_name,host_ip,endpoint_id,base_url,model_id,model_key,case_key,task_family,priority,context_tokens,recommendation_signal,repeat_index,ok,http_status,error,wall_s,ttft_s,load_s,prompt_tokens,completion_tokens,total_tokens,tokens_per_sec,finish_reason,eval_ok,eval_score,eval_failed_json,eval_result_json,output_file
-```
-
-### `run_summary.csv`
-
-Per-model aggregate summary across all task families:
+Important aggregate fields include:
 
 ```csv
 run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
 ```
 
-### `task_summary.csv`
+Fleet selection additionally requires:
 
-Per-model, per-task-family aggregate summary:
+- request success of at least 98%;
+- streaming success;
+- declared concurrency success;
+- no observed crash;
+- at least 10% system-memory headroom;
+- sustained-stability success;
+- loopback-only physical execution evidence.
 
-```csv
-run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
-```
+A selected loadout remains desired state only. It does not admit or route the runtime.
 
-### `capability_matrix.csv`
+## Benchmark suite
 
-Normalized routing recommendation rows. When `task_summary.csv` exists, rows are task-specific.
-
-```csv
-run_id,host_name,host_ip,base_url,model_key,context_tokens,task_family,score,grade,latency_grade,throughput_grade,reliability_grade,recommended_use,avoid_use,evidence,notes
-```
-
-### `machine_synopsis.md`
-
-Human-friendly machine report:
-
-- Machine identity and OS.
-- CPU, RAM, GPU, VRAM, storage, network details.
-- LM Studio endpoints discovered.
-- Practical machine recommendations.
-- Known limitations and hardware warnings.
-
-### `agent_recommendations.md`
-
-Agent-facing operating guide:
-
-- Task-specific routing candidates.
-- Expected TTFT and tokens/sec.
-- OK-rate and evaluator-score evidence.
-- Suggested routing behavior.
-- Warnings for complex, long-context, or high-risk work.
-
-## Benchmark manifest
-
-The default manifest is:
+The packaged suite is:
 
 ```text
-benchmarks/agent_skill_suite.v1.json
+src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json
 ```
 
-The benchmark runner accepts it directly:
-
-```bash
-python3 benchmark_lmstudio_cross_machine_models.py \
-  --inventory-csv runs/<run_id>/lmstudio_inventory.csv \
-  --cases-file benchmarks/agent_skill_suite.v1.json \
-  --output-dir runs/<run_id> \
-  --sidecar-dir runs/<run_id>/sidecars \
-  --max-context-tokens 8192
-```
-
-Supported manifest case fields include:
-
-```json
-{
-  "case_key": "structured_json_capability_card",
-  "priority": "P0",
-  "task_family": "structured_output",
-  "system": "You produce strict JSON only. Do not use markdown.",
-  "prompt": "Return a JSON object...",
-  "temperature": 0.0,
-  "max_output_tokens": 256,
-  "evaluators": [
-    {"type": "json_parse"},
-    {"type": "json_required_keys", "value": ["task_fit", "confidence"]}
-  ],
-  "recommendation_signal": "json_tool_call_reliability"
-}
-```
-
-Long-context cases can use `prompt_template`, `synthetic_context`, and `context_sweep_tokens`. The runner creates deterministic synthetic filler context and caps context sweep runs with `--max-context-tokens`.
-
-## Deterministic evaluators
-
-Evaluators run during benchmark execution through `lms_eval.evaluate_output()`. Supported evaluator types include:
-
-- `exact_contains`
-- `contains_all`
-- `max_chars`
-- `min_chars`
-- `json_parse`
-- `json_required_keys`
-- `json_forbidden_extra_keys`
-- `no_markdown_fence`
-- `regex_contains`
-- `regex_not_contains`
-
-The evaluator result is stored in `run_results.csv` as `eval_ok`, `eval_score`, `eval_failed_json`, and `eval_result_json`.
+Task families include operational health, structured output, coding, agent planning, long-context behavior, and repository-work simulation. Evaluators are deterministic and include JSON parsing, required keys, contains checks, regex checks, length checks, and markdown-fence restrictions.
 
 ## Product objective
 
-The tool should answer these questions for every reachable LM Studio node:
+The toolkit should answer:
 
-1. **What hardware is available?**
-   - CPU model, cores, threads, RAM, swap, disk, OS, kernel, GPU inventory, VRAM, driver/runtime availability, thermal and power limits when available.
+1. What hardware and acceleration backends are currently available?
+2. What local models and quantizations are present?
+3. Which model/loadout combinations fit safely?
+4. What can each combination do reliably at measured latency and throughput?
+5. Where are its context, memory, stability, and instruction-following limits?
+6. Which reviewed desired loadout should proceed to external identity, path, capacity, and rollback gates?
 
-2. **What models are available?**
-   - Model ID, family, quantization, apparent parameter class, context length, endpoint URL, host, reachability, load behavior, and memory fit.
+## Safety and authority rules
 
-3. **What can this model reliably do on this machine?**
-   - Coding, debugging, planning, summarization, extraction, JSON/tool formatting, long-context retrieval, multi-step reasoning, refactor review, command generation, and agent planning.
-
-4. **Where are the limits?**
-   - Context length degradation, hallucination risk, malformed JSON/tool calls, low throughput, unstable load, out-of-memory failure, poor instruction following, slow TTFT, low quality at long context, or unsuitable hardware.
-
-5. **What should an agent do with this result?**
-   - Recommended model routing, safe task classes, max input length, max output length, expected latency, fallback behavior, and warnings for tasks that should be routed to stronger models.
-
-## Target architecture
-
-```text
-+-------------------+        +----------------------+        +----------------------+
-| machine profiler  | -----> | inventory collector  | -----> | manifest benchmark   |
-+-------------------+        +----------------------+        +----------------------+
-          |                            |                              |
-          v                            v                              v
-+-------------------+        +----------------------+        +----------------------+
-| hardware synopsis |        | endpoint/model CSV   |        | raw run artifacts    |
-+-------------------+        +----------------------+        +----------------------+
-                                                                    |
-                                                                    v
-                                                        +----------------------+
-                                                        | deterministic evals  |
-                                                        +----------------------+
-                                                                    |
-                                                                    v
-                                                        +----------------------+
-                                                        | routing/capabilities |
-                                                        +----------------------+
-```
-
-## Benchmark suite v1
-
-The first agent-centered suite includes these families:
-
-### P0: Operational health
-
-- Endpoint reachability.
-- Model list retrieval.
-- Cold/warm load timing.
-- TTFT.
-- Sustained tokens/sec.
-- Error rate.
-- Output truncation detection.
-
-### P0: Structured output and tool discipline
-
-- Valid JSON generation.
-- JSON schema adherence.
-- Tool-call argument formatting.
-- Refusal to invent missing arguments.
-- Recovery from malformed user input.
-
-### P1: Coding capability
-
-- Small function implementation.
-- Multi-file patch planning.
-- Bug diagnosis from traceback.
-- Refactor plan with acceptance criteria.
-- Unit test generation.
-- Security review of a small snippet.
-
-### P1: Agent planning
-
-- Convert a product request into P0/P1/P2 implementation tasks.
-- Identify missing requirements without stalling.
-- Produce acceptance criteria.
-- Detect unsafe or impossible requirements.
-- Estimate task fit for local vs larger model.
-
-### P1: Long-context behavior
-
-Run supported long-context cases at increasing context sizes:
-
-- 2k tokens.
-- 4k tokens.
-- 8k tokens.
-- 16k tokens.
-- 32k tokens.
-- 64k tokens if supported.
-
-The default CLI cap is currently 8k tokens for quick local runs:
-
-```bash
-lms quick --max-context-tokens 8192
-```
-
-### P2: Repository work simulation
-
-- Read synthetic repository summary.
-- Find implementation gaps.
-- Generate patch plan.
-- Produce test plan.
-- Summarize risk.
-- Generate next Codex prompt.
-
-## Scoring model
-
-The current route score combines runtime reliability, deterministic evaluator quality, throughput, and TTFT:
-
-```text
-route_score =
-  ok_rate * 0.35 +
-  max(eval_score_avg, eval_ok_rate) * 0.45 +
-  min(tokens_per_sec / 40, 1.0) * 0.15 +
-  low_ttft_bonus * 0.05
-```
-
-Recommended grades:
-
-- `A`: safe default for this task family.
-- `B`: usable with review.
-- `C`: acceptable for drafts only.
-- `D`: not recommended except small/simple tasks.
-- `F`: do not route this task family to this model on this hardware.
-
-## Implementation status
-
-### Implemented
-
-- `lms_cli.py` active CLI entrypoint.
-- `lms doctor`, `probe`, `inventory`, `profile`, `quick`, `runs`, `show`, `route`, `recommend`, and `eval`.
-- `lms_machine_profile.py` machine profiling.
-- Manifest-driven benchmark execution through `--cases-file`.
-- Deterministic evaluator execution during benchmark runs.
-- `run_results.csv`, `run_summary.csv`, and `task_summary.csv`.
-- Task-specific capability matrix generation.
-- `routing_rules.yaml` and `routing_rules.json` export.
-- Synthetic long-context prompt generation with `--max-context-tokens` cap.
-
-### Next refinements
-
-- Add `lms compare <run_a> <run_b>` to compare model, driver, quantization, and hardware changes.
-- Add safety-focused evaluators for shell commands, secrets, destructive operations, and unsafe bindings.
-- Move to a real package layout or use `importlib.resources` for package assets in non-editable installs.
-- Add optional static dashboard over run artifacts.
-- Add fallback-model selection per task family.
-
-## Design rules
-
-- Do not require cloud services.
-- Do not require internet access during benchmarks.
-- Do not leak prompts, API keys, or private outputs outside the run directory.
-- Keep local/Tailscale endpoints explicit.
-- Treat LLM-as-judge as optional, not required.
-- Prefer deterministic evaluation where possible.
-- Make every recommendation traceable to raw benchmark evidence.
-- Assume smaller models can draft, but stronger models should refine, judge, or handle long-context work.
+- Do not require cloud services for local benchmarking.
+- Do not require internet access during benchmark execution.
+- Do not leak prompts, credentials, model output, or private paths outside retained evidence.
+- Keep physical candidate endpoints loopback-local.
+- Treat LAN, Tailscale, loopback, and LM Studio Link URLs as access paths to one physical capacity record.
+- Execute only explicitly reviewed candidate IDs.
+- Preserve failed archives for diagnosis, but never import or admit them.
+- Treat LLM-as-judge as optional; deterministic evaluation is authoritative for hard gates.
+- Make every recommendation traceable to immutable benchmark evidence.
+- Keep profile output and selection artifacts non-admitted until the external live authority verifies runtime identity, model SHA-256, shared capacity, path behavior, sustained stability, freshness, and rollback.

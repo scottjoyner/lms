@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.17.0"
-description = "Agent-facing CLI for profiling and benchmarking local LM Studio nodes"
+version = "0.24.0"
+description = "Agent-facing CLI for reliable profiling and benchmarking of local inference nodes"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -26,14 +26,30 @@ graph = [
 ]
 
 [project.scripts]
-lms = "lms_agent_bench.cli:main"
+# Never install a command named `lms`: that name belongs to LM Studio's official
+# CLI and is required for Link-aware `lms ps --json --host ...` observation.
+lms-agent = "lms_agent_bench.cli:main"
 lms-bench = "lms_agent_bench.lms_cli_v2:main"
 lmsbench = "lms_agent_bench.lms_cli_v2:main"
 lms-bench-endpoints = "lms_agent_bench.lms_endpoint_registry:main"
 lmstudio-bridge = "lms_agent_bench.lmstudio_cli_bridge:main"
+lms-fleet = "lms_agent_bench.fleet_loadout_entrypoint:main"
+lms-fleet-bench = "lms_agent_bench.fleet_bench_entrypoint:main"
+lms-fleet-models = "lms_agent_bench.fleet_models:main"
+lms-fleet-rollout = "lms_agent_bench.fleet_rollout_command:main"
+lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
 
 [tool.setuptools]
+package-dir = {"" = "src"}
 packages = ["lms_agent_bench"]
+py-modules = [
+  "lms_artifact_validate",
+  "lms_run_audit",
+  "lms_skill_export",
+  "lms_config",
+  "lms_decide",
+  "lms_eval",
+]
 
 [tool.setuptools.package-data]
 "lms_agent_bench" = ["benchmarks/*.json", "schemas/*.json"]
