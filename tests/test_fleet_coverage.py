@@ -54,7 +54,7 @@ def test_full_coverage_accounts_for_required_and_unsupported_devices(tmp_path):
             [
                 device("node-a"),
                 device("node-b"),
-                device("phone", "unsupported", "no remote runner"),
+                device("phone", "unsupported", "not benchmark-capable"),
             ]
         ),
     )
@@ -65,11 +65,39 @@ def test_full_coverage_accounts_for_required_and_unsupported_devices(tmp_path):
     report = validate_rollout_coverage(config, str(config_path))
     assert report["ready"] is True
     assert report["coverage_complete"] is True
+    assert report["benchmark_interface_complete"] is True
     assert report["fleet_device_count"] == 3
     assert report["benchmark_required_count"] == 2
     assert report["configured_benchmark_count"] == 2
     assert report["accounted_device_count"] == 3
     assert report["unsupported_node_ids"] == ["phone"]
+
+
+def test_adapter_required_device_is_accounted_but_blocks_interface_completion(
+    tmp_path,
+):
+    census_path = tmp_path / "census.json"
+    write_json(
+        census_path,
+        census(
+            [
+                device("node-a"),
+                device("phone", "adapter_required", "mobile adapter needed"),
+            ]
+        ),
+    )
+    config_path = tmp_path / "rollout.json"
+    config = rollout(census_path.name, ["node-a"])
+    write_json(config_path, config)
+
+    report = validate_rollout_coverage(config, str(config_path))
+    assert report["ready"] is True
+    assert report["coverage_complete"] is True
+    assert report["benchmark_interface_complete"] is False
+    assert report["adapter_required_node_ids"] == ["phone"]
+    assert report["adapter_required_count"] == 1
+    assert report["accounted_device_count"] == 2
+    assert report["qualification_blockers"]
 
 
 def test_full_coverage_fails_when_required_node_is_missing(tmp_path):
@@ -99,11 +127,11 @@ def test_partial_coverage_is_explicit_but_not_complete(tmp_path):
     assert report["missing_required_node_ids"] == ["node-b"]
 
 
-def test_unsupported_device_cannot_be_benchmarked_as_a_rollout_node(tmp_path):
+def test_non_rollout_device_cannot_be_used_as_ssh_rollout_node(tmp_path):
     census_path = tmp_path / "census.json"
     write_json(
         census_path,
-        census([device("phone", "unsupported", "no remote runner")]),
+        census([device("phone", "adapter_required", "mobile adapter needed")]),
     )
     config_path = tmp_path / "rollout.json"
     config = rollout(census_path.name, ["phone"])
@@ -111,12 +139,13 @@ def test_unsupported_device_cannot_be_benchmarked_as_a_rollout_node(tmp_path):
 
     report = validate_rollout_coverage(config, str(config_path))
     assert report["ready"] is False
-    assert report["unsupported_configured_node_ids"] == ["phone"]
+    assert report["non_rollout_configured_node_ids"] == ["phone"]
 
 
-def test_unsupported_policy_requires_a_reason():
+@pytest.mark.parametrize("policy", ["adapter_required", "unsupported"])
+def test_nonstandard_policy_requires_a_reason(policy):
     with pytest.raises(ValueError, match="requires a reason"):
-        validate_census(census([device("phone", "unsupported")]))
+        validate_census(census([device("phone", policy)]))
 
 
 def test_canonical_full_fleet_template_covers_current_census():
@@ -126,11 +155,13 @@ def test_canonical_full_fleet_template_covers_current_census():
 
     assert report["ready"] is True
     assert report["coverage_complete"] is True
+    assert report["benchmark_interface_complete"] is False
     assert report["fleet_device_count"] == 11
     assert report["benchmark_required_count"] == 10
     assert report["configured_benchmark_count"] == 10
     assert report["accounted_device_count"] == 11
-    assert report["unsupported_node_ids"] == ["iphone-12-pro-max"]
+    assert report["adapter_required_node_ids"] == ["iphone-12-pro-max"]
+    assert report["unsupported_node_ids"] == []
     assert set(report["configured_node_ids"]) == {
         "destroyer",
         "raspberrypi",
@@ -155,6 +186,7 @@ def test_tier1_template_is_marked_partial_and_reports_deferred_nodes():
     assert report["coverage_complete"] is False
     assert report["configured_benchmark_count"] == 3
     assert len(report["missing_required_node_ids"]) == 7
+    assert report["adapter_required_node_ids"] == ["iphone-12-pro-max"]
 
 
 def test_public_validate_command_adds_coverage_to_report(tmp_path, monkeypatch):
