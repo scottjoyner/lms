@@ -32,9 +32,11 @@ jobs:
             src/lms_agent_bench/fleet_bench_entrypoint.py \
             src/lms_agent_bench/fleet_models.py \
             src/lms_agent_bench/fleet_provenance.py \
+            src/lms_agent_bench/fleet_coverage.py \
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
             src/lms_agent_bench/fleet_rollout_command.py \
+            src/lms_agent_bench/fleet_rollout_complete.py \
             src/lms_agent_bench/fleet_gate.py \
             src/lms_agent_bench/fleet_gate_entrypoint.py
       - name: Run focused tests
@@ -49,6 +51,7 @@ jobs:
             tests/test_fleet_bench_plan.py \
             tests/test_fleet_models.py \
             tests/test_fleet_provenance.py \
+            tests/test_fleet_coverage.py \
             tests/test_fleet_rollout.py \
             tests/test_fleet_rollout_entrypoint.py \
             tests/test_fleet_rollout_command.py \
@@ -61,8 +64,10 @@ jobs:
           python -m json.tool src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_model_inventory.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_release_gate.v1.schema.json >/dev/null
+          python -m json.tool examples/fleet-benchmark-census.v1.json >/dev/null
           python -m json.tool examples/fleet-rollout.v1.example.json >/dev/null
           python -m json.tool examples/fleet-rollout.tier1.template.json >/dev/null
+          python -m json.tool examples/fleet-rollout.full-fleet.template.json >/dev/null
           python - <<'PY'
           from pathlib import Path
           from jsonschema import Draft202012Validator
@@ -75,29 +80,77 @@ jobs:
               schema = json.loads((Path("src/lms_agent_bench/schemas") / name).read_text())
               Draft202012Validator.check_schema(schema)
           PY
-      - name: Validate Tier-1 template fails closed when unresolved
+      - name: Validate unresolved templates fail before SSH
         run: |
-          set +e
-          lms-fleet-rollout validate \
-            --config examples/fleet-rollout.tier1.template.json \
-            --env-file examples/fleet-rollout.tier1.env.example \
-            --all-nodes \
-            --out /tmp/tier1-validation.json
-          rc=$?
-          set -e
-          test "$rc" -ne 0
-          python - <<'PY'
-          import json
-          report = json.load(open('/tmp/tier1-validation.json'))
+          for scope in tier1 full-fleet; do
+            set +e
+            lms-fleet-rollout validate \
+              --config "examples/fleet-rollout.${scope}.template.json" \
+              --env-file "examples/fleet-rollout.${scope}.env.example" \
+              --all-nodes \
+              --out "/tmp/${scope}-unresolved-validation.json"
+            rc=$?
+            set -e
+            test "$rc" -ne 0
+            SCOPE="$scope" python - <<'PY'
+          import json, os
+          scope = os.environ['SCOPE']
+          report = json.load(open(f'/tmp/{scope}-unresolved-validation.json'))
           assert report['ready_for_observation'] is False
           assert report['admission']['admitted'] is False
           assert 'unresolved environment variable' in report['error']
           PY
+          done
+      - name: Validate complete fleet census and resolved template
+        run: |
+          python - <<'PY'
+          import pathlib, re
+          source = pathlib.Path('examples/fleet-rollout.full-fleet.template.json').read_text()
+          keys = sorted(set(re.findall(r'\$\{([A-Za-z_][A-Za-z0-9_]*)\}', source)))
+          values = []
+          for key in keys:
+              if key == 'LMS_EXPECTED_COMMIT':
+                  value = 'a' * 40
+              elif key.endswith('_SSH_TARGET'):
+                  value = 'benchmark@private-host.example'
+              elif key.endswith('_REPO_DIR'):
+                  value = '/srv/lms'
+              elif key.endswith('_PYTHON'):
+                  value = '/usr/bin/python3'
+              elif key.endswith('_MODEL_ROOT'):
+                  value = '/models'
+              else:
+                  raise AssertionError(key)
+              values.append(f'{key}={value}')
+          pathlib.Path('/tmp/full-fleet.env').write_text('\n'.join(values) + '\n')
+          PY
+          lms-fleet-rollout validate \
+            --config examples/fleet-rollout.full-fleet.template.json \
+            --env-file /tmp/full-fleet.env \
+            --all-nodes \
+            --out /tmp/full-fleet-validation.json
+          python - <<'PY'
+          import json
+          report = json.load(open('/tmp/full-fleet-validation.json'))
+          assert report['ready_for_observation'] is True
+          coverage = report['coverage']
+          assert coverage['ready'] is True
+          assert coverage['coverage_complete'] is True
+          assert coverage['fleet_device_count'] == 11
+          assert coverage['benchmark_required_count'] == 10
+          assert coverage['configured_benchmark_count'] == 10
+          assert coverage['accounted_device_count'] == 11
+          assert coverage['unsupported_node_ids'] == ['iphone-12-pro-max']
+          assert len(report['node_ids']) == 10
+          PY
       - name: Reject private network identities in public rollout files
         run: |
-          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|[A-Za-z0-9-]+\.ts\.net' \
+          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|fd7a:|[A-Za-z0-9-]+\.ts\.net|tailcb8954' \
+            examples/fleet-benchmark-census.v1.json \
             examples/fleet-rollout.tier1.template.json \
             examples/fleet-rollout.tier1.env.example \
+            examples/fleet-rollout.full-fleet.template.json \
+            examples/fleet-rollout.full-fleet.env.example \
             docs/PHYSICAL_FLEET_ROLLOUT.md \
             docs/TIER1_ROLLOUT_CHECKPOINT.md
       - name: Smoke-test installed commands
