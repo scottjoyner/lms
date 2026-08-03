@@ -1,18 +1,27 @@
-# Tier-1 physical rollout checkpoint
+# Tier-1 partial rollout checkpoint
 
-This checkpoint advances `x1-370`, `xwing`, and `scotts-macbook-air` from repository validation to physical evidence. It remains observation-first, candidate-explicit, loopback-only, and non-admitted.
+This checkpoint covers only `x1-370`, `xwing`, and `scotts-macbook-air`. It is a deliberately partial proving tranche for the physical evidence workflow, not the fleet benchmark definition.
+
+The canonical complete-fleet files are:
+
+```text
+examples/fleet-benchmark-census.v1.json
+examples/fleet-rollout.full-fleet.template.json
+examples/fleet-rollout.full-fleet.env.example
+docs/PHYSICAL_FLEET_ROLLOUT.md
+```
+
+The Tier-1 template is marked `coverage_mode=partial`. Validation reports `coverage_complete=false` and lists the seven required benchmark nodes deferred from this tranche. A successful Tier-1 run must never be represented as complete fleet qualification.
 
 ## Tier-1 roles
 
 | Node | Initial role | First-pass scope |
 |---|---|---|
 | `x1-370` | heavy local reasoning | Linux CPU/Vulkan/available accelerator candidates, LM Studio, and XDNA2 endpoint observation |
-| `xwing` | default development worker | Linux CPU/GPU candidates and the currently available large local models |
-| `scotts-macbook-air` | fast small-model scout | Metal and CPU candidates for short low-latency work; do not schedule heavy fleet jobs initially |
+| `xwing` | development worker | Linux CPU and available accelerated candidates |
+| `scotts-macbook-air` | fast small-model worker | Metal and CPU candidates with latency-sensitive workloads |
 
-The public template intentionally contains no private IP addresses, tailnet DNS suffixes, SSH usernames, repository locations, Python environments, or model directories. Supply those values only through the private environment file.
-
-## 1. Prepare the control checkout
+## Prepare the controller checkout
 
 ```bash
 git checkout full-auto-reconciliation-20260730
@@ -20,67 +29,68 @@ git pull --ff-only origin full-auto-reconciliation-20260730
 python3 -m pip install -e '.[test]'
 ```
 
-The installed rollout command is `lms-fleet-rollout`. Generated remote scripts invoke the hardened `fleet_loadout_entrypoint` and `fleet_bench_entrypoint` modules; they do not bypass fair planning, dry-run behavior, or loopback enforcement.
+Pin every remote node to the exact reviewed 40-character commit and require a completely clean working tree.
 
-## 2. Create the private environment file
+## Create the private Tier-1 environment
 
 ```bash
 mkdir -p ~/.config/lms-fleet
-cp examples/fleet-rollout.tier1.env.example \
-  ~/.config/lms-fleet/tier1.env
+cp examples/fleet-rollout.tier1.env.example ~/.config/lms-fleet/tier1.env
 chmod 600 ~/.config/lms-fleet/tier1.env
 $EDITOR ~/.config/lms-fleet/tier1.env
 ```
 
-Fill every blank value with the exact SSH target, absolute remote `lms` checkout path, absolute remote Python executable, and absolute or home-relative model root for that node. Keep the completed file outside the repository.
+Do not commit private SSH targets, hostnames, Tailscale addresses, repository paths, Python environments, model directories, or credentials.
 
-## 3. Resolve and validate the complete Tier-1 configuration
+## Validate the partial tranche
 
 ```bash
-mkdir -p rollout/tier1-validate
 lms-fleet-rollout validate \
   --config examples/fleet-rollout.tier1.template.json \
   --env-file ~/.config/lms-fleet/tier1.env \
   --all-nodes \
-  --out rollout/tier1-validate/report.json
+  --out rollout/tier1-validation.json
 ```
 
-Validation fails before SSH when a variable is blank, a repository path is not absolute, a Python value is neither a command name nor an absolute remote path, a model root is ambiguous or duplicated, or an endpoint mapping is not loopback-local.
+A resolved Tier-1 report may set `ready_for_observation=true`, but it must also show:
 
-## 4. Render and inspect the observation scripts
+```text
+coverage.coverage_mode=partial
+coverage.coverage_complete=false
+coverage.configured_benchmark_count=3
+coverage.benchmark_required_count=10
+```
+
+This is expected and prevents the three-node tranche from being confused with full coverage.
+
+## Render and inspect scripts
 
 ```bash
 lms-fleet-rollout render \
   --config examples/fleet-rollout.tier1.template.json \
   --env-file ~/.config/lms-fleet/tier1.env \
   --all-nodes \
-  --update-code \
   --dry-run-limit 6 \
   --output-dir rollout/tier1-render
-
-less rollout/tier1-render/scripts/x1-370.sh
-less rollout/tier1-render/scripts/xwing.sh
-less rollout/tier1-render/scripts/scotts-macbook-air.sh
 ```
 
-`--update-code` only changes the generated remote behavior at this stage. During `run`, it fetches and fast-forwards the configured branch before observation. Remove the flag when a machine has already been pinned manually to the exact branch head.
+Inspect all three scripts before physical execution. They must preserve exact source provenance, loopback-only candidate execution, per-node locking, bounded execution, and failure-safe artifact packaging.
 
-## 5. Run observation and dry-run planning
+## Collect observation evidence
 
 ```bash
 lms-fleet-rollout run \
   --config examples/fleet-rollout.tier1.template.json \
   --env-file ~/.config/lms-fleet/tier1.env \
   --all-nodes \
-  --update-code \
   --continue-on-error \
   --dry-run-limit 6 \
   --output-dir rollout/tier1-observe
 ```
 
-This stage performs no inference. Each node collects hardware observation, endpoint observation, quick model inventory, a fair model/backend candidate plan, and rendered candidate intent. Remote failures still attempt to package diagnostic evidence, but failed bundles are not promotable.
+This performs observation, quick model inventory, candidate planning, and dry-run rendering. It does not perform candidate inference.
 
-## 6. Verify the collected observation archives
+Gate the three collected archives:
 
 ```bash
 lms-fleet-gate \
@@ -92,65 +102,9 @@ lms-fleet-gate \
   --out rollout/tier1-observe/release-gate.json
 ```
 
-The gate verifies:
+## Execute exact reviewed candidates
 
-- every required node has one successful remote result;
-- collection succeeded and the archive exists;
-- archive paths are safe and non-duplicated;
-- every manifest size and SHA-256 matches the tar member;
-- no unlisted files exist in the archive;
-- the bundle records `remote_exit_code=0`;
-- observation, inventory, and a non-empty candidate plan are present;
-- the plan references the collected observation;
-- admission remains false.
-
-A zero exit means the archives are ready for candidate review, not deployment.
-
-## 7. Review candidates one node at a time
-
-Extract only after the gate passes:
-
-```bash
-mkdir -p rollout/tier1-observe/extracted/x1-370
-mkdir -p rollout/tier1-observe/extracted/xwing
-mkdir -p rollout/tier1-observe/extracted/scotts-macbook-air
-
-tar -xzf rollout/tier1-observe/artifacts/x1-370.tar.gz \
-  -C rollout/tier1-observe/extracted/x1-370
-tar -xzf rollout/tier1-observe/artifacts/xwing.tar.gz \
-  -C rollout/tier1-observe/extracted/xwing
-tar -xzf rollout/tier1-observe/artifacts/scotts-macbook-air.tar.gz \
-  -C rollout/tier1-observe/extracted/scotts-macbook-air
-```
-
-Print the candidate matrix:
-
-```bash
-python3 - <<'PY'
-import json
-from pathlib import Path
-for node in ('x1-370', 'xwing', 'scotts-macbook-air'):
-    path = Path('rollout/tier1-observe/extracted') / node / 'benchmark_plan.json'
-    plan = json.loads(path.read_text())
-    print(f'\n[{node}]')
-    for item in plan['candidates']:
-        print(
-            item['candidate_id'],
-            item['backend'],
-            item['model']['id'],
-            item['context_tokens'],
-            item['parallel_slots'],
-        )
-PY
-```
-
-Begin with one conservative candidate on one node. Do not launch all candidate combinations together.
-
-For an existing XDNA2 NPU service, copy the Tier-1 JSON to a private resolved configuration and add only the reviewed candidate ID to `x1-370.endpoint_map`, using `http://127.0.0.1:1236/v1`. LAN or Tailscale endpoint mappings are rejected.
-
-## 8. Execute an exact reviewed candidate
-
-Example for `x1-370`:
+Run one conservative candidate at a time:
 
 ```bash
 lms-fleet-rollout run \
@@ -161,24 +115,20 @@ lms-fleet-rollout run \
   --output-dir rollout/x1-370-sweep-1
 ```
 
-Then verify the sweep archive:
+Every candidate remains subject to the complete reliability contract: strict protocol, exact sample accounting, raw-output integrity, three valid trials, confidence and dispersion gates, bounded retries, and post-trial exact-model health.
 
-```bash
-lms-fleet-gate \
-  --mode sweep \
-  --rollout-results rollout/x1-370-sweep-1/rollout_results.json \
-  --required-node x1-370 \
-  --out rollout/x1-370-sweep-1/release-gate.json
-```
+## Exit from Tier-1 into full-fleet qualification
 
-Sweep mode additionally requires loopback-only execution, an eligible selected candidate, every hard benchmark gate, and exactly one full-hash model record matching the selected candidate among the otherwise quick inventory records. A passing result is ready for reviewed profile import; it still does not admit or route the runtime.
+Tier-1 is complete only when the three-node evidence flow is understood and reproducible. The next action is not merge or admission. It is to populate and validate the full-fleet configuration, then collect evidence for:
 
-## 9. Promotion order
+- `destroyer`
+- `raspberrypi`
+- `beelink-ryzen-7-mini-pc`
+- `deathstar-xps-8920`
+- `scott-lenovo-ideapad-330s-15ikb`
+- `scott-optiplex-9030-aio`
+- `scotts-macbook-pro-2`
 
-1. `x1-370`: observation, one conservative llama.cpp/LM Studio candidate, then XDNA2 preflight and exact NPU candidate.
-2. `xwing`: observation and one development-worker candidate after the `x1-370` archive flow is proven.
-3. `scotts-macbook-air`: observation and one small Metal candidate after the Linux flow is stable.
-4. Import successful sweep evidence into `fleet-llm-profiles`.
-5. Independently verify runtime identity, private-path behavior, shared capacity, sustained stability, and rollback before live admission.
+The iPhone remains explicitly census-accounted and unsupported by the current remote benchmark runner.
 
-Keep all four pull requests unmerged until these physical gates are recorded. Progress is tracked in issue #7.
+No runtime may be admitted or routed merely because the Tier-1 tranche passed. Full fleet coverage, profile import, live identity, path behavior, capacity, freshness, and rollback remain separate gates.
