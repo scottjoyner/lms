@@ -136,11 +136,16 @@ jobs:
           coverage = report['coverage']
           assert coverage['ready'] is True
           assert coverage['coverage_complete'] is True
+          assert coverage['benchmark_interface_complete'] is False
           assert coverage['fleet_device_count'] == 11
           assert coverage['benchmark_required_count'] == 10
+          assert coverage['adapter_required_count'] == 1
+          assert coverage['unsupported_count'] == 0
           assert coverage['configured_benchmark_count'] == 10
           assert coverage['accounted_device_count'] == 11
-          assert coverage['unsupported_node_ids'] == ['iphone-12-pro-max']
+          assert coverage['adapter_required_node_ids'] == ['iphone-12-pro-max']
+          assert coverage['unsupported_node_ids'] == []
+          assert coverage['qualification_blockers']
           assert len(report['node_ids']) == 10
           PY
       - name: Reject private network identities in public rollout files
