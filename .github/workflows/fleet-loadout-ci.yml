@@ -44,7 +44,8 @@ jobs:
             src/lms_agent_bench/hermes_agent_common.py \
             src/lms_agent_bench/hermes_agent_scoring.py \
             src/lms_agent_bench/hermes_mcp_fixture.py \
-            src/lms_agent_bench/hermes_agent_bench.py
+            src/lms_agent_bench/hermes_agent_bench.py \
+            src/lms_agent_bench/loadout_comparison.py
       - name: Run focused tests
         run: |
           python -m pytest -q \
@@ -66,11 +67,13 @@ jobs:
             tests/test_fleet_gate.py \
             tests/test_model_loadout.py \
             tests/test_hermes_agent_bench.py \
+            tests/test_loadout_comparison.py \
             tests/test_packaged_entrypoints.py
       - name: Validate packaged artifacts
         run: |
           python -m json.tool src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json >/dev/null
           python -m json.tool src/lms_agent_bench/benchmarks/hermes_agent_suite.v1.json >/dev/null
+          python -m json.tool src/lms_agent_bench/benchmarks/hermes_agent_context_suite.v1.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_model_inventory.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_release_gate.v1.schema.json >/dev/null
@@ -116,8 +119,11 @@ jobs:
           assert matrix['candidate_count'] == 128
           assert len({item['loadout_fingerprint'] for item in matrix['candidates']}) == 128
           assert {item['context']['configured_tokens'] for item in matrix['candidates']} == {4096, 8192, 16384, 32768}
-          suite = json.loads(Path('src/lms_agent_bench/benchmarks/hermes_agent_suite.v1.json').read_text())
-          assert len(validate_suite(suite)['cases']) >= 8
+          base_suite = json.loads(Path('src/lms_agent_bench/benchmarks/hermes_agent_suite.v1.json').read_text())
+          context_suite = json.loads(Path('src/lms_agent_bench/benchmarks/hermes_agent_context_suite.v1.json').read_text())
+          assert len(validate_suite(base_suite)['cases']) >= 8
+          assert len(validate_suite(context_suite)['cases']) >= 2
+          assert all(item.get('context_pressure_ratio') for item in context_suite['cases'])
           PY
       - name: Validate unresolved templates fail before SSH
         run: |
@@ -188,7 +194,8 @@ jobs:
             examples/model-loadouts.v1.example.json \
             examples/model-loadout-matrix.axes.example.json \
             docs/PHYSICAL_FLEET_ROLLOUT.md \
-            docs/TIER1_ROLLOUT_CHECKPOINT.md
+            docs/TIER1_ROLLOUT_CHECKPOINT.md \
+            docs/HERMES_INTELLIGENCE_AND_LOADOUT_BENCHMARK.md
       - name: Smoke-test installed commands
         run: |
           lms-agent --help >/dev/null
@@ -207,6 +214,7 @@ jobs:
           lms-hermes-bench --help >/dev/null
           lms-hermes-bench run --help >/dev/null
           lms-hermes-bench gate --help >/dev/null
+          lms-loadout-compare --help >/dev/null
           python -m lms_agent_bench.benchmark_entrypoint --help >/dev/null
           python -m lms_agent_bench.benchmark_raw_entrypoint --help >/dev/null
           python -m lms_agent_bench.fleet_provenance --help >/dev/null
