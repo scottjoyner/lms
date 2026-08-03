@@ -17,7 +17,7 @@ Every benchmarked loadout must have a `model_loadout_manifest.v1` artifact conta
 - parallel slots and continuous batching;
 - speculative decoding and exact draft-model identity when enabled.
 
-The canonical fingerprint covers all of these settings. Benchmark results from one fingerprint cannot qualify another fingerprint.
+The canonical fingerprint covers all of these settings. Benchmark results from one fingerprint cannot qualify another fingerprint. `candidate_id` is a human-readable review label and is deliberately excluded from the fingerprint, so relabeling a candidate does not create a false runtime identity.
 
 ## Weight quantization versus KV-cache quantization
 
@@ -194,9 +194,23 @@ lms-hermes-bench run \
   --out ~/lms-hermes-runs/result.json
 ```
 
+Run the dedicated context-pressure suite against the same exact loadout:
+
+```bash
+lms-hermes-bench run \
+  --loadout /path/to/exact-loadout.json \
+  --hermes-repo /path/to/hermes-agent \
+  --hermes-python /path/to/hermes-agent/.venv/bin/python \
+  --endpoint http://127.0.0.1:1234/v1 \
+  --suite src/lms_agent_bench/benchmarks/hermes_agent_context_suite.v1.json \
+  --workspace ~/lms-hermes-context-runs \
+  --trials 3 \
+  --out ~/lms-hermes-context-runs/result.json
+```
+
 The runner creates an isolated Hermes home, a deterministic stdio MCP server, and a fresh workspace for every trial. It records the final response, message/tool trace, fixture calls, file effects, errors, latency, usage when exposed, and useful-work throughput.
 
-Validate the retained report with:
+Validate each retained report with:
 
 ```bash
 lms-hermes-bench gate \
@@ -208,12 +222,26 @@ lms-hermes-bench gate \
   --out ~/lms-hermes-runs/intelligence-gate.json
 ```
 
+## Comparing loadouts
+
+Compare two or more completed reports with:
+
+```bash
+lms-loadout-compare \
+  --report /path/to/report-a.json \
+  --report /path/to/report-b.json \
+  --out rollout/loadout-comparison.json
+```
+
+Only a same-model, same-node, same-suite comparison with one changed dimension is marked as a controlled single-axis comparison. Dense-versus-MoE and cross-quant comparisons are observational because they necessarily change the model artifact. Quality and speed remain separate fields; the comparison command does not average them into one score.
+
 ## Promotion rule
 
 A loadout is eligible for profile-import review only when the same loadout fingerprint has:
 
 1. a passing repeated throughput/reliability artifact;
-2. a passing Hermes intelligence artifact;
-3. matching node, candidate, model ID, full model hash, runtime configuration, context configuration, KV-cache configuration, quantization, and architecture metadata.
+2. a passing base Hermes intelligence artifact;
+3. a passing context-pressure Hermes intelligence artifact;
+4. matching node, model ID, full model hash, runtime configuration, context configuration, KV-cache configuration, quantization, and architecture metadata.
 
 Neither artifact admits or routes the runtime. Live identity, health, shared capacity, path behavior, freshness, and rollback remain external gates.
