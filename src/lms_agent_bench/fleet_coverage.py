@@ -6,7 +6,11 @@ from pathlib import Path
 from typing import Any, Dict, Mapping
 
 CENSUS_SCHEMA_VERSION = "fleet_benchmark_census.v1"
-_ALLOWED_POLICIES = {"benchmark_required", "unsupported"}
+_ALLOWED_POLICIES = {
+    "benchmark_required",
+    "adapter_required",
+    "unsupported",
+}
 _ALLOWED_MODES = {"full", "partial"}
 
 
@@ -47,9 +51,9 @@ def validate_census(census: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
         if not os_family:
             raise ValueError(f"fleet census node {node_id} has no os_family")
         reason = str(raw.get("reason") or "").strip()
-        if policy == "unsupported" and not reason:
+        if policy in {"adapter_required", "unsupported"} and not reason:
             raise ValueError(
-                f"unsupported fleet census node {node_id} requires a reason"
+                f"{policy} fleet census node {node_id} requires a reason"
             )
         by_id[node_id] = dict(raw)
     return by_id
@@ -75,14 +79,18 @@ def validate_rollout_coverage(
             "coverage_mode": "unmanaged",
             "coverage_enforced": False,
             "coverage_complete": False,
+            "benchmark_interface_complete": False,
             "configured_node_ids": sorted(configured),
             "benchmark_required_node_ids": [],
+            "adapter_required_node_ids": [],
             "unsupported_node_ids": [],
             "missing_required_node_ids": [],
             "unexpected_node_ids": [],
-            "unsupported_configured_node_ids": [],
+            "non_rollout_configured_node_ids": [],
             "fleet_device_count": None,
             "benchmark_required_count": None,
+            "adapter_required_count": None,
+            "unsupported_count": None,
             "configured_benchmark_count": len(configured),
             "accounted_device_count": None,
             "ready": True,
@@ -106,13 +114,23 @@ def validate_rollout_coverage(
         for node_id, item in by_id.items()
         if item["benchmark_policy"] == "benchmark_required"
     }
-    unsupported = all_ids - required
+    adapter_required = {
+        node_id
+        for node_id, item in by_id.items()
+        if item["benchmark_policy"] == "adapter_required"
+    }
+    unsupported = {
+        node_id
+        for node_id, item in by_id.items()
+        if item["benchmark_policy"] == "unsupported"
+    }
+    non_rollout = adapter_required | unsupported
     missing = required - configured
     unexpected = configured - all_ids
-    unsupported_configured = configured & unsupported
-    accounted = (configured & required) | unsupported
-    complete = not missing and not unexpected and not unsupported_configured
-    ready = not unexpected and not unsupported_configured
+    non_rollout_configured = configured & non_rollout
+    accounted = (configured & required) | non_rollout
+    complete = not missing and not unexpected and not non_rollout_configured
+    ready = not unexpected and not non_rollout_configured
     if mode == "full":
         ready = ready and complete
 
@@ -121,20 +139,29 @@ def validate_rollout_coverage(
         "coverage_mode": mode,
         "coverage_enforced": True,
         "coverage_complete": complete,
+        "benchmark_interface_complete": not adapter_required,
         "census_file": str(census_path),
         "configured_node_ids": sorted(configured),
         "benchmark_required_node_ids": sorted(required),
+        "adapter_required_node_ids": sorted(adapter_required),
         "unsupported_node_ids": sorted(unsupported),
         "missing_required_node_ids": sorted(missing),
         "unexpected_node_ids": sorted(unexpected),
-        "unsupported_configured_node_ids": sorted(unsupported_configured),
+        "non_rollout_configured_node_ids": sorted(non_rollout_configured),
         "fleet_device_count": len(all_ids),
         "benchmark_required_count": len(required),
+        "adapter_required_count": len(adapter_required),
+        "unsupported_count": len(unsupported),
         "configured_benchmark_count": len(configured & required),
         "accounted_device_count": len(accounted),
         "ready": ready,
         "admission": {"admitted": False},
     }
+    if adapter_required:
+        report["qualification_blockers"] = [
+            "benchmark adapter required for: "
+            + ", ".join(sorted(adapter_required))
+        ]
     if not ready:
         reasons = []
         if missing and mode == "full":
@@ -146,10 +173,11 @@ def validate_rollout_coverage(
                 "rollout nodes absent from census: "
                 + ", ".join(sorted(unexpected))
             )
-        if unsupported_configured:
+        if non_rollout_configured:
             reasons.append(
-                "unsupported devices included as benchmark nodes: "
-                + ", ".join(sorted(unsupported_configured))
+                "devices requiring another benchmark interface were included "
+                "as SSH rollout nodes: "
+                + ", ".join(sorted(non_rollout_configured))
             )
         report["errors"] = reasons
     return report
