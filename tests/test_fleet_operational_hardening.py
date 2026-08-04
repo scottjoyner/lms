@@ -50,6 +50,32 @@ def test_safe_ssh_defaults_are_injected_for_run_only():
     assert render == ["render", "--config", "fleet.json"]
 
 
+def test_update_code_is_pinned_to_fetched_exact_commit():
+    original = '''git -C "$REPO_DIR" fetch --prune origin "$EXPECTED_BRANCH"
+git -C "$REPO_DIR" checkout "$EXPECTED_BRANCH"
+git -C "$REPO_DIR" pull --ff-only origin "$EXPECTED_BRANCH"'''
+    hardened = hardening.harden_exact_update_script(
+        original,
+        {"expected_commit": "a" * 40},
+        True,
+    )
+    assert "pull --ff-only" not in hardened
+    assert "FETCHED_COMMIT=$(git -C \"$REPO_DIR\" rev-parse FETCH_HEAD)" in hardened
+    assert "origin branch moved" in hardened
+    assert "merge-base --is-ancestor" in hardened
+    assert "merge --ff-only \"$FETCHED_COMMIT\"" in hardened
+    assert "a" * 40 in hardened
+
+
+def test_update_hardening_rejects_unexpected_script_shape():
+    with pytest.raises(RuntimeError, match="changed unexpectedly"):
+        hardening.harden_exact_update_script(
+            "git pull origin main",
+            {"expected_commit": "a" * 40},
+            True,
+        )
+
+
 def test_remote_lock_snippet_records_actual_shell_owner_and_stale_logic():
     class Base:
         @staticmethod
@@ -90,7 +116,6 @@ def test_rollout_complete_reaches_final_coverage_enforcement(tmp_path, monkeypat
     )
 
     def command_main(argv):
-        # Exercise the covered loader installed by the wrapper.
         fleet_rollout_complete._entrypoint.load_rollout_config("fleet.json", None)
         out.write_text(
             json.dumps(
