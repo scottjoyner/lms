@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.28.0"
-description = "Exact-loadout throughput, Hermes intelligence, and prompt-cache evidence for local inference fleets"
+version = "0.29.0"
+description = "Exact-loadout throughput, Hermes intelligence, qualification, and prompt-cache evidence for local inference fleets"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -42,6 +42,7 @@ lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
 lms-loadout-matrix = "lms_agent_bench.model_loadout:main"
 lms-hermes-bench = "lms_agent_bench.hermes_agent_bench:main"
 lms-loadout-compare = "lms_agent_bench.loadout_comparison:main"
+lms-loadout-qualify = "lms_agent_bench.loadout_qualification:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
