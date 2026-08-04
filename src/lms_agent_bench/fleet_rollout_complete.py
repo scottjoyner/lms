@@ -13,6 +13,7 @@ from lms_agent_bench.fleet_operational_hardening import (
     apply_entrypoint_hardening,
     harden_ssh_argv,
 )
+from lms_agent_bench.fleet_transfer_hardening import apply_transfer_hardening
 
 
 def _option_value(argv: Sequence[str], name: str) -> Optional[str]:
@@ -81,6 +82,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return config
 
     apply_entrypoint_hardening(_entrypoint)
+    apply_transfer_hardening(_entrypoint)
     _entrypoint.load_rollout_config = covered_load
     try:
         returncode = _command.main(actual_argv)
