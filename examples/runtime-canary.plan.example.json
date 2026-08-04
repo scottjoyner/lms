@@ -1,0 +1,74 @@
+{
+  "schema_version": "runtime_canary_plan.v1",
+  "canary_id": "x1-370-reviewed-loadout",
+  "loadout_fingerprint": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "working_directory": "/absolute/path/to/reviewed/lms-checkout",
+  "environment_names": [
+    "LMSTUDIO_API_KEY"
+  ],
+  "commands": {
+    "snapshot": {
+      "argv": [
+        "/absolute/path/to/runtime-snapshot-wrapper",
+        "--out",
+        "/secure/operator-state/pre-canary-runtime.json"
+      ],
+      "timeout_seconds": 30
+    },
+    "start_candidate": {
+      "argv": [
+        "/absolute/path/to/start-reviewed-candidate"
+      ],
+      "timeout_seconds": 120
+    },
+    "candidate_health": {
+      "argv": [
+        "/absolute/path/to/verify-reviewed-candidate"
+      ],
+      "timeout_seconds": 30
+    },
+    "qualification": {
+      "argv": [
+        "/absolute/path/to/run-reviewed-qualification"
+      ],
+      "timeout_seconds": 7200
+    },
+    "soak_probe": {
+      "argv": [
+        "/absolute/path/to/runtime-soak-probe"
+      ],
+      "timeout_seconds": 60
+    },
+    "stop_candidate": {
+      "argv": [
+        "/absolute/path/to/stop-reviewed-candidate"
+      ],
+      "timeout_seconds": 120
+    },
+    "rollback": {
+      "argv": [
+        "/absolute/path/to/restore-pre-canary-runtime",
+        "--snapshot",
+        "/secure/operator-state/pre-canary-runtime.json"
+      ],
+      "timeout_seconds": 120
+    },
+    "rollback_health": {
+      "argv": [
+        "/absolute/path/to/verify-restored-runtime"
+      ],
+      "timeout_seconds": 30
+    }
+  },
+  "soak": {
+    "duration_seconds": 1800,
+    "interval_seconds": 10,
+    "minimum_samples": 100,
+    "minimum_success_rate": 0.99,
+    "max_consecutive_failures": 1,
+    "max_p95_latency_seconds": 30,
+    "max_rss_growth_bytes": 1073741824,
+    "minimum_terminal_tps_ratio": 0.8,
+    "max_temperature_c": 90
+  }
+}
