@@ -9,6 +9,10 @@ from typing import Any, Dict, List, Optional, Sequence
 from lms_agent_bench import fleet_rollout_command as _command
 from lms_agent_bench import fleet_rollout_entrypoint as _entrypoint
 from lms_agent_bench.fleet_coverage import validate_rollout_coverage
+from lms_agent_bench.fleet_operational_hardening import (
+    apply_entrypoint_hardening,
+    harden_ssh_argv,
+)
 
 
 def _option_value(argv: Sequence[str], name: str) -> Optional[str]:
@@ -38,17 +42,25 @@ def _write_validation_coverage(
         payload.get("ready_for_observation") and coverage.get("ready")
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    temporary.replace(path)
     if not coverage.get("ready"):
         return 1
     return base_returncode
 
 
 def main(argv: Optional[List[str]] = None) -> int:
-    actual_argv = list(sys.argv[1:] if argv is None else argv)
+    original_argv = list(sys.argv[1:] if argv is None else argv)
+    try:
+        actual_argv, _trust_mode = harden_ssh_argv(original_argv)
+    except ValueError as exc:
+        print(f"fleet rollout rejected: {exc}", file=sys.stderr)
+        return 1
+
     config_path = _option_value(actual_argv, "--config")
     env_file = _option_value(actual_argv, "--env-file")
     command_name = actual_argv[0] if actual_argv else ""
@@ -68,12 +80,15 @@ def main(argv: Optional[List[str]] = None) -> int:
             )
         return config
 
+    apply_entrypoint_hardening(_entrypoint)
     _entrypoint.load_rollout_config = covered_load
     try:
         returncode = _command.main(actual_argv)
     finally:
         _entrypoint.load_rollout_config = active_loader
 
+    # This logic must remain reachable. A previous return inside the try block
+    # silently skipped final validation coverage enforcement.
     if command_name == "validate":
         output_path = _option_value(actual_argv, "--out")
         coverage = captured.get("coverage")
