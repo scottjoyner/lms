@@ -59,6 +59,35 @@ def test_hidden_trial_defaults_to_nonsecret_local_key(monkeypatch):
     assert args.api_key == "local-benchmark"
 
 
+def test_secure_parser_does_not_require_hidden_api_key_argument():
+    parser = secure.build_parser()
+    parsed = parser.parse_args(
+        [
+            "_trial",
+            "--hermes-repo",
+            "/srv/hermes",
+            "--case",
+            "case.json",
+            "--loadout",
+            "loadout.json",
+            "--endpoint",
+            "http://127.0.0.1:8080/v1",
+            "--api-key-env",
+            "HERMES_SECRET",
+            "--result",
+            "result.json",
+            "--hermes-home",
+            "home",
+            "--workspace",
+            "workspace",
+            "--state-dir",
+            "state",
+        ]
+    )
+    assert parsed.api_key is None
+    assert parsed.api_key_env == "HERMES_SECRET"
+
+
 def test_secure_qualification_command_rewrites_hermes_module():
     qualification._ACTIVE_API_KEY_ENV = "QUALIFICATION_SECRET"
     command = qualification._secure_module(
@@ -81,7 +110,9 @@ def test_nonhermes_qualification_modules_are_unchanged():
     command = qualification._secure_module(
         "lms_agent_bench.loadout_qualification", "verify"
     )
-    assert command[-3:] == [
+    assert command == [
+        command[0],
+        "-m",
         "lms_agent_bench.loadout_qualification",
         "verify",
     ]
