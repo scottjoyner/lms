@@ -7,7 +7,7 @@ import json
 import sqlite3
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 from lms_agent_bench.hermes_agent_common import canonical_hash, utc_now_iso
 from lms_agent_bench.prompt_cache_identity import (
@@ -206,8 +206,15 @@ class SQLitePromptCacheRegistry(PromptCacheRegistry):
                 )
             connection.execute(
                 "INSERT OR IGNORE INTO prompt_sequences VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (sequence.sequence_hash, namespace, compatibility_hash, final_block_hash,
-                 sequence.token_count, sequence.block_size, created),
+                (
+                    sequence.sequence_hash,
+                    namespace,
+                    compatibility_hash,
+                    final_block_hash,
+                    sequence.token_count,
+                    sequence.block_size,
+                    created,
+                ),
             )
             connection.commit()
 
@@ -234,7 +241,8 @@ class SQLitePromptCacheRegistry(PromptCacheRegistry):
                 )
             except sqlite3.IntegrityError:
                 row = connection.execute(
-                    "SELECT * FROM kv_artifacts WHERE artifact_id = ?", (artifact.artifact_id,)
+                    "SELECT * FROM kv_artifacts WHERE artifact_id = ?",
+                    (artifact.artifact_id,),
                 ).fetchone()
                 if row is None or self._artifact(row) != artifact:
                     raise RuntimeError("artifact ID collision")
@@ -255,8 +263,12 @@ class SQLitePromptCacheRegistry(PromptCacheRegistry):
                 f"AND a.block_hash IN ({placeholders}) "
                 f"AND (a.expires_at_utc IS NULL OR a.expires_at_utc>?) "
                 f"ORDER BY b.cumulative_token_count DESC, a.created_at_utc DESC LIMIT 1",
-                (self._namespace(namespace), sequence.compatibility_hash,
-                 *hashes, now_utc or utc_now_iso()),
+                (
+                    self._namespace(namespace),
+                    sequence.compatibility_hash,
+                    *hashes,
+                    now_utc or utc_now_iso(),
+                ),
             ).fetchone()
         return None if row is None else self._artifact(row)
 
@@ -281,36 +293,52 @@ class SQLitePromptCacheRegistry(PromptCacheRegistry):
         with self._connect() as connection:
             connection.execute(
                 "INSERT INTO cache_observations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (observation_id,
-                 require_sha256(str(value["sequence_hash"]), "sequence_hash"),
-                 require_sha256(str(value["compatibility_hash"]), "compatibility_hash"),
-                 artifact_id, str(value["outcome"]), max(0, int(value.get("matched_tokens", 0))),
-                 max(0, int(value.get("tokens_skipped", 0))), value.get("restore_ms"),
-                 value.get("prefill_ms_saved"), value.get("ttft_ms"), str(value["node_id"]),
-                 self._namespace(str(value["namespace"])), utc_now_iso(),
-                 _canonical_json(dict(value.get("details") or {}))),
+                (
+                    observation_id,
+                    require_sha256(str(value["sequence_hash"]), "sequence_hash"),
+                    require_sha256(str(value["compatibility_hash"]), "compatibility_hash"),
+                    artifact_id,
+                    str(value["outcome"]),
+                    max(0, int(value.get("matched_tokens", 0))),
+                    max(0, int(value.get("tokens_skipped", 0))),
+                    value.get("restore_ms"),
+                    value.get("prefill_ms_saved"),
+                    value.get("ttft_ms"),
+                    str(value["node_id"]),
+                    self._namespace(str(value["namespace"])),
+                    utc_now_iso(),
+                    _canonical_json(dict(value.get("details") or {})),
+                ),
             )
         return observation_id
 
     def stats(self, *, namespace: Optional[str] = None) -> Dict[str, Any]:
         self.initialize()
-        clause, parameters = ("", ()) if namespace is None else (
-            " WHERE namespace = ?", (self._namespace(namespace),)
+        clause, parameters = (
+            ("", ())
+            if namespace is None
+            else (" WHERE namespace = ?", (self._namespace(namespace),))
         )
         with self._connect() as connection:
             artifacts = connection.execute(
                 f"SELECT state, COUNT(*) count, COALESCE(SUM(size_bytes),0) bytes "
-                f"FROM kv_artifacts{clause} GROUP BY state ORDER BY state", parameters
+                f"FROM kv_artifacts{clause} GROUP BY state ORDER BY state",
+                parameters,
             ).fetchall()
             observations = connection.execute(
-                f"SELECT outcome, COUNT(*) count, COALESCE(SUM(tokens_skipped),0) tokens_skipped, "
+                f"SELECT outcome, COUNT(*) count, "
+                f"COALESCE(SUM(tokens_skipped),0) tokens_skipped, "
                 f"COALESCE(SUM(prefill_ms_saved),0) prefill_ms_saved "
-                f"FROM cache_observations{clause} GROUP BY outcome ORDER BY outcome", parameters
+                f"FROM cache_observations{clause} GROUP BY outcome ORDER BY outcome",
+                parameters,
             ).fetchall()
-        return {"schema_version": REGISTRY_SCHEMA_VERSION, "namespace": namespace,
-                "artifacts": [dict(row) for row in artifacts],
-                "observations": [dict(row) for row in observations],
-                "admission": {"admitted": False}}
+        return {
+            "schema_version": REGISTRY_SCHEMA_VERSION,
+            "namespace": namespace,
+            "artifacts": [dict(row) for row in artifacts],
+            "observations": [dict(row) for row in observations],
+            "admission": {"admitted": False},
+        }
 
 
 class PromptCacheRecorder:
@@ -324,14 +352,24 @@ class PromptCacheRecorder:
         self.store.initialize()
 
     def register_local_artifact(
-        self, manifest: Mapping[str, Any], token_ids: Sequence[int], artifact_path: Path,
-        *, namespace: str, node_id: str, serialization_format: str,
-        serialization_version: str, sensitivity: str = "private",
-        expires_at_utc: Optional[str] = None, block_size: int = DEFAULT_BLOCK_SIZE,
+        self,
+        manifest: Mapping[str, Any],
+        token_ids: Sequence[int],
+        artifact_path: Path,
+        *,
+        namespace: str,
+        node_id: str,
+        serialization_format: str,
+        serialization_version: str,
+        sensitivity: str = "private",
+        expires_at_utc: Optional[str] = None,
+        block_size: int = DEFAULT_BLOCK_SIZE,
     ) -> ArtifactRecord:
         self.initialize()
         sequence = build_prefix_sequence(
-            token_ids, str(manifest["compatibility_hash"]), block_size=block_size
+            token_ids,
+            str(manifest["compatibility_hash"]),
+            block_size=block_size,
         )
         if not sequence.blocks:
             raise ValueError("cannot register an artifact for an empty prompt")
@@ -341,39 +379,62 @@ class PromptCacheRecorder:
             raise RuntimeError("payload failed post-write verification")
         now = utc_now_iso()
         artifact = ArtifactRecord(
-            artifact_id=canonical_hash({"block_hash": sequence.blocks[-1].block_hash,
-                "compatibility_hash": sequence.compatibility_hash,
-                "payload_sha256": write.payload_sha256,
-                "serialization_format": serialization_format,
-                "serialization_version": serialization_version,
-                "namespace": namespace, "node_id": node_id}),
+            artifact_id=canonical_hash(
+                {
+                    "block_hash": sequence.blocks[-1].block_hash,
+                    "compatibility_hash": sequence.compatibility_hash,
+                    "payload_sha256": write.payload_sha256,
+                    "serialization_format": serialization_format,
+                    "serialization_version": serialization_version,
+                    "namespace": namespace,
+                    "node_id": node_id,
+                }
+            ),
             block_hash=sequence.blocks[-1].block_hash,
             compatibility_hash=sequence.compatibility_hash,
-            payload_uri=write.payload_uri, payload_sha256=write.payload_sha256,
+            payload_uri=write.payload_uri,
+            payload_sha256=write.payload_sha256,
             serialization_format=serialization_format,
-            serialization_version=serialization_version, size_bytes=write.size_bytes,
-            state="ready", sensitivity=sensitivity, namespace=namespace,
-            node_id=node_id, created_at_utc=now, last_verified_at_utc=now,
-            expires_at_utc=expires_at_utc)
+            serialization_version=serialization_version,
+            size_bytes=write.size_bytes,
+            state="ready",
+            sensitivity=sensitivity,
+            namespace=namespace,
+            node_id=node_id,
+            created_at_utc=now,
+            last_verified_at_utc=now,
+            expires_at_utc=expires_at_utc,
+        )
         self.registry.register_artifact(artifact)
         return artifact
 
     def observe_request(
-        self, manifest: Mapping[str, Any], token_ids: Sequence[int], *, namespace: str,
-        node_id: str, block_size: int = DEFAULT_BLOCK_SIZE,
+        self,
+        manifest: Mapping[str, Any],
+        token_ids: Sequence[int],
+        *,
+        namespace: str,
+        node_id: str,
+        block_size: int = DEFAULT_BLOCK_SIZE,
         estimated_prefill_ms_per_token: Optional[float] = None,
     ) -> Dict[str, Any]:
         self.initialize()
         sequence = build_prefix_sequence(
-            token_ids, str(manifest["compatibility_hash"]), block_size=block_size
+            token_ids,
+            str(manifest["compatibility_hash"]),
+            block_size=block_size,
         )
         self.registry.register_sequence(manifest, sequence, namespace=namespace)
-        candidate = self.registry.find_longest_ready_prefix(sequence, namespace=namespace)
+        candidate = self.registry.find_longest_ready_prefix(
+            sequence,
+            namespace=namespace,
+        )
         outcome, matched_tokens, artifact_id, verified = "miss", 0, None, False
         if candidate is not None:
             artifact_id = candidate.artifact_id
             matched_tokens = next(
-                block.cumulative_token_count for block in sequence.blocks
+                block.cumulative_token_count
+                for block in sequence.blocks
                 if block.block_hash == candidate.block_hash
             )
             verified = self.store.verify(candidate.payload_sha256)
@@ -381,29 +442,54 @@ class PromptCacheRecorder:
                 outcome = "candidate_hit"
             else:
                 outcome, matched_tokens = "verification_failed", 0
-                self.registry.mark_artifact_state(candidate.artifact_id, "quarantined")
-                self.store.quarantine(candidate.payload_sha256, "verification-failed")
+                self.registry.mark_artifact_state(
+                    candidate.artifact_id,
+                    "quarantined",
+                )
+                self.store.quarantine(
+                    candidate.payload_sha256,
+                    "verification-failed",
+                )
         estimated = None
         if estimated_prefill_ms_per_token is not None:
             rate = float(estimated_prefill_ms_per_token)
             if rate < 0:
                 raise ValueError("estimated_prefill_ms_per_token cannot be negative")
             estimated = rate * matched_tokens
-        observation_id = self.registry.record_observation({
+        observation_id = self.registry.record_observation(
+            {
+                "sequence_hash": sequence.sequence_hash,
+                "compatibility_hash": sequence.compatibility_hash,
+                "artifact_id": artifact_id,
+                "outcome": outcome,
+                "matched_tokens": matched_tokens,
+                "tokens_skipped": 0,
+                "prefill_ms_saved": 0.0,
+                "node_id": node_id,
+                "namespace": namespace,
+                "details": {
+                    "record_only": True,
+                    "restoration_attempted": False,
+                    "payload_verified": verified,
+                    "estimated_prefill_ms_saved": estimated,
+                    "requested_token_count": sequence.token_count,
+                    "block_size": block_size,
+                },
+            }
+        )
+        return {
+            "schema_version": REGISTRY_SCHEMA_VERSION,
+            "mode": "record_only",
+            "observation_id": observation_id,
             "sequence_hash": sequence.sequence_hash,
             "compatibility_hash": sequence.compatibility_hash,
-            "artifact_id": artifact_id, "outcome": outcome,
-            "matched_tokens": matched_tokens, "tokens_skipped": 0,
-            "prefill_ms_saved": 0.0, "node_id": node_id, "namespace": namespace,
-            "details": {"record_only": True, "restoration_attempted": False,
-                "payload_verified": verified, "estimated_prefill_ms_saved": estimated,
-                "requested_token_count": sequence.token_count, "block_size": block_size}})
-        return {"schema_version": REGISTRY_SCHEMA_VERSION, "mode": "record_only",
-                "observation_id": observation_id, "sequence_hash": sequence.sequence_hash,
-                "compatibility_hash": sequence.compatibility_hash,
-                "requested_token_count": sequence.token_count,
-                "matched_prefix_tokens": matched_tokens, "outcome": outcome,
-                "candidate_artifact_id": artifact_id, "payload_verified": verified,
-                "estimated_prefill_ms_saved": estimated,
-                "restoration_attempted": False, "tokens_skipped": 0,
-                "admission": {"admitted": False}}
+            "requested_token_count": sequence.token_count,
+            "matched_prefix_tokens": matched_tokens,
+            "outcome": outcome,
+            "candidate_artifact_id": artifact_id,
+            "payload_verified": verified,
+            "estimated_prefill_ms_saved": estimated,
+            "restoration_attempted": False,
+            "tokens_skipped": 0,
+            "admission": {"admitted": False},
+        }
