@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.29.0"
-description = "Exact-loadout throughput, Hermes intelligence, qualification, and prompt-cache evidence for local inference fleets"
+version = "0.30.0"
+description = "Reliable exact-loadout fleet execution, Hermes qualification, and prompt-cache evidence"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
