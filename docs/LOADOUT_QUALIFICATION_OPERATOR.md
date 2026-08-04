@@ -27,6 +27,10 @@ The installed package must be sourced from the reviewed LMS checkout. This
 prevents an operator from reviewing one commit while executing another installed
 wheel or checkout.
 
+API authentication is resolved from `--api-key-env`. The environment-variable
+name may appear in commands and logs, but the secret value is never placed in
+the Hermes parent or trial process argument vectors.
+
 ## Execute
 
 ```bash
@@ -135,14 +139,43 @@ after the complete run.
 - Base and context Hermes reports must independently pass their suite gates.
 - The combined qualification must independently verify against the original
   exact loadout.
+- API-key values remain in inherited environment state, not process arguments.
 - All outputs remain `admission.admitted=false`.
 
-## Authentication boundary
+## Authenticate the run
 
-The qualification-run manifest is tamper-evident but is not currently signed by
-`lms-fleet-attest`, which is defined for fleet operator manifests. Until a
-qualification-specific signing command is added, retain the run under access
-control and include its manifest SHA-256 in the reviewed profile-import record.
+After local verification, sign the immutable qualification manifest with a key
+stored outside the run directory:
+
+```bash
+lms-loadout-qualification-attest sign \
+  --run-dir /secure/lms-qualification-runs/<run-id> \
+  --key /secure/keys/lms-qualification-signing \
+  --require-success
+```
+
+Independent verification uses a separately controlled OpenSSH allowed-signers
+file:
+
+```bash
+lms-loadout-qualification-attest verify \
+  --run-dir /secure/lms-qualification-runs/<run-id> \
+  --allowed-signers /secure/policy/lms_allowed_signers \
+  --identity qualification-operator-prod \
+  --require-success
+```
+
+Signing produces:
+
+```text
+qualification-run-manifest.json.sig
+qualification-run-attestation.json
+```
+
+The attestation binds the authenticated manifest to the run ID, success state,
+exact loadout fingerprint, final qualification fingerprint, namespace, key
+fingerprint, manifest SHA-256, and signature SHA-256. The allowed-signers file
+must remain outside the run evidence and under separate policy control.
 
 ## Remaining physical boundary
 
