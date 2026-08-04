@@ -161,7 +161,9 @@ def test_inventory_must_be_one_exact_loopback_identity(tmp_path):
     assert identity["model_key"] == "model-a"
 
     rows = inputs["inventory_path"].read_text(encoding="utf-8")
-    inputs["inventory_path"].write_text(rows.replace("node-a,", "wrong-node,"), encoding="utf-8")
+    inputs["inventory_path"].write_text(
+        rows.replace("node-a,", "wrong-node,"), encoding="utf-8"
+    )
     with pytest.raises(ValueError, match="node_id"):
         operator.inventory_identity(
             inputs["inventory_path"],
@@ -172,8 +174,16 @@ def test_inventory_must_be_one_exact_loopback_identity(tmp_path):
 
 def test_source_snapshot_rejects_dirty_checkout(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
-    (repo / ".git").mkdir(parents=True)
-    monkeypatch.setattr(operator, "_git", lambda *args: "modified-file")
+    repo.mkdir()
+
+    def fake_git(_repo, *args):
+        if args == ("rev-parse", "--is-inside-work-tree"):
+            return "true"
+        if args == ("status", "--porcelain", "--untracked-files=all"):
+            return "modified-file"
+        raise AssertionError(args)
+
+    monkeypatch.setattr(operator, "_git", fake_git)
     with pytest.raises(ValueError, match="not completely clean"):
         operator.source_snapshot(
             repo,
@@ -187,7 +197,9 @@ def test_model_hash_mismatch_stops_before_run_directory(tmp_path, monkeypatch):
     inputs = make_inputs(tmp_path)
     inputs["model_path"].write_bytes(b"changed model")
     monkeypatch.setattr(operator, "source_snapshot", stable_source)
-    monkeypatch.setattr(operator, "endpoint_probe", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr(
+        operator, "endpoint_probe", lambda *args, **kwargs: {"ok": True}
+    )
     with pytest.raises(ValueError, match="model artifact SHA-256"):
         operator.run_qualification(args_for(tmp_path, inputs))
     assert not (tmp_path / "runs" / "qualification-run-a").exists()
@@ -214,13 +226,21 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
         }
         if name == "throughput":
             (root / "throughput").mkdir(parents=True, exist_ok=True)
-            fleet_operator.write_json(root / "throughput" / "reliability.json", {"passed": True})
+            fleet_operator.write_json(
+                root / "throughput" / "reliability.json", {"passed": True}
+            )
         elif name == "hermes-base":
-            fleet_operator.write_json(root / "hermes-base.json", {"gate": {"passed": True}})
+            fleet_operator.write_json(
+                root / "hermes-base.json", {"gate": {"passed": True}}
+            )
         elif name == "hermes-context":
-            fleet_operator.write_json(root / "hermes-context.json", {"gate": {"passed": True}})
+            fleet_operator.write_json(
+                root / "hermes-context.json", {"gate": {"passed": True}}
+            )
         elif name == "bind-throughput":
-            fleet_operator.write_json(root / "throughput-evidence.json", {"throughput_qualified": True})
+            fleet_operator.write_json(
+                root / "throughput-evidence.json", {"throughput_qualified": True}
+            )
         elif name == "qualify":
             fleet_operator.write_json(
                 root / "loadout-qualification.json",
@@ -249,11 +269,15 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
     ]
     assert all("supersecret" not in " ".join(command) for command in commands)
     root = tmp_path / "runs" / "qualification-run-a"
-    state = json.loads((root / "qualification-state.json").read_text(encoding="utf-8"))
+    state = json.loads(
+        (root / "qualification-state.json").read_text(encoding="utf-8")
+    )
     assert state["success"] is True
     assert state["admission"]["admitted"] is False
     assert state["qualification_fingerprint"] == "sha256:" + "9" * 64
-    assert not (tmp_path / "runs" / ".qualification-locks" / ".fleet-operator.lock").exists()
+    assert not (
+        tmp_path / "runs" / ".qualification-locks" / ".fleet-operator.lock"
+    ).exists()
     verified = operator.verify_manifest(root, require_success=True)
     assert verified["valid"] is True
     assert verified["success"] is True
@@ -263,7 +287,9 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
 def test_phase_failure_finalizes_manifest_and_releases_lock(tmp_path, monkeypatch):
     inputs = make_inputs(tmp_path)
     monkeypatch.setattr(operator, "source_snapshot", stable_source)
-    monkeypatch.setattr(operator, "endpoint_probe", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr(
+        operator, "endpoint_probe", lambda *args, **kwargs: {"ok": True}
+    )
     phases = []
 
     def fake_phase(state, name, command, root, timeout_seconds):
@@ -279,11 +305,15 @@ def test_phase_failure_finalizes_manifest_and_releases_lock(tmp_path, monkeypatc
     assert operator.run_qualification(args_for(tmp_path, inputs)) == 1
     assert phases == ["throughput", "hermes-base"]
     root = tmp_path / "runs" / "qualification-run-a"
-    state = json.loads((root / "qualification-state.json").read_text(encoding="utf-8"))
+    state = json.loads(
+        (root / "qualification-state.json").read_text(encoding="utf-8")
+    )
     assert state["success"] is False
     assert state["failure_stage"] == "hermes-base"
     assert (root / "qualification-run-manifest.json").is_file()
-    assert not (tmp_path / "runs" / ".qualification-locks" / ".fleet-operator.lock").exists()
+    assert not (
+        tmp_path / "runs" / ".qualification-locks" / ".fleet-operator.lock"
+    ).exists()
 
 
 def test_manifest_detects_artifact_tampering(tmp_path):
@@ -302,7 +332,9 @@ def test_manifest_detects_artifact_tampering(tmp_path):
         },
     )
     assert operator.verify_manifest(root)["valid"] is True
-    (root / "qualification-state.json").write_text("tampered\n", encoding="utf-8")
+    (root / "qualification-state.json").write_text(
+        "tampered\n", encoding="utf-8"
+    )
     with pytest.raises(ValueError, match="mismatch"):
         operator.verify_manifest(root)
 
