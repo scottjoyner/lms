@@ -30,7 +30,10 @@ jobs:
             src/lms_agent_bench/hermes_agent_secure_entrypoint.py \
             src/lms_agent_bench/loadout_qualification_operator.py \
             src/lms_agent_bench/loadout_qualification_secure_entrypoint.py \
-            src/lms_agent_bench/loadout_qualification_attestation.py
+            src/lms_agent_bench/loadout_qualification_attestation.py \
+            src/lms_agent_bench/runtime_canary.py \
+            src/lms_agent_bench/runtime_canary_secure_entrypoint.py \
+            src/lms_agent_bench/runtime_canary_attestation.py
       - name: Run operational and failure-injection tests
         run: |
           python -m pytest -q \
@@ -42,6 +45,7 @@ jobs:
             tests/test_hermes_agent_secure_entrypoint.py \
             tests/test_loadout_qualification_operator.py \
             tests/test_loadout_qualification_attestation.py \
+            tests/test_runtime_canary.py \
             tests/test_fleet_failure_safety.py \
             tests/test_fleet_rollout_command.py \
             tests/test_fleet_gate.py
@@ -64,3 +68,10 @@ jobs:
           lms-loadout-qualification-attest --help >/dev/null
           lms-loadout-qualification-attest sign --help >/dev/null
           lms-loadout-qualification-attest verify --help >/dev/null
+          lms-runtime-canary --help >/dev/null
+          lms-runtime-canary validate --help >/dev/null
+          lms-runtime-canary run --help >/dev/null
+          lms-runtime-canary verify --help >/dev/null
+          lms-runtime-canary-attest --help >/dev/null
+          lms-runtime-canary-attest sign --help >/dev/null
+          lms-runtime-canary-attest verify --help >/dev/null
