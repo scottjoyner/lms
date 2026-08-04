@@ -1,7 +1,6 @@
 """Operational hardening shared by the fleet rollout and operator surfaces."""
 from __future__ import annotations
 
-import shlex
 from typing import Any, List, Mapping, Sequence, Tuple
 
 SAFE_SSH_OPTIONS: Tuple[str, ...] = (
@@ -34,12 +33,7 @@ def _option_values(argv: Sequence[str], name: str) -> List[str]:
 
 
 def harden_ssh_argv(argv: Sequence[str]) -> Tuple[List[str], str]:
-    """Enforce non-interactive SSH and explicit host-key trust.
-
-    First-contact ``accept-new`` is available only through the wrapper-only
-    ``--allow-accept-new-host-keys`` acknowledgement. Host-key verification may
-    never be disabled and known-host files may not be redirected to /dev/null.
-    """
+    """Enforce non-interactive SSH and explicit host-key trust."""
     cleaned: List[str] = []
     allow_accept_new = False
     for value in argv:
@@ -106,17 +100,59 @@ def harden_ssh_argv(argv: Sequence[str]) -> Tuple[List[str], str]:
     return cleaned, trust_mode
 
 
+def harden_exact_update_script(
+    script: str,
+    node: Mapping[str, Any],
+    update_code: bool,
+) -> str:
+    """Replace moving-branch pull behavior with an exact-commit fast-forward.
+
+    The configured branch must resolve to the configured commit at fetch time.
+    The local branch may advance only when its current commit is an ancestor of
+    that exact fetched commit. Divergence, a branch move, or rollback fails
+    before benchmark execution.
+    """
+    if not update_code:
+        return script
+    expected_commit = str(node.get("expected_commit") or "").lower()
+    original = '''git -C "$REPO_DIR" fetch --prune origin "$EXPECTED_BRANCH"
+git -C "$REPO_DIR" checkout "$EXPECTED_BRANCH"
+git -C "$REPO_DIR" pull --ff-only origin "$EXPECTED_BRANCH"'''
+    replacement = f'''test -z "$(git -C "$REPO_DIR" status --porcelain --untracked-files=all)" || {{
+  echo "remote checkout is not completely clean before update" >&2
+  exit 21
+}}
+git -C "$REPO_DIR" fetch --prune origin "$EXPECTED_BRANCH"
+FETCHED_COMMIT=$(git -C "$REPO_DIR" rev-parse FETCH_HEAD)
+test "$FETCHED_COMMIT" = "{expected_commit}" || {{
+  echo "origin branch moved: expected {expected_commit}, fetched $FETCHED_COMMIT" >&2
+  exit 21
+}}
+git -C "$REPO_DIR" checkout "$EXPECTED_BRANCH"
+CURRENT_COMMIT=$(git -C "$REPO_DIR" rev-parse HEAD)
+if [ "$CURRENT_COMMIT" != "$FETCHED_COMMIT" ]; then
+  git -C "$REPO_DIR" merge-base --is-ancestor "$CURRENT_COMMIT" "$FETCHED_COMMIT" || {{
+    echo "local branch is not a fast-forward ancestor of expected commit" >&2
+    exit 21
+  }}
+  git -C "$REPO_DIR" merge --ff-only "$FETCHED_COMMIT"
+fi
+UPDATED_COMMIT=$(git -C "$REPO_DIR" rev-parse HEAD)
+test "$UPDATED_COMMIT" = "{expected_commit}" || {{
+  echo "exact commit update failed: found $UPDATED_COMMIT" >&2
+  exit 21
+}}'''
+    if original not in script:
+        raise RuntimeError("rollout update block changed unexpectedly")
+    return script.replace(original, replacement, 1)
+
+
 def remote_lock_and_provenance_snippet(
     base: Any,
     node: Mapping[str, Any],
     run_id: str,
 ) -> str:
-    """Return portable mkdir-lock logic with safe stale-lock recovery.
-
-    A lock is automatically archived only when its owner is provably stale on
-    the same host: a different boot ID or a non-existent owner PID. Corrupt,
-    foreign-host, or active locks fail closed.
-    """
+    """Return portable mkdir-lock logic with safe stale-lock recovery."""
     lock_root = str(node.get("lock_root") or "~/.local/state/lms-fleet/locks")
     node_slug = base.safe_slug(str(node["node_id"]))
     expected_commit = str(node.get("expected_commit") or "").lower()
@@ -224,3 +260,24 @@ def apply_entrypoint_hardening(entrypoint: Any) -> None:
             entrypoint._base, node, run_id  # noqa: SLF001
         )
     )
+    if not getattr(entrypoint, "_lms_exact_update_hardened", False):
+        original_builder = entrypoint._ORIGINAL_BUILD_REMOTE_SCRIPT  # noqa: SLF001
+
+        def exact_builder(
+            node: Mapping[str, Any],
+            run_id: str,
+            execute_candidates: Sequence[str] = (),
+            update_code: bool = False,
+            dry_run_limit: int = 4,
+        ) -> str:
+            generated = original_builder(
+                node,
+                run_id,
+                execute_candidates=execute_candidates,
+                update_code=update_code,
+                dry_run_limit=dry_run_limit,
+            )
+            return harden_exact_update_script(generated, node, update_code)
+
+        entrypoint._ORIGINAL_BUILD_REMOTE_SCRIPT = exact_builder  # noqa: SLF001
+        entrypoint._lms_exact_update_hardened = True  # noqa: SLF001
