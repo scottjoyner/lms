@@ -29,7 +29,8 @@ jobs:
             src/lms_agent_bench/fleet_evidence_attestation.py \
             src/lms_agent_bench/hermes_agent_secure_entrypoint.py \
             src/lms_agent_bench/loadout_qualification_operator.py \
-            src/lms_agent_bench/loadout_qualification_secure_entrypoint.py
+            src/lms_agent_bench/loadout_qualification_secure_entrypoint.py \
+            src/lms_agent_bench/loadout_qualification_attestation.py
       - name: Run operational and failure-injection tests
         run: |
           python -m pytest -q \
@@ -40,6 +41,7 @@ jobs:
             tests/test_fleet_evidence_attestation.py \
             tests/test_hermes_agent_secure_entrypoint.py \
             tests/test_loadout_qualification_operator.py \
+            tests/test_loadout_qualification_attestation.py \
             tests/test_fleet_failure_safety.py \
             tests/test_fleet_rollout_command.py \
             tests/test_fleet_gate.py
@@ -59,3 +61,6 @@ jobs:
           lms-loadout-qualification-run --help >/dev/null
           lms-loadout-qualification-run run --help >/dev/null
           lms-loadout-qualification-run verify --help >/dev/null
+          lms-loadout-qualification-attest --help >/dev/null
+          lms-loadout-qualification-attest sign --help >/dev/null
+          lms-loadout-qualification-attest verify --help >/dev/null
