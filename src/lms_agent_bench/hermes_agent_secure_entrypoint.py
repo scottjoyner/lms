@@ -11,7 +11,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from lms_agent_bench import hermes_agent_bench as _base
 
@@ -30,7 +30,13 @@ def _parser() -> argparse.ArgumentParser:
     hidden = sub_action.choices["_trial"]
     run.add_argument("--api-key-env", default=DEFAULT_API_KEY_ENV)
     hidden.add_argument("--api-key-env", required=True)
-    hidden.get_default("api_key")
+    hidden_api_key = next(
+        action
+        for action in hidden._actions
+        if "--api-key" in action.option_strings
+    )
+    hidden_api_key.required = False
+    hidden_api_key.default = None
     return parser
 
 
@@ -46,7 +52,7 @@ def _safe_trial_command(
 ) -> List[str]:
     return [
         args.hermes_python,
-        str(Path(_base.__file__).resolve()),
+        str(Path(__file__).resolve()),
         "_trial",
         "--hermes-repo",
         str(Path(args.hermes_repo).resolve()),
