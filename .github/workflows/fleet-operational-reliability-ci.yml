@@ -25,7 +25,8 @@ jobs:
             src/lms_agent_bench/fleet_transfer_hardening.py \
             src/lms_agent_bench/fleet_rollout_complete.py \
             src/lms_agent_bench/fleet_operator.py \
-            src/lms_agent_bench/fleet_operator_entrypoint.py
+            src/lms_agent_bench/fleet_operator_entrypoint.py \
+            src/lms_agent_bench/fleet_evidence_attestation.py
       - name: Run operational and failure-injection tests
         run: |
           python -m pytest -q \
@@ -33,6 +34,7 @@ jobs:
             tests/test_fleet_operator_entrypoint.py \
             tests/test_fleet_operational_hardening.py \
             tests/test_fleet_transfer_hardening.py \
+            tests/test_fleet_evidence_attestation.py \
             tests/test_fleet_failure_safety.py \
             tests/test_fleet_rollout_command.py \
             tests/test_fleet_gate.py
@@ -44,3 +46,6 @@ jobs:
           lms-fleet-operator preflight --help >/dev/null
           lms-fleet-operator observe --help >/dev/null
           lms-fleet-operator verify --help >/dev/null
+          lms-fleet-attest --help >/dev/null
+          lms-fleet-attest sign --help >/dev/null
+          lms-fleet-attest verify --help >/dev/null
