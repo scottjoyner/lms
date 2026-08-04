@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.31.0"
-description = "Reliable exact-loadout fleet execution, qualification, and prompt-cache evidence"
+version = "0.32.0"
+description = "Reliable exact-loadout fleet execution, qualification, canary rollback, and prompt-cache evidence"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -46,6 +46,8 @@ lms-loadout-compare = "lms_agent_bench.loadout_comparison:main"
 lms-loadout-qualify = "lms_agent_bench.loadout_qualification:main"
 lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_secure_entrypoint:main"
 lms-loadout-qualification-attest = "lms_agent_bench.loadout_qualification_attestation:main"
+lms-runtime-canary = "lms_agent_bench.runtime_canary_secure_entrypoint:main"
+lms-runtime-canary-attest = "lms_agent_bench.runtime_canary_attestation:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
