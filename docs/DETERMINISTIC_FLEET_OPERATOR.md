@@ -1,10 +1,94 @@
-# Deterministic fleet operator
+# Deterministic Fleet Operator
 
-This is the supported physical observation path. It exists so an operator or automation system does not construct a sequence of ad-hoc SSH, rollout, and release-gate commands.
+The supported physical fleet entrypoint is:
 
-## Scope
+```bash
+lms-fleet-operator
+```
 
-Runnable nodes:
+It is a fail-closed controller for complete-fleet observation evidence. It does
+not invent candidates, enable live admission, change routing, or restore KV
+state.
+
+The complete operational contract—including SSH trust, exact-commit updates,
+controller and remote locks, disk and clock checks, bounded retries, atomic
+artifact transport, postflight, run-manifest verification, and OpenSSH evidence
+attestation—is defined in:
+
+```text
+docs/FLEET_OPERATIONAL_RELIABILITY.md
+```
+
+## Required sequence
+
+```bash
+lms-fleet-operator preflight \
+  --config /secure/fleet-rollout.json \
+  --env-file /secure/fleet-rollout.env \
+  --workspace /secure/lms-fleet-runs
+
+lms-fleet-operator observe \
+  --config /secure/fleet-rollout.json \
+  --env-file /secure/fleet-rollout.env \
+  --workspace /secure/lms-fleet-runs
+
+lms-fleet-operator verify \
+  --run-dir /secure/lms-fleet-runs/<run-id> \
+  --require-success
+```
+
+Production evidence should then be authenticated with a key whose private half
+is stored separately from the run directory:
+
+```bash
+lms-fleet-attest sign \
+  --run-dir /secure/lms-fleet-runs/<run-id> \
+  --key /secure/keys/lms-evidence-signing \
+  --require-success
+
+lms-fleet-attest verify \
+  --run-dir /secure/lms-fleet-runs/<run-id> \
+  --allowed-signers /secure/policy/lms_allowed_signers \
+  --identity fleet-operator-prod \
+  --require-success
+```
+
+## Host-key bootstrap
+
+Normal operation requires an existing verified known-host entry. First contact
+is explicit:
+
+```bash
+lms-fleet-operator preflight \
+  --accept-new-host-keys \
+  --config /secure/fleet-rollout.json \
+  --env-file /secure/fleet-rollout.env \
+  --workspace /secure/lms-fleet-runs
+```
+
+Review the resulting host key out of band, then return to strict known-host
+operation. Host-key verification cannot be disabled.
+
+## Failure behavior
+
+- Any incomplete fleet coverage fails before rollout.
+- Any deterministic preflight failure stops execution without retry.
+- Transient SSH preflight failures may retry with recorded attempts.
+- An active or ambiguous lock fails closed.
+- A stale controller lock requires explicit safe recovery.
+- A stale remote lock is archived only when same-host boot/PID evidence proves
+  it stale.
+- Remote code update is pinned to the configured exact commit.
+- The remote workload is never automatically rerun.
+- Immutable SCP collection may retry through partial files and atomic promotion.
+- Postflight and the release gate run even after partial rollout failure when
+  diagnostic artifacts are available.
+- Success requires rollout, postflight, and release gate success.
+- Interrupted and failed runs remain non-admitted and are retained for review.
+
+## Current fleet
+
+The rollout contract contains nine runnable nodes:
 
 ```text
 destroyer
@@ -18,124 +102,20 @@ x1-370
 xwing
 ```
 
-Deferred node:
-
-```text
-joyner
-```
-
-`joyner` remains in the census but is not contacted while powered off. The Raspberry Pi and iPhone are not fleet inference nodes.
-
-## Safety properties
-
-`lms-fleet-operator`:
-
-- accepts a complete checked-in JSON structure plus one private environment file;
-- uses a fixed non-interactive SSH option set;
-- derives SSH targets from canonical node IDs;
-- never invokes `shell=True` locally;
-- validates the complete census before selecting or contacting nodes;
-- requires all runnable nodes to pass preflight before rollout begins;
-- rejects dirty remote repositories;
-- checks repository, branch/commit policy, Python, `requests`, and model roots;
-- renders scripts before execution;
-- preserves diagnostic output when a remote stage fails;
-- requires the observation release gate to pass for every runnable node;
-- holds a controller-side lock so two fleet runs cannot overlap;
-- records the exact commands and stage outputs under one run directory;
-- never selects candidate IDs, admits runtimes, or changes routing.
-
-## Prepare private configuration
-
-From the reviewed LMS checkout:
-
-```bash
-mkdir -p ~/.config/lms-fleet ~/lms-fleet-runs
-cp examples/fleet-rollout.full-fleet.template.json \
-  ~/.config/lms-fleet/full-fleet.json
-cp examples/fleet-benchmark-census.v1.json \
-  ~/.config/lms-fleet/fleet-benchmark-census.v1.json
-cp examples/fleet-rollout.full-fleet.env.example \
-  ~/.config/lms-fleet/full-fleet.env
-chmod 600 ~/.config/lms-fleet/full-fleet.env
-```
-
-Edit `~/.config/lms-fleet/full-fleet.env` once. Do not pass path or host overrides interactively during a run.
-
-The template assumes one common Linux checkout/Python/model root and one common macOS checkout/Python/model root. When a machine differs, edit the private JSON copy once and retain it as reviewed operator configuration.
-
-## Preflight only
-
-```bash
-lms-fleet-operator preflight \
-  --config ~/.config/lms-fleet/full-fleet.json \
-  --env-file ~/.config/lms-fleet/full-fleet.env \
-  --workspace ~/lms-fleet-runs \
-  --update-code
-```
-
-The report is written to:
-
-```text
-~/lms-fleet-runs/preflight.json
-```
-
-Every result must have `ok=true`. Fix the private configuration or remote checkout rather than bypassing a failed node.
-
-## Full observation run
-
-```bash
-lms-fleet-operator observe \
-  --config ~/.config/lms-fleet/full-fleet.json \
-  --env-file ~/.config/lms-fleet/full-fleet.env \
-  --workspace ~/lms-fleet-runs \
-  --update-code
-```
-
-A successful run creates:
-
-```text
-~/lms-fleet-runs/<UTC_RUN_ID>/
-  operator-state.json
-  preflight.json
-  render/
-  observe/
-    rollout_results.json
-    release-gate.json
-    artifacts/
-  logs/
-    render.log
-    observe.log
-    gate.log
-```
-
-Success requires:
-
-```text
-operator-state.json: success=true
-operator-state.json: gate_returncode=0
-release-gate.json: passed=true
-admission.admitted=false
-```
-
-## Exact source behavior
-
-With `--update-code`, preflight still requires a clean repository. The guarded rollout then performs a fast-forward-only update and the provenance gate requires the exact configured 40-character commit.
-
-Without `--update-code`, preflight requires the branch and commit to already match before any rollout starts.
-
-No mode permits a dirty checkout.
-
-## Failure behavior
-
-- A preflight failure prevents observation from starting on every node.
-- A render failure stops before SSH rollout.
-- A remote rollout failure preserves logs and any collected diagnostic archives.
-- A release-gate failure leaves the run non-admitted and unsuitable for profile import.
-- The controller lock prevents an overlapping run from starting in the same workspace.
-
-Do not manually rerun fragments from the logs. Correct the cause and start a new operator run so the evidence chain remains coherent.
+`joyner` remains `benchmark_deferred` while powered off. It must not receive a
+profile based on stale evidence.
 
 ## Candidate sweeps
 
-Observation does not execute inference candidates. Candidate sweeps remain a separate reviewed phase because candidate IDs must come from collected `benchmark_plan.json` artifacts and must be explicitly approved. Do not allow an agent to invent or substitute candidate IDs.
+Observation does not execute inference candidates. Candidate sweeps remain a
+separate reviewed phase because candidate IDs must come from collected
+`benchmark_plan.json` artifacts and be explicitly approved. The operator must
+not invent or substitute candidate IDs.
+
+## Physical boundary
+
+Repository tests exercise failure behavior synthetically and with real local
+OpenSSH signatures. They do not prove fleet network reachability, real host
+keys, remote disk behavior, power loss, thermal stability, process cleanup, or
+rollback on the physical nodes. Those failure injections must be performed on a
+noncritical node before live admission.
