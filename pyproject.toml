@@ -41,10 +41,10 @@ lms-fleet-operator = "lms_agent_bench.fleet_operator_entrypoint:main"
 lms-fleet-attest = "lms_agent_bench.fleet_evidence_attestation:main"
 lms-fleet-gate = "lms_agent_bench.fleet_gate_entrypoint:main"
 lms-loadout-matrix = "lms_agent_bench.model_loadout:main"
-lms-hermes-bench = "lms_agent_bench.hermes_agent_bench:main"
+lms-hermes-bench = "lms_agent_bench.hermes_agent_secure_entrypoint:main"
 lms-loadout-compare = "lms_agent_bench.loadout_comparison:main"
 lms-loadout-qualify = "lms_agent_bench.loadout_qualification:main"
-lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_operator:main"
+lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_secure_entrypoint:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
