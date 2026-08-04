@@ -1,13 +1,13 @@
-"""lms_agent_bench — exact-loadout local and fleet inference benchmarking.
+"""lms_agent_bench — reliable exact-loadout fleet qualification.
 
-The package provides endpoint discovery, strict protocol and repeated-throughput
-measurement, census-complete fleet operation, immutable model/runtime loadout
-identity, controlled context/KV/quant matrices, real Hermes MCP agent-loop
-intelligence evaluation, cryptographically linked exact-loadout qualification,
-record-only prompt-prefix and KV artifact evidence, and safe ephemeral candidate
-execution. Live runtime admission and KV restoration remain external.
+The package provides endpoint discovery, repeated-throughput measurement,
+census-complete fleet operation, strict controller and remote readiness checks,
+immutable model/runtime loadout identity, real Hermes MCP agent-loop evaluation,
+cryptographically linked qualification, record-only prompt-prefix/KV evidence,
+and verifiable non-admitted run artifacts. Live admission and KV restoration
+remain external.
 """
 
 from __future__ import annotations
 
-__version__ = "0.29.0"
+__version__ = "0.30.0"
