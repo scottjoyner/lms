@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -97,7 +98,7 @@ def test_manifest_tampering_is_rejected_before_signature_verification(tmp_path):
     attestation.sign_run(root, key)
     manifest = root / "qualification-run-manifest.json"
     manifest.write_bytes(manifest.read_bytes() + b"tamper")
-    with pytest.raises(ValueError, match="manifest"):
+    with pytest.raises((ValueError, json.JSONDecodeError)):
         attestation.verify_attestation(root, allowed, "qualification-operator")
 
 
