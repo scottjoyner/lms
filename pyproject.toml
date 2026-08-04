@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lms-agent-bench"
-version = "0.30.0"
-description = "Reliable exact-loadout fleet execution, Hermes qualification, and prompt-cache evidence"
+version = "0.31.0"
+description = "Reliable exact-loadout fleet execution, qualification, and prompt-cache evidence"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -44,6 +44,7 @@ lms-loadout-matrix = "lms_agent_bench.model_loadout:main"
 lms-hermes-bench = "lms_agent_bench.hermes_agent_bench:main"
 lms-loadout-compare = "lms_agent_bench.loadout_comparison:main"
 lms-loadout-qualify = "lms_agent_bench.loadout_qualification:main"
+lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_operator:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
