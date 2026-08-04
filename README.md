@@ -1,20 +1,29 @@
 # LMS Agent Benchmarking Toolkit
 
-LMS profiles and benchmarks local or Tailscale-reachable OpenAI-compatible inference nodes. It produces deterministic benchmark evidence, guarded physical execution, census validation, and non-admitted runtime recommendations.
+`lms-agent-bench` produces deterministic, non-admitting evidence for local and
+fleet inference systems. It separates observation, repeated throughput,
+intelligence, exact-loadout qualification, prompt-cache evidence, desired-state
+profile import, and live admission.
 
 > The package intentionally does not install a command named `lms`; that name belongs to LM Studio's official CLI.
 
 ## Installed commands
 
 ```text
-lms-agent             Agent-facing doctor/probe/profile/quick/route CLI
-lms-bench             Manifest-driven benchmark CLI
+lms-agent              Agent-facing doctor/probe/profile/quick/route CLI
+lms-bench              Reliability-first benchmark CLI
 lms-fleet              Hardware observation, planning, and selection
 lms-fleet-bench        Guarded loopback-only candidate execution
 lms-fleet-models       Model inventory and selected-model hashing
 lms-fleet-rollout      Low-level census-validated SSH rollout
-lms-fleet-operator     Deterministic preflight/render/observe/gate workflow
+lms-fleet-operator     Hardened preflight/render/observe/postflight/gate workflow
+lms-fleet-attest       OpenSSH sign/verify operator evidence
 lms-fleet-gate         Collected-archive release gate
+lms-loadout-matrix     Exact model/runtime loadout matrices
+lms-loadout-compare    Separate quality and throughput comparisons
+lms-hermes-bench       Real Hermes MCP agent-loop intelligence suites
+lms-loadout-qualify    Combined exact-loadout evidence gate
+lms-prompt-cache       Record-only exact prompt-prefix/KV registry
 ```
 
 ## Install
@@ -39,22 +48,13 @@ x1-370
 xwing
 ```
 
-`joyner` remains in the census as `benchmark_deferred` because it is powered off. It is not silently deleted and must return to `benchmark_required` when it comes online.
-
-The Raspberry Pi and iPhone are not fleet inference nodes and are not part of this census or rollout.
-
-Canonical files:
-
-```text
-examples/fleet-benchmark-census.v1.json
-examples/fleet-rollout.full-fleet.template.json
-examples/fleet-rollout.full-fleet.env.example
-docs/DETERMINISTIC_FLEET_OPERATOR.md
-```
+`joyner` remains in the census as `benchmark_deferred` because it is powered
+off. It must return to `benchmark_required` when it comes online. Raspberry Pi
+and iPhone devices are not fleet inference nodes.
 
 ## Private setup
 
-Create the private configuration outside the repository:
+Create reviewed private configuration outside the repository:
 
 ```bash
 mkdir -p ~/.config/lms-fleet ~/lms-fleet-runs
@@ -68,67 +68,93 @@ chmod 600 ~/.config/lms-fleet/full-fleet.env
 $EDITOR ~/.config/lms-fleet/full-fleet.env
 ```
 
-The environment file contains only:
-
-```text
-LMS_EXPECTED_COMMIT
-LMS_FLEET_SSH_USER
-LMS_LINUX_REPO_DIR
-LMS_LINUX_PYTHON
-LMS_LINUX_MODEL_ROOT
-LMS_MACOS_REPO_DIR
-LMS_MACOS_PYTHON
-LMS_MACOS_MODEL_ROOT
-```
-
-Node SSH targets are generated as `<user>@<canonical-node-id>`; operators do not manually compose nine target strings.
-
-## One-command observation run
-
-After filling the private environment file, run exactly:
-
-```bash
-lms-fleet-operator observe \
-  --config ~/.config/lms-fleet/full-fleet.json \
-  --env-file ~/.config/lms-fleet/full-fleet.env \
-  --workspace ~/lms-fleet-runs \
-  --update-code
-```
-
-The operator performs, in order:
-
-1. Complete census and configuration validation.
-2. A fixed non-interactive Tailscale SSH preflight against all nine nodes.
-3. Remote repository, Python, model-root, and clean-working-tree checks.
-4. Rendered-script generation.
-5. Observation-only rollout and artifact collection.
-6. A release gate requiring successful evidence from every runnable node.
-7. A durable `operator-state.json` plus per-stage logs.
-
-Any unexpected preflight failure stops the rollout before remote observation begins. During collection, failures are retained diagnostically, but the final gate still fails unless every required node produced valid evidence.
-
-Use a preflight-only pass when correcting paths:
+## Reliable fleet observation
 
 ```bash
 lms-fleet-operator preflight \
   --config ~/.config/lms-fleet/full-fleet.json \
   --env-file ~/.config/lms-fleet/full-fleet.env \
-  --workspace ~/lms-fleet-runs \
-  --update-code
+  --workspace ~/lms-fleet-runs
+
+lms-fleet-operator observe \
+  --config ~/.config/lms-fleet/full-fleet.json \
+  --env-file ~/.config/lms-fleet/full-fleet.env \
+  --workspace ~/lms-fleet-runs
+
+lms-fleet-operator verify \
+  --run-dir ~/lms-fleet-runs/<run-id> \
+  --require-success
 ```
 
-`--update-code` permits the guarded rollout to fast-forward the reviewed branch. Without it, every remote checkout must already be on the exact configured branch and commit. A dirty remote checkout is always rejected.
+The operator enforces:
 
-## Reliability contract
+- strict SSH host-key verification;
+- complete fleet coverage;
+- safe controller inputs and run IDs;
+- clean exact-commit source;
+- controller and remote boot/PID locks;
+- disk, file-limit, hostname, model-root, and clock readiness;
+- transient-only preflight retries;
+- bounded process-group timeouts;
+- atomic retried archive collection without rerunning the workload;
+- all-node postflight;
+- release gating;
+- atomic local state and archive-contained run manifests.
 
-A selectable candidate requires exact model identity, strict streaming completion, complete sample accounting, unique retained raw outputs, at least three valid complete trials, bounded retries, Wilson confidence, bounded TPS/TTFT dispersion, post-trial health, memory headroom, and no observed crash.
+Production evidence can be authenticated separately from its storage location:
 
-All evidence remains non-admitted. No operator command modifies routers, registries, persistent services, or live admission.
+```bash
+lms-fleet-attest sign \
+  --run-dir ~/lms-fleet-runs/<run-id> \
+  --key /secure/keys/lms-evidence-signing \
+  --require-success
+
+lms-fleet-attest verify \
+  --run-dir ~/lms-fleet-runs/<run-id> \
+  --allowed-signers /secure/policy/lms_allowed_signers \
+  --identity fleet-operator-prod \
+  --require-success
+```
 
 See:
 
 ```text
 docs/DETERMINISTIC_FLEET_OPERATOR.md
-docs/BENCHMARK_RELIABILITY.md
+docs/FLEET_OPERATIONAL_RELIABILITY.md
 docs/PHYSICAL_FLEET_ROLLOUT.md
 ```
+
+## Exact-loadout qualification
+
+A final qualification requires one immutable loadout fingerprint across
+repeated throughput, base Hermes intelligence, and context-pressure Hermes
+intelligence:
+
+```bash
+lms-loadout-qualify bind-throughput \
+  --loadout loadout.json \
+  --reliability reliability.json \
+  --out throughput-evidence.json
+
+lms-loadout-qualify qualify \
+  --loadout loadout.json \
+  --throughput throughput-evidence.json \
+  --base-hermes hermes-base.json \
+  --context-hermes hermes-context.json \
+  --out loadout-qualification.json
+```
+
+Qualification remains `admission.admitted=false`.
+
+## Prompt-cache evidence
+
+`lms-prompt-cache` stores metadata in SQLite and opaque engine-native payloads
+in an atomic content-addressed local store. It is record-only: candidate hits do
+not restore KV state, skip tokens, change routing, or claim measured savings.
+
+## Safety boundary
+
+All generated evidence remains non-admitted. Repository tests do not prove
+physical host keys, network paths, disk failure, power interruption, thermal
+behavior, model-process cleanup, or rollback. Physical failure injection and
+independent live admission remain required.
