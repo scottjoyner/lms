@@ -1,0 +1,37 @@
+name: prompt-cache-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  prompt-cache-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package and test dependencies
+        run: python -m pip install -e ".[test]"
+      - name: Compile prompt-cache modules
+        run: |
+          python -m py_compile \
+            src/lms_agent_bench/prompt_cache_identity.py \
+            src/lms_agent_bench/prompt_cache_store.py \
+            src/lms_agent_bench/prompt_cache_registry.py \
+            src/lms_agent_bench/prompt_cache_cli.py
+      - name: Run prompt-cache tests
+        run: python -m pytest -q tests/test_prompt_cache_registry.py
+      - name: Smoke-test installed command
+        run: |
+          lms-prompt-cache --help >/dev/null
+          lms-prompt-cache init --help >/dev/null
+          lms-prompt-cache observe --help >/dev/null
+          lms-prompt-cache register-artifact --help >/dev/null
+          lms-prompt-cache stats --help >/dev/null
+          lms-prompt-cache verify --help >/dev/null
