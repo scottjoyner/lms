@@ -17,10 +17,12 @@ _PATCHED = False
 
 
 def validate_run_id(value: str) -> str:
-    run = str(value or "").strip()
-    if not _RUN_ID_RE.fullmatch(run) or ".." in run:
+    raw = str(value or "")
+    run = raw.strip()
+    if raw != run or not _RUN_ID_RE.fullmatch(run) or ".." in run:
         raise ValueError(
-            "run_id must be 1-128 safe characters without path separators or '..'"
+            "run_id must be 1-128 safe characters without path separators, "
+            "surrounding whitespace, or '..'"
         )
     return run
 
@@ -30,7 +32,8 @@ def _positive(value: Any, label: str, *, allow_zero: bool = False) -> None:
         parsed = int(value)
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{label} must be an integer") from exc
-    if parsed < 0 if allow_zero else parsed <= 0:
+    invalid = parsed < 0 if allow_zero else parsed <= 0
+    if invalid:
         qualifier = "non-negative" if allow_zero else "positive"
         raise ValueError(f"{label} must be {qualifier}")
 
