@@ -45,6 +45,7 @@ lms-hermes-bench = "lms_agent_bench.hermes_agent_secure_entrypoint:main"
 lms-loadout-compare = "lms_agent_bench.loadout_comparison:main"
 lms-loadout-qualify = "lms_agent_bench.loadout_qualification:main"
 lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_secure_entrypoint:main"
+lms-loadout-qualification-attest = "lms_agent_bench.loadout_qualification_attestation:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
