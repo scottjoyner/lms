@@ -11,9 +11,8 @@ import shutil
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import requests
 
@@ -83,7 +82,7 @@ def source_snapshot(
     if value.is_symlink():
         raise ValueError(f"{label} repository may not be a symbolic link")
     resolved = value.resolve()
-    if not (resolved / ".git").is_dir():
+    if _git(resolved, "rev-parse", "--is-inside-work-tree") != "true":
         raise ValueError(f"{label} is not a Git checkout: {resolved}")
     commit = str(expected_commit or "").lower()
     if not _COMMIT_RE.fullmatch(commit):
