@@ -10,20 +10,22 @@ profile import, and live admission.
 ## Installed commands
 
 ```text
-lms-agent              Agent-facing doctor/probe/profile/quick/route CLI
-lms-bench              Reliability-first benchmark CLI
-lms-fleet              Hardware observation, planning, and selection
-lms-fleet-bench        Guarded loopback-only candidate execution
-lms-fleet-models       Model inventory and selected-model hashing
-lms-fleet-rollout      Low-level census-validated SSH rollout
-lms-fleet-operator     Hardened preflight/render/observe/postflight/gate workflow
-lms-fleet-attest       OpenSSH sign/verify operator evidence
-lms-fleet-gate         Collected-archive release gate
-lms-loadout-matrix     Exact model/runtime loadout matrices
-lms-loadout-compare    Separate quality and throughput comparisons
-lms-hermes-bench       Real Hermes MCP agent-loop intelligence suites
-lms-loadout-qualify    Combined exact-loadout evidence gate
-lms-prompt-cache       Record-only exact prompt-prefix/KV registry
+lms-agent                          Agent-facing doctor/probe/profile/route CLI
+lms-bench                          Reliability-first benchmark CLI
+lms-fleet                          Hardware observation, planning, and selection
+lms-fleet-bench                    Guarded loopback candidate execution
+lms-fleet-models                   Model inventory and selected-model hashing
+lms-fleet-rollout                  Low-level census-validated SSH rollout
+lms-fleet-operator                 Hardened fleet observation workflow
+lms-fleet-attest                   OpenSSH sign/verify fleet evidence
+lms-fleet-gate                     Collected-archive release gate
+lms-loadout-matrix                 Exact model/runtime loadout matrices
+lms-loadout-compare                Separate quality and throughput comparisons
+lms-hermes-bench                   Secret-safe Hermes MCP intelligence suites
+lms-loadout-qualify                Combined exact-loadout evidence gate
+lms-loadout-qualification-run      One-run throughput and Hermes orchestration
+lms-loadout-qualification-attest   OpenSSH sign/verify qualification evidence
+lms-prompt-cache                   Record-only prompt-prefix/KV registry
 ```
 
 ## Install
@@ -53,8 +55,6 @@ off. It must return to `benchmark_required` when it comes online. Raspberry Pi
 and iPhone devices are not fleet inference nodes.
 
 ## Private setup
-
-Create reviewed private configuration outside the repository:
 
 ```bash
 mkdir -p ~/.config/lms-fleet ~/lms-fleet-runs
@@ -86,22 +86,12 @@ lms-fleet-operator verify \
   --require-success
 ```
 
-The operator enforces:
+The operator enforces strict SSH host-key verification, complete fleet coverage,
+safe controller inputs, exact-commit source, boot/PID locks, disk and clock
+readiness, transient-only retries, bounded process groups, atomic archive
+collection, all-node postflight, release gating, and verifiable run manifests.
 
-- strict SSH host-key verification;
-- complete fleet coverage;
-- safe controller inputs and run IDs;
-- clean exact-commit source;
-- controller and remote boot/PID locks;
-- disk, file-limit, hostname, model-root, and clock readiness;
-- transient-only preflight retries;
-- bounded process-group timeouts;
-- atomic retried archive collection without rerunning the workload;
-- all-node postflight;
-- release gating;
-- atomic local state and archive-contained run manifests.
-
-Production evidence can be authenticated separately from its storage location:
+Authenticate production evidence:
 
 ```bash
 lms-fleet-attest sign \
@@ -124,27 +114,53 @@ docs/FLEET_OPERATIONAL_RELIABILITY.md
 docs/PHYSICAL_FLEET_ROLLOUT.md
 ```
 
-## Exact-loadout qualification
+## Reliable exact-loadout qualification
 
 A final qualification requires one immutable loadout fingerprint across
 repeated throughput, base Hermes intelligence, and context-pressure Hermes
-intelligence:
+intelligence. The supported execution path is one locked run:
 
 ```bash
-lms-loadout-qualify bind-throughput \
-  --loadout loadout.json \
-  --reliability reliability.json \
-  --out throughput-evidence.json
+lms-loadout-qualification-run run \
+  --loadout /reviewed/loadout.json \
+  --inventory-csv /reviewed/inventory.csv \
+  --cases-file /reviewed/throughput-cases.json \
+  --model-artifact /models/exact-model.gguf \
+  --endpoint http://127.0.0.1:8080/v1 \
+  --api-key-env LMSTUDIO_API_KEY \
+  --lms-repo /srv/lms \
+  --lms-branch <reviewed-branch> \
+  --lms-commit <40-character-commit> \
+  --hermes-repo /srv/hermes-agent \
+  --hermes-branch <reviewed-branch> \
+  --hermes-commit <40-character-commit> \
+  --workspace /secure/lms-qualification-runs
 
-lms-loadout-qualify qualify \
-  --loadout loadout.json \
-  --throughput throughput-evidence.json \
-  --base-hermes hermes-base.json \
-  --context-hermes hermes-context.json \
-  --out loadout-qualification.json
+lms-loadout-qualification-run verify \
+  --run-dir /secure/lms-qualification-runs/<run-id> \
+  --require-success
 ```
 
-Qualification remains `admission.admitted=false`.
+API-key values are inherited from the named environment variable and are not
+placed in Hermes process arguments or logs.
+
+Authenticate the qualification evidence:
+
+```bash
+lms-loadout-qualification-attest sign \
+  --run-dir /secure/lms-qualification-runs/<run-id> \
+  --key /secure/keys/lms-qualification-signing \
+  --require-success
+
+lms-loadout-qualification-attest verify \
+  --run-dir /secure/lms-qualification-runs/<run-id> \
+  --allowed-signers /secure/policy/lms_allowed_signers \
+  --identity qualification-operator-prod \
+  --require-success
+```
+
+See `docs/LOADOUT_QUALIFICATION_OPERATOR.md` and
+`docs/EXACT_LOADOUT_QUALIFICATION.md`.
 
 ## Prompt-cache evidence
 
@@ -156,5 +172,5 @@ not restore KV state, skip tokens, change routing, or claim measured savings.
 
 All generated evidence remains non-admitted. Repository tests do not prove
 physical host keys, network paths, disk failure, power interruption, thermal
-behavior, model-process cleanup, or rollback. Physical failure injection and
+behavior, runtime process cleanup, or rollback. Physical failure injection and
 independent live admission remain required.
