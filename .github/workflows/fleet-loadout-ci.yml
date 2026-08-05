@@ -18,7 +18,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install package and test dependencies
         run: python -m pip install -e ".[test]"
-      - name: Compile new runtime modules
+      - name: Compile runtime modules
         run: |
           python -m py_compile \
             src/lms_agent_bench/benchmark_protocol.py \
@@ -32,11 +32,20 @@ jobs:
             src/lms_agent_bench/fleet_bench_entrypoint.py \
             src/lms_agent_bench/fleet_models.py \
             src/lms_agent_bench/fleet_provenance.py \
+            src/lms_agent_bench/fleet_coverage.py \
             src/lms_agent_bench/fleet_rollout.py \
             src/lms_agent_bench/fleet_rollout_entrypoint.py \
             src/lms_agent_bench/fleet_rollout_command.py \
+            src/lms_agent_bench/fleet_rollout_complete.py \
+            src/lms_agent_bench/fleet_operator.py \
             src/lms_agent_bench/fleet_gate.py \
-            src/lms_agent_bench/fleet_gate_entrypoint.py
+            src/lms_agent_bench/fleet_gate_entrypoint.py \
+            src/lms_agent_bench/model_loadout.py \
+            src/lms_agent_bench/hermes_agent_common.py \
+            src/lms_agent_bench/hermes_agent_scoring.py \
+            src/lms_agent_bench/hermes_mcp_fixture.py \
+            src/lms_agent_bench/hermes_agent_bench.py \
+            src/lms_agent_bench/loadout_comparison.py
       - name: Run focused tests
         run: |
           python -m pytest -q \
@@ -49,20 +58,32 @@ jobs:
             tests/test_fleet_bench_plan.py \
             tests/test_fleet_models.py \
             tests/test_fleet_provenance.py \
+            tests/test_fleet_coverage.py \
+            tests/test_fleet_operator.py \
             tests/test_fleet_rollout.py \
             tests/test_fleet_rollout_entrypoint.py \
             tests/test_fleet_rollout_command.py \
             tests/test_fleet_failure_safety.py \
             tests/test_fleet_gate.py \
+            tests/test_model_loadout.py \
+            tests/test_hermes_agent_bench.py \
+            tests/test_loadout_comparison.py \
             tests/test_packaged_entrypoints.py
       - name: Validate packaged artifacts
         run: |
           python -m json.tool src/lms_agent_bench/benchmarks/agent_skill_suite.v1.json >/dev/null
+          python -m json.tool src/lms_agent_bench/benchmarks/hermes_agent_suite.v1.json >/dev/null
+          python -m json.tool src/lms_agent_bench/benchmarks/hermes_agent_context_suite.v1.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_loadout.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_model_inventory.v1.schema.json >/dev/null
           python -m json.tool src/lms_agent_bench/schemas/fleet_release_gate.v1.schema.json >/dev/null
+          python -m json.tool src/lms_agent_bench/schemas/model_loadout_manifest.v1.schema.json >/dev/null
+          python -m json.tool examples/model-loadouts.v1.example.json >/dev/null
+          python -m json.tool examples/model-loadout-matrix.axes.example.json >/dev/null
+          python -m json.tool examples/fleet-benchmark-census.v1.json >/dev/null
           python -m json.tool examples/fleet-rollout.v1.example.json >/dev/null
           python -m json.tool examples/fleet-rollout.tier1.template.json >/dev/null
+          python -m json.tool examples/fleet-rollout.full-fleet.template.json >/dev/null
           python - <<'PY'
           from pathlib import Path
           from jsonschema import Draft202012Validator
@@ -71,35 +92,110 @@ jobs:
               "fleet_loadout.v1.schema.json",
               "fleet_model_inventory.v1.schema.json",
               "fleet_release_gate.v1.schema.json",
+              "model_loadout_manifest.v1.schema.json",
           ):
               schema = json.loads((Path("src/lms_agent_bench/schemas") / name).read_text())
               Draft202012Validator.check_schema(schema)
           PY
-      - name: Validate Tier-1 template fails closed when unresolved
+      - name: Validate exact loadout examples and matrix
         run: |
-          set +e
-          lms-fleet-rollout validate \
-            --config examples/fleet-rollout.tier1.template.json \
-            --env-file examples/fleet-rollout.tier1.env.example \
-            --all-nodes \
-            --out /tmp/tier1-validation.json
-          rc=$?
-          set -e
-          test "$rc" -ne 0
           python - <<'PY'
           import json
-          report = json.load(open('/tmp/tier1-validation.json'))
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          from lms_agent_bench.model_loadout import build_matrix, validate_manifest
+          from lms_agent_bench.hermes_agent_common import validate_suite
+
+          schema = json.loads(Path('src/lms_agent_bench/schemas/model_loadout_manifest.v1.schema.json').read_text())
+          payload = json.loads(Path('examples/model-loadouts.v1.example.json').read_text())
+          bases = [validate_manifest(item) for item in payload['base_manifests']]
+          assert {item['architecture']['kind'] for item in bases} == {'dense', 'moe'}
+          assert bases[0]['architecture']['active_parameter_count_per_token'] == bases[0]['architecture']['total_parameter_count']
+          assert bases[1]['architecture']['active_parameter_count_per_token'] < bases[1]['architecture']['total_parameter_count']
+          for item in bases:
+              Draft202012Validator(schema).validate(item)
+          axes = json.loads(Path('examples/model-loadout-matrix.axes.example.json').read_text())
+          matrix = build_matrix(bases, axes)
+          assert matrix['candidate_count'] == 128
+          assert len({item['loadout_fingerprint'] for item in matrix['candidates']}) == 128
+          assert {item['context']['configured_tokens'] for item in matrix['candidates']} == {4096, 8192, 16384, 32768}
+          base_suite = json.loads(Path('src/lms_agent_bench/benchmarks/hermes_agent_suite.v1.json').read_text())
+          context_suite = json.loads(Path('src/lms_agent_bench/benchmarks/hermes_agent_context_suite.v1.json').read_text())
+          assert len(validate_suite(base_suite)['cases']) >= 8
+          assert len(validate_suite(context_suite)['cases']) >= 2
+          assert all(item.get('context_pressure_ratio') for item in context_suite['cases'])
+          PY
+      - name: Validate unresolved templates fail before SSH
+        run: |
+          for scope in tier1 full-fleet; do
+            set +e
+            lms-fleet-rollout validate \
+              --config "examples/fleet-rollout.${scope}.template.json" \
+              --env-file "examples/fleet-rollout.${scope}.env.example" \
+              --all-nodes \
+              --out "/tmp/${scope}-unresolved-validation.json"
+            rc=$?
+            set -e
+            test "$rc" -ne 0
+            SCOPE="$scope" python - <<'PY'
+          import json, os
+          scope = os.environ['SCOPE']
+          report = json.load(open(f'/tmp/{scope}-unresolved-validation.json'))
           assert report['ready_for_observation'] is False
           assert report['admission']['admitted'] is False
           assert 'unresolved environment variable' in report['error']
           PY
+          done
+      - name: Validate confirmed runnable fleet template
+        run: |
+          cat >/tmp/full-fleet.env <<'EOF'
+          LMS_EXPECTED_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          LMS_FLEET_SSH_USER=benchmark
+          LMS_LINUX_REPO_DIR=/srv/lms
+          LMS_LINUX_PYTHON=/usr/bin/python3
+          LMS_LINUX_MODEL_ROOT=/models
+          LMS_MACOS_REPO_DIR=/Users/benchmark/lms
+          LMS_MACOS_PYTHON=/usr/bin/python3
+          LMS_MACOS_MODEL_ROOT=/Users/benchmark/models
+          EOF
+          lms-fleet-rollout validate \
+            --config examples/fleet-rollout.full-fleet.template.json \
+            --env-file /tmp/full-fleet.env \
+            --all-nodes \
+            --out /tmp/full-fleet-validation.json
+          python - <<'PY'
+          import json
+          report = json.load(open('/tmp/full-fleet-validation.json'))
+          assert report['ready_for_observation'] is True
+          coverage = report['coverage']
+          assert coverage['ready'] is True
+          assert coverage['coverage_complete'] is True
+          assert coverage['benchmark_interface_complete'] is True
+          assert coverage['current_execution_scope_complete'] is False
+          assert coverage['fleet_device_count'] == 10
+          assert coverage['benchmark_required_count'] == 9
+          assert coverage['benchmark_deferred_count'] == 1
+          assert coverage['configured_benchmark_count'] == 9
+          assert coverage['accounted_device_count'] == 10
+          assert coverage['benchmark_deferred_node_ids'] == ['joyner']
+          assert coverage['adapter_required_node_ids'] == []
+          assert coverage['unsupported_node_ids'] == []
+          assert coverage['qualification_blockers']
+          assert len(report['node_ids']) == 9
+          PY
       - name: Reject private network identities in public rollout files
         run: |
-          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|[A-Za-z0-9-]+\.ts\.net' \
+          ! grep -REn '100\.[0-9]+\.[0-9]+\.[0-9]+|fd7a:|[A-Za-z0-9-]+\.ts\.net|tailcb8954' \
+            examples/fleet-benchmark-census.v1.json \
             examples/fleet-rollout.tier1.template.json \
             examples/fleet-rollout.tier1.env.example \
+            examples/fleet-rollout.full-fleet.template.json \
+            examples/fleet-rollout.full-fleet.env.example \
+            examples/model-loadouts.v1.example.json \
+            examples/model-loadout-matrix.axes.example.json \
             docs/PHYSICAL_FLEET_ROLLOUT.md \
-            docs/TIER1_ROLLOUT_CHECKPOINT.md
+            docs/TIER1_ROLLOUT_CHECKPOINT.md \
+            docs/HERMES_INTELLIGENCE_AND_LOADOUT_BENCHMARK.md
       - name: Smoke-test installed commands
         run: |
           lms-agent --help >/dev/null
@@ -108,7 +204,17 @@ jobs:
           lms-fleet-models --help >/dev/null
           lms-fleet-rollout --help >/dev/null
           lms-fleet-rollout validate --help >/dev/null
+          lms-fleet-operator --help >/dev/null
+          lms-fleet-operator preflight --help >/dev/null
+          lms-fleet-operator observe --help >/dev/null
           lms-fleet-gate --help >/dev/null
+          lms-loadout-matrix --help >/dev/null
+          lms-loadout-matrix validate --help >/dev/null
+          lms-loadout-matrix matrix --help >/dev/null
+          lms-hermes-bench --help >/dev/null
+          lms-hermes-bench run --help >/dev/null
+          lms-hermes-bench gate --help >/dev/null
+          lms-loadout-compare --help >/dev/null
           python -m lms_agent_bench.benchmark_entrypoint --help >/dev/null
           python -m lms_agent_bench.benchmark_raw_entrypoint --help >/dev/null
           python -m lms_agent_bench.fleet_provenance --help >/dev/null

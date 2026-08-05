@@ -1,0 +1,138 @@
+{
+  "base_manifests": [
+    {
+      "schema_version": "model_loadout_manifest.v1",
+      "node_id": "example-node",
+      "candidate_id": "dense-base",
+      "model": {
+        "id": "example-dense-8b-q4_k_m",
+        "content_sha256": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "format": "gguf",
+        "size_bytes": 4900000000,
+        "family": "example-dense"
+      },
+      "architecture": {
+        "kind": "dense",
+        "total_parameter_count": 8000000000,
+        "active_parameter_count_per_token": 8000000000,
+        "layer_count": 32,
+        "hidden_size": 4096,
+        "head_count": 32,
+        "kv_head_count": 8,
+        "attention_type": "grouped-query"
+      },
+      "weight_quantization": {
+        "scheme": "Q4_K_M",
+        "nominal_bits": 4.0,
+        "mixed_precision": true,
+        "importance_matrix": true
+      },
+      "runtime": {
+        "engine": "llama.cpp",
+        "engine_version": null,
+        "backend": "vulkan",
+        "gpu_layers": 999,
+        "threads": 8,
+        "batch_size": 512,
+        "ubatch_size": 128,
+        "flash_attention": true,
+        "mmap": true,
+        "mlock": false,
+        "engine_arguments": []
+      },
+      "context": {
+        "configured_tokens": 8192,
+        "model_native_tokens": 32768,
+        "rope_scaling_type": null,
+        "prompt_tokens_target": 4096
+      },
+      "kv_cache": {
+        "key_dtype": "q8_0",
+        "value_dtype": "q8_0",
+        "location": "unified",
+        "capacity_tokens": 8192,
+        "shared_across_requests": false,
+        "prefix_reuse": false,
+        "cache_policy": "per-slot",
+        "cache_key_scope": "exact-prompt-prefix",
+        "persistent": false,
+        "eviction_policy": "slot-reset"
+      },
+      "concurrency": {
+        "parallel_slots": 1,
+        "continuous_batching": true,
+        "max_queued_requests": 8
+      },
+      "speculative_decoding": {"enabled": false}
+    },
+    {
+      "schema_version": "model_loadout_manifest.v1",
+      "node_id": "example-node",
+      "candidate_id": "moe-base",
+      "model": {
+        "id": "example-moe-35b-a3b-q4_k_m",
+        "content_sha256": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "format": "gguf",
+        "size_bytes": 21000000000,
+        "family": "example-moe"
+      },
+      "architecture": {
+        "kind": "moe",
+        "total_parameter_count": 35000000000,
+        "active_parameter_count_per_token": 3000000000,
+        "expert_count_total": 128,
+        "expert_count_active_per_token": 8,
+        "shared_expert_count": 1,
+        "router_type": "top-k",
+        "layer_count": 40,
+        "hidden_size": 4096,
+        "head_count": 32,
+        "kv_head_count": 8,
+        "attention_type": "grouped-query"
+      },
+      "weight_quantization": {
+        "scheme": "Q4_K_M",
+        "nominal_bits": 4.0,
+        "mixed_precision": true,
+        "importance_matrix": true
+      },
+      "runtime": {
+        "engine": "llama.cpp",
+        "engine_version": null,
+        "backend": "vulkan",
+        "gpu_layers": 999,
+        "threads": 8,
+        "batch_size": 512,
+        "ubatch_size": 128,
+        "flash_attention": true,
+        "mmap": true,
+        "mlock": false,
+        "engine_arguments": []
+      },
+      "context": {
+        "configured_tokens": 8192,
+        "model_native_tokens": 32768,
+        "rope_scaling_type": null,
+        "prompt_tokens_target": 4096
+      },
+      "kv_cache": {
+        "key_dtype": "q8_0",
+        "value_dtype": "q8_0",
+        "location": "unified",
+        "capacity_tokens": 8192,
+        "shared_across_requests": false,
+        "prefix_reuse": false,
+        "cache_policy": "per-slot",
+        "cache_key_scope": "exact-prompt-prefix",
+        "persistent": false,
+        "eviction_policy": "slot-reset"
+      },
+      "concurrency": {
+        "parallel_slots": 1,
+        "continuous_batching": true,
+        "max_queued_requests": 8
+      },
+      "speculative_decoding": {"enabled": false}
+    }
+  ]
+}

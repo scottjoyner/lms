@@ -1,0 +1,8 @@
+{
+  "context.configured_tokens": [4096, 8192, 16384, 32768],
+  "kv_cache.capacity_tokens": [32768],
+  "kv_cache.key_dtype": ["q8_0", "q4_0"],
+  "kv_cache.value_dtype": ["q8_0", "q4_0"],
+  "concurrency.parallel_slots": [1, 2],
+  "runtime.flash_attention": [true, false]
+}

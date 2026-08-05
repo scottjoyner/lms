@@ -1,0 +1,68 @@
+{
+  "schema_version": "fleet_benchmark_census.v1",
+  "snapshot_at_utc": "2026-08-03T17:56:00Z",
+  "source": "operator-confirmed fleet scope; private identifiers redacted",
+  "devices": [
+    {
+      "node_id": "destroyer",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "general-linux-worker"
+    },
+    {
+      "node_id": "beelink-ryzen-7-mini-pc",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "general-linux-worker"
+    },
+    {
+      "node_id": "deathstar-xps-8920",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-gpu-worker"
+    },
+    {
+      "node_id": "joyner",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_deferred",
+      "benchmark_class": "general-linux-worker",
+      "reason": "The physical node remains part of the fleet but is currently powered off. It must be promoted back to benchmark_required when it returns online."
+    },
+    {
+      "node_id": "scott-lenovo-ideapad-330s-15ikb",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-light-worker"
+    },
+    {
+      "node_id": "scott-optiplex-9030-aio",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "legacy-light-worker"
+    },
+    {
+      "node_id": "scotts-macbook-air",
+      "os_family": "macos",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "apple-silicon-metal-worker"
+    },
+    {
+      "node_id": "scotts-macbook-pro-2",
+      "os_family": "macos",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "macos-worker-pending-hardware-observation"
+    },
+    {
+      "node_id": "x1-370",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "strix-halo-primary-worker"
+    },
+    {
+      "node_id": "xwing",
+      "os_family": "linux",
+      "benchmark_policy": "benchmark_required",
+      "benchmark_class": "accelerated-linux-worker"
+    }
+  ]
+}

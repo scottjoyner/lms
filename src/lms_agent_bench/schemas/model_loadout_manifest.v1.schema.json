@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/model_loadout_manifest.v1.schema.json",
+  "title": "Exact model and runtime loadout manifest",
+  "type": "object",
+  "required": ["schema_version", "node_id", "candidate_id", "model", "architecture", "weight_quantization", "runtime", "context", "kv_cache", "concurrency"],
+  "properties": {
+    "schema_version": {"const": "model_loadout_manifest.v1"},
+    "node_id": {"type": "string", "minLength": 1},
+    "candidate_id": {"type": "string", "minLength": 1},
+    "model": {
+      "type": "object",
+      "required": ["id", "content_sha256", "format"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "content_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "format": {"type": "string", "minLength": 1},
+        "size_bytes": {"type": ["integer", "null"], "minimum": 1},
+        "family": {"type": ["string", "null"]},
+        "revision": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "architecture": {
+      "type": "object",
+      "required": ["kind", "total_parameter_count"],
+      "properties": {
+        "kind": {"enum": ["dense", "moe", "hybrid_moe", "recurrent", "other"]},
+        "total_parameter_count": {"type": "integer", "minimum": 1},
+        "active_parameter_count_per_token": {"type": ["integer", "null"], "minimum": 1},
+        "expert_count_total": {"type": ["integer", "null"], "minimum": 1},
+        "expert_count_active_per_token": {"type": ["integer", "null"], "minimum": 1},
+        "shared_expert_count": {"type": ["integer", "null"], "minimum": 0},
+        "router_type": {"type": ["string", "null"]},
+        "attention_type": {"type": ["string", "null"]},
+        "layer_count": {"type": ["integer", "null"], "minimum": 1},
+        "hidden_size": {"type": ["integer", "null"], "minimum": 1},
+        "head_count": {"type": ["integer", "null"], "minimum": 1},
+        "kv_head_count": {"type": ["integer", "null"], "minimum": 1}
+      },
+      "additionalProperties": true
+    },
+    "weight_quantization": {
+      "type": "object",
+      "required": ["scheme"],
+      "properties": {
+        "scheme": {"type": "string", "minLength": 1},
+        "nominal_bits": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "effective_bits_per_weight": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "group_size": {"type": ["integer", "null"], "minimum": 1},
+        "mixed_precision": {"type": "boolean"},
+        "calibration_dataset": {"type": ["string", "null"]},
+        "importance_matrix": {"type": ["boolean", "null"]},
+        "tensor_overrides": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "runtime": {
+      "type": "object",
+      "required": ["engine", "backend"],
+      "properties": {
+        "engine": {"type": "string", "minLength": 1},
+        "engine_version": {"type": ["string", "null"]},
+        "engine_build": {"type": ["string", "null"]},
+        "backend": {"type": "string", "minLength": 1},
+        "gpu_layers": {"type": ["integer", "null"], "minimum": 0},
+        "tensor_split": {"type": "array", "items": {"type": "number", "minimum": 0}},
+        "threads": {"type": ["integer", "null"], "minimum": 1},
+        "batch_size": {"type": ["integer", "null"], "minimum": 1},
+        "ubatch_size": {"type": ["integer", "null"], "minimum": 1},
+        "flash_attention": {"type": ["boolean", "null"]},
+        "mmap": {"type": ["boolean", "null"]},
+        "mlock": {"type": ["boolean", "null"]},
+        "numa_policy": {"type": ["string", "null"]},
+        "engine_arguments": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "context": {
+      "type": "object",
+      "required": ["configured_tokens"],
+      "properties": {
+        "configured_tokens": {"type": "integer", "minimum": 1},
+        "model_native_tokens": {"type": ["integer", "null"], "minimum": 1},
+        "rope_scaling_type": {"type": ["string", "null"]},
+        "rope_frequency_base": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "rope_frequency_scale": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "sliding_window_tokens": {"type": ["integer", "null"], "minimum": 1},
+        "prompt_tokens_target": {"type": ["integer", "null"], "minimum": 1}
+      },
+      "additionalProperties": true
+    },
+    "kv_cache": {
+      "type": "object",
+      "required": ["key_dtype", "value_dtype", "location", "shared_across_requests", "prefix_reuse"],
+      "properties": {
+        "key_dtype": {"type": "string", "minLength": 1},
+        "value_dtype": {"type": "string", "minLength": 1},
+        "key_bits": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "value_bits": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "location": {"enum": ["cpu", "gpu", "unified", "mixed", "unknown"]},
+        "capacity_tokens": {"type": ["integer", "null"], "minimum": 1},
+        "bytes_per_token": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "shared_across_requests": {"type": "boolean"},
+        "prefix_reuse": {"type": "boolean"},
+        "cache_policy": {"type": ["string", "null"]},
+        "cache_key_scope": {"type": ["string", "null"]},
+        "persistent": {"type": "boolean"},
+        "eviction_policy": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "concurrency": {
+      "type": "object",
+      "required": ["parallel_slots", "continuous_batching"],
+      "properties": {
+        "parallel_slots": {"type": "integer", "minimum": 1},
+        "continuous_batching": {"type": "boolean"},
+        "max_queued_requests": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "speculative_decoding": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "draft_model_id": {"type": ["string", "null"]},
+        "draft_model_content_sha256": {"type": ["string", "null"], "pattern": "^(sha256:[0-9a-f]{64})?$"},
+        "draft_quantization": {"type": ["string", "null"]},
+        "draft_tokens": {"type": ["integer", "null"], "minimum": 1}
+      },
+      "additionalProperties": true
+    },
+    "derived": {
+      "type": "object",
+      "properties": {
+        "active_parameter_ratio": {"type": ["number", "null"], "exclusiveMinimum": 0, "maximum": 1},
+        "weight_bytes_per_total_parameter": {"type": ["number", "null"], "exclusiveMinimum": 0},
+        "estimated_kv_cache_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "comparison_group": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    },
+    "loadout_fingerprint": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "admission": {
+      "type": "object",
+      "properties": {"admitted": {"const": false}},
+      "required": ["admitted"],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

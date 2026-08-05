@@ -1,6 +1,7 @@
 import hashlib
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -159,9 +160,11 @@ def test_execute_remote_records_outer_archive_digest(tmp_path, monkeypatch):
         if command[0] == "ssh":
             return subprocess.CompletedProcess(command, 0, "remote ok", "")
         assert command[0] == "scp"
-        local_path = tmp_path / "x1-370.tar.gz"
-        assert str(local_path) == command[-1]
-        local_path.write_bytes(archive_bytes)
+        partial_path = Path(command[-1])
+        assert partial_path.parent == tmp_path
+        assert partial_path.name.startswith(".x1-370.tar.gz.attempt-")
+        assert partial_path.name.endswith(".partial")
+        partial_path.write_bytes(archive_bytes)
         return subprocess.CompletedProcess(command, 0, "copied", "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
@@ -174,8 +177,12 @@ def test_execute_remote_records_outer_archive_digest(tmp_path, monkeypatch):
         collect=True,
     )
     expected = "sha256:" + hashlib.sha256(archive_bytes).hexdigest()
+    final_path = tmp_path / "x1-370.tar.gz"
+    assert result["collected_artifact"] == str(final_path)
+    assert final_path.read_bytes() == archive_bytes
     assert result["collected_artifact_sha256"] == expected
     assert result["collected_artifact_size_bytes"] == len(archive_bytes)
+    assert result["scp_attempt_count"] == 1
     assert result["timed_out"] is False
     assert result["scp_timed_out"] is False
 
