@@ -11,8 +11,4 @@ artifacts. Live admission and KV restoration remain external.
 
 from __future__ import annotations
 
-from .fleet_routing_serialization_policy import install_json_safe_routing_matrix
-
-install_json_safe_routing_matrix()
-
 __version__ = "0.33.0"
