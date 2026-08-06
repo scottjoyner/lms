@@ -1,0 +1,102 @@
+{
+  "schema_version": "fleet_role_policy.v1",
+  "default_policy": {
+    "roles": ["observer"],
+    "worker_mode": "observer_only",
+    "allow_agent_runtime": false,
+    "allow_code_execution": false,
+    "benchmark_policy": "inventory_only"
+  },
+  "nodes": {
+    "x1-370": {
+      "roles": ["full_agent", "reasoning", "long_context", "code_agent"],
+      "worker_mode": "agent",
+      "allow_agent_runtime": true,
+      "allow_code_execution": true,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 2,
+      "energy_class": "high-capability"
+    },
+    "xwing": {
+      "roles": ["full_agent", "code_agent", "tool_agent"],
+      "worker_mode": "agent",
+      "allow_agent_runtime": true,
+      "allow_code_execution": true,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "accelerated"
+    },
+    "scotts-macbook-air": {
+      "roles": ["full_agent", "summarization", "compression"],
+      "worker_mode": "agent",
+      "allow_agent_runtime": true,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "efficient"
+    },
+    "scotts-macbook-pro-2": {
+      "roles": ["auxiliary_llm", "summarization", "compression", "extraction"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "pending-observation"
+    },
+    "deathstar-xps-8920": {
+      "roles": ["auxiliary_llm", "summarization", "compression", "extraction"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "legacy-gpu"
+    },
+    "destroyer": {
+      "roles": ["auxiliary_llm", "summarization", "compression", "extraction"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "general"
+    },
+    "beelink-ryzen-7-mini-pc": {
+      "roles": ["auxiliary_llm", "summarization", "compression", "extraction", "reasoning"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "efficient"
+    },
+    "scott-lenovo-ideapad-330s-15ikb": {
+      "roles": ["auxiliary_llm", "compression", "summarization"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "legacy-light"
+    },
+    "scott-optiplex-9030-aio": {
+      "roles": ["auxiliary_llm", "compression", "summarization", "extraction"],
+      "worker_mode": "auxiliary",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_required",
+      "max_concurrent": 1,
+      "energy_class": "legacy-light"
+    },
+    "joyner": {
+      "roles": ["benchmark_only"],
+      "worker_mode": "benchmark_only",
+      "allow_agent_runtime": false,
+      "allow_code_execution": false,
+      "benchmark_policy": "benchmark_deferred",
+      "max_concurrent": 0,
+      "energy_class": "offline"
+    }
+  }
+}
