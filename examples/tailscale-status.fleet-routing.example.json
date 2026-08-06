@@ -1,0 +1,33 @@
+{
+  "Self": {
+    "HostName": "x1-370",
+    "DNSName": "x1-370.example.ts.net.",
+    "TailscaleIPs": ["100.64.0.10"],
+    "OS": "linux",
+    "Online": true,
+    "Active": true
+  },
+  "Peer": {
+    "peer-xwing": {
+      "HostName": "xwing",
+      "DNSName": "xwing.example.ts.net.",
+      "TailscaleIPs": ["100.64.0.11"],
+      "OS": "linux",
+      "Online": true
+    },
+    "peer-optiplex": {
+      "HostName": "scott-optiplex-9030-aio",
+      "DNSName": "scott-optiplex-9030-aio.example.ts.net.",
+      "TailscaleIPs": ["100.64.0.12"],
+      "OS": "linux",
+      "Online": true
+    },
+    "peer-phone": {
+      "HostName": "iphone-12-pro-max",
+      "DNSName": "iphone-12-pro-max.example.ts.net.",
+      "TailscaleIPs": ["100.64.0.13"],
+      "OS": "ios",
+      "Online": true
+    }
+  }
+}

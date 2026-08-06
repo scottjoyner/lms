@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/schemas/fleet_routing_matrix.v1.schema.json",
+  "title": "Fleet capability and routing matrix",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "generated_at_utc",
+    "summary",
+    "nodes",
+    "profiles",
+    "rankings",
+    "admission"
+  ],
+  "properties": {
+    "schema_version": {"const": "fleet_routing_matrix.v1"},
+    "artifact_type": {"const": "fleet_capability_and_routing_matrix"},
+    "generated_at_utc": {"type": "string", "format": "date-time"},
+    "source": {"type": "object"},
+    "policy": {"type": "object"},
+    "summary": {
+      "type": "object",
+      "required": ["tailnet_nodes", "online_nodes"],
+      "properties": {
+        "tailnet_nodes": {"type": "integer", "minimum": 1},
+        "online_nodes": {"type": "integer", "minimum": 0},
+        "observer_only_nodes": {"type": "integer", "minimum": 0},
+        "agent_runtime_nodes": {"type": "integer", "minimum": 0},
+        "benchmark_rows": {"type": "integer", "minimum": 0},
+        "routing_profiles": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "online",
+          "tailnet_discovered",
+          "worker_mode",
+          "roles",
+          "capabilities",
+          "allow_agent_runtime",
+          "allow_code_execution"
+        ],
+        "properties": {
+          "node_id": {"type": "string", "minLength": 1},
+          "display_name": {"type": "string"},
+          "dns_name": {"type": ["string", "null"]},
+          "tailscale_ips": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+          },
+          "online": {"type": "boolean"},
+          "tailnet_discovered": {"const": true},
+          "worker_mode": {
+            "enum": ["observer_only", "benchmark_only", "auxiliary", "agent"]
+          },
+          "roles": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {"type": "string"},
+            "uniqueItems": true
+          },
+          "allow_agent_runtime": {"type": "boolean"},
+          "allow_code_execution": {"type": "boolean"},
+          "max_concurrent": {"type": "integer", "minimum": 0}
+        },
+        "additionalProperties": true
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "node_id",
+          "model_id",
+          "task_family",
+          "quality_score",
+          "quality_confidence",
+          "reliability",
+          "utility_score",
+          "quality_floor",
+          "quality_floor_passed"
+        ],
+        "properties": {
+          "node_id": {"type": "string", "minLength": 1},
+          "model_id": {"type": "string", "minLength": 1},
+          "task_family": {
+            "enum": [
+              "coding",
+              "reasoning",
+              "tool_use",
+              "long_context",
+              "summarization",
+              "compression",
+              "extraction"
+            ]
+          },
+          "quality_score": {"type": "number", "minimum": 0, "maximum": 1},
+          "quality_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "reliability": {"type": "number", "minimum": 0, "maximum": 1},
+          "tokens_per_second": {"type": ["number", "null"], "minimum": 0},
+          "utility_score": {"type": "number"},
+          "quality_floor": {"type": "number", "minimum": 0, "maximum": 1},
+          "quality_floor_passed": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "rankings": {"type": "object"},
+    "admission": {
+      "type": "object",
+      "required": ["admitted"],
+      "properties": {"admitted": {"const": false}},
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}
