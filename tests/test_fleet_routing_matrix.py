@@ -43,6 +43,13 @@ def _status() -> dict:
 
 def _policy() -> dict:
     return {
+        "default_policy": {
+            "roles": ["observer"],
+            "worker_mode": "observer_only",
+            "allow_agent_runtime": False,
+            "allow_code_execution": False,
+            "benchmark_policy": "inventory_only",
+        },
         "nodes": {
             "x1-370": {
                 "roles": ["full_agent"],
@@ -56,17 +63,12 @@ def _policy() -> dict:
                 "allow_agent_runtime": False,
                 "max_concurrent": 1,
             },
-            "iphone-12-pro-max": {
-                "roles": ["observer"],
-                "worker_mode": "observer_only",
-                "benchmark_policy": "excluded",
-            },
             "joyner": {
                 "roles": ["benchmark_only"],
                 "worker_mode": "benchmark_only",
                 "benchmark_policy": "benchmark_deferred",
             },
-        }
+        },
     }
 
 
@@ -116,6 +118,7 @@ def test_every_tailnet_node_is_visible_without_becoming_routable() -> None:
     }
     assert nodes["iphone-12-pro-max"]["tailnet_discovered"] is True
     assert nodes["iphone-12-pro-max"]["worker_mode"] == "observer_only"
+    assert nodes["iphone-12-pro-max"]["roles"] == ["observer"]
     assert nodes["iphone-12-pro-max"]["allow_agent_runtime"] is False
     assert matrix["summary"]["tailnet_nodes"] == 4
     assert json.loads(json.dumps(matrix))["schema_version"] == "fleet_routing_matrix.v1"
@@ -157,5 +160,36 @@ def test_quality_floor_applies_before_speed() -> None:
 
     assert all(
         row["model_id"] != "fast-bad-summary"
+        for row in matrix["rankings"]["summarization"]
+    )
+
+
+def test_unqualified_loadout_never_enters_profiles_or_rankings() -> None:
+    comparison = _comparison()
+    comparison["rows"].append(
+        {
+            "node_id": "scott-optiplex-9030-aio",
+            "model_id": "unqualified-fast",
+            "loadout_fingerprint": "sha256:unqualified",
+            "qualified": False,
+            "overall_task_pass_rate": 0.99,
+            "effect_checkpoint_rate": 0.99,
+            "quality_confidence": 1.0,
+            "completion_tokens_per_second_end_to_end": 100.0,
+            "task_families": ["summarization"],
+        }
+    )
+
+    matrix = build_routing_matrix(
+        _status(),
+        role_policy=_policy(),
+        benchmark_documents=[comparison],
+    )
+
+    assert all(
+        row["model_id"] != "unqualified-fast" for row in matrix["profiles"]
+    )
+    assert all(
+        row["model_id"] != "unqualified-fast"
         for row in matrix["rankings"]["summarization"]
     )
