@@ -11,7 +11,7 @@ Environment=LMS_FLEET_MATRIX_OUT=%h/.local/state/lms-fleet/fleet-routing-matrix.
 Environment=LMS_FLEET_COMPARISON_DIR=%h/lms-fleet-runs/compare
 Environment=LMS_FLEET_MIN_DISCOVERED_NODES=3
 Environment=LMS_FLEET_PUBLISH_TO_ASSISTX=true
-ExecStart=%h/git/lms/scripts/refresh-fleet-routing-matrix.sh
+ExecStart=/usr/bin/env bash %h/git/lms/scripts/refresh-fleet-routing-matrix.sh
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
