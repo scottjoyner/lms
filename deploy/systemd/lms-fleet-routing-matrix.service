@@ -1,0 +1,23 @@
+[Unit]
+Description=Refresh LMS tailnet capability and routing matrix
+After=network-online.target tailscaled.service assistx-api.service
+Wants=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+User=%i
+EnvironmentFile=%h/.config/lms-fleet/full-fleet.env
+Environment=LMS_FLEET_ROLE_POLICY=%h/.config/lms-fleet/fleet-role-policy.v1.json
+Environment=LMS_FLEET_MATRIX_OUT=%h/.local/state/lms-fleet/fleet-routing-matrix.json
+Environment=LMS_FLEET_COMPARISON_DIR=%h/lms-fleet-runs/compare
+Environment=LMS_FLEET_MIN_DISCOVERED_NODES=3
+Environment=LMS_FLEET_PUBLISH_TO_ASSISTX=true
+ExecStart=%h/git/lms/scripts/refresh-fleet-routing-matrix.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/lms-fleet
+
+[Install]
+WantedBy=multi-user.target
