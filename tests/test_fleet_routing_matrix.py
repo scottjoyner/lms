@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from lms_agent_bench.fleet_routing_matrix import build_routing_matrix
+from lms_agent_bench.fleet_routing_matrix_public import build_routing_matrix
 
 
 def _status() -> dict:
