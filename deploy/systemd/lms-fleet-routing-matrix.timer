@@ -6,7 +6,7 @@ OnBootSec=2min
 OnUnitActiveSec=5min
 RandomizedDelaySec=30s
 Persistent=true
-Unit=lms-fleet-routing-matrix@%i.service
+Unit=lms-fleet-routing-matrix.service
 
 [Install]
 WantedBy=timers.target
