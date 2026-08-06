@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from lms_agent_bench.fleet_routing_matrix import build_routing_matrix
 
 
@@ -116,6 +118,7 @@ def test_every_tailnet_node_is_visible_without_becoming_routable() -> None:
     assert nodes["iphone-12-pro-max"]["worker_mode"] == "observer_only"
     assert nodes["iphone-12-pro-max"]["allow_agent_runtime"] is False
     assert matrix["summary"]["tailnet_nodes"] == 4
+    assert json.loads(json.dumps(matrix))["schema_version"] == "fleet_routing_matrix.v1"
 
 
 def test_auxiliary_node_routes_summary_but_not_full_coding_agent() -> None:
@@ -152,4 +155,7 @@ def test_quality_floor_applies_before_speed() -> None:
         benchmark_documents=[comparison],
     )
 
-    assert all(row["model_id"] != "fast-bad-summary" for row in matrix["rankings"]["summarization"])
+    assert all(
+        row["model_id"] != "fast-bad-summary"
+        for row in matrix["rankings"]["summarization"]
+    )
