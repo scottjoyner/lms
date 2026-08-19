@@ -103,7 +103,7 @@ server_case() {
   stop_server
   echo "== server $label =="
   "$BIN/llama-server" \
-    -m "$model" \
+    -m "$model" --alias "$id" \
     --host "$SERVER_HOST" --port "$SERVER_PORT" \
     -ngl all -fa on \
     -c "$ctx" -np "$np" \
