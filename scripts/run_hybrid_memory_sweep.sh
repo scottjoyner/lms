@@ -15,8 +15,10 @@ PROBE=${PROBE:-"$(cd "$(dirname "$0")" && pwd)/llama_server_probe.py"}
 TOPOLOGY=${TOPOLOGY:-"$(cd "$(dirname "$0")" && pwd)/collect_hybrid_memory_topology.sh"}
 TELEMETRY=${TELEMETRY:-"$(cd "$(dirname "$0")" && pwd)/sample_rocm_telemetry.sh"}
 EXPERIMENTAL_SPLITS=${EXPERIMENTAL_SPLITS:-0}
+MOE_SWEEP=${MOE_SWEEP:-1}
 LAYER_SPLITS=${LAYER_SPLITS:-"1,3 1,2 1,1 2,1 3,1"}
 PARTIAL_LAYERS=${PARTIAL_LAYERS:-"8 12 16 20 24 auto"}
+CPU_MOE_LAYERS=${CPU_MOE_LAYERS:-"8 16 24 32 40"}
 
 mkdir -p "$OUT"/{topology,cases,logs,telemetry}
 "$TOPOLOGY" "$OUT/topology" >/dev/null || true
@@ -49,31 +51,38 @@ run_case(){
 
 port=$PORT_BASE
 
-# A: Discrete GPU only, letting llama.cpp fit as much as possible in VRAM and
-# leave the remainder host-resident. This directly measures the host<->OCuLink
-# penalty for models larger than dGPU VRAM.
+# A: Discrete GPU only with progressively larger GPU-resident layer counts.
 for ngl in $PARTIAL_LAYERS; do
   run_case "egpu-only-ngl-${ngl}" "$port" -sm none -mg "$EGPU_INDEX" -ngl "$ngl" --fit on --fit-target 2048
   port=$((port+1))
 done
 
-# B: APU/iGPU only. This only works when llama.cpp exposes the integrated GPU as
-# a selectable HIP device. The observed usable UMA/GTT, not BIOS carve-out, is
-# the relevant limit.
+# B: Integrated GPU / UMA only when exposed as a selectable HIP device.
 run_case "igpu-uma-only" "$port" -sm none -mg "$IGPU_INDEX" -ngl auto --fit on --fit-target 4096
 port=$((port+1))
 
-# C: Layer split between dGPU and APU/iGPU. The tensor split ratios are empirical
-# candidates, not assumptions about physical capacity. Preserve which device
-# index corresponds to each GPU in topology evidence.
+# C: Layer split between dGPU and APU/iGPU.
 for split in $LAYER_SPLITS; do
   tag=${split//,/-}
   run_case "hybrid-layer-ts-${tag}" "$port" -sm layer -ts "$split" -ngl all --fit on --fit-target 2048,4096
   port=$((port+1))
 done
 
-# D: Experimental cross-device row/tensor splits. These can increase cross-link
-# traffic and have current mixed-device stability caveats; keep opt-in.
+# D: MoE-specific placement. Keep some or all expert weights host-resident while
+# allowing attention/signal-path tensors to use the discrete GPU. This directly
+# tests whether 96 GB host memory can make large sparse models useful without
+# paying the cost of generic whole-layer CPU spill.
+if [[ "$MOE_SWEEP" == 1 ]]; then
+  for n in $CPU_MOE_LAYERS; do
+    run_case "egpu-cpu-moe-${n}" "$port" -sm none -mg "$EGPU_INDEX" -ngl auto -ncmoe "$n" --fit on --fit-target 2048
+    port=$((port+1))
+  done
+  run_case "egpu-cpu-moe-all" "$port" -sm none -mg "$EGPU_INDEX" -ngl auto -cmoe --fit on --fit-target 2048
+  port=$((port+1))
+fi
+
+# E: Experimental row/tensor cross-device splits. These may increase OCuLink
+# traffic and currently have mixed-device stability caveats, so they are opt-in.
 if [[ "$EXPERIMENTAL_SPLITS" == 1 ]]; then
   for mode in row tensor; do
     for split in $LAYER_SPLITS; do
@@ -84,8 +93,8 @@ if [[ "$EXPERIMENTAL_SPLITS" == 1 ]]; then
   done
 fi
 
-# E: mmap/direct-I/O control for very large UMA models. If the current llama.cpp
-# build supports -dio, test it explicitly; unsupported startup is evidence.
-run_case "hybrid-layer-direct-io" "$port" -sm layer -ts 1,2 -ngl all --fit on --fit-target 2048,4096 -dio
+# F: Model-loading control for large UMA/hybrid allocations. Current llama.cpp
+# prefers --load-mode dio over the legacy -dio spelling.
+run_case "hybrid-layer-loadmode-dio" "$port" -sm layer -ts 1,2 -ngl all --fit on --fit-target 2048,4096 --load-mode dio
 
 echo "$OUT"
