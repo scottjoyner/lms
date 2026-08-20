@@ -21,9 +21,15 @@ if [[ "$LLAMA_REF" == "master" || "$LLAMA_REF" == "main" ]]; then
   git -C "$ROOT" pull --ff-only
 fi
 
-GPU_TARGET=${GPU_TARGET:-$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]+/{print $2; exit}')}
-if [[ -z "${GPU_TARGET:-}" ]]; then
-  echo "Unable to determine gfx target from rocminfo. Set GPU_TARGET explicitly (for example gfx1201)." >&2
+# Compile for every distinct gfx target exposed by ROCm. This matters on hybrid
+# APU + OCuLink dGPU hosts where the integrated and discrete GPUs are different
+# architectures. GPU_TARGETS can be overridden explicitly with a semicolon list.
+if [[ -n "${GPU_TARGET:-}" && -z "${GPU_TARGETS:-}" ]]; then
+  GPU_TARGETS="$GPU_TARGET"
+fi
+GPU_TARGETS=${GPU_TARGETS:-$(rocminfo 2>/dev/null | awk '/^[[:space:]]*Name:[[:space:]]*gfx[0-9]+/{print $2}' | awk '!seen[$0]++' | paste -sd';' -)}
+if [[ -z "${GPU_TARGETS:-}" ]]; then
+  echo "Unable to determine gfx targets from rocminfo. Set GPU_TARGETS explicitly (for example gfx1150;gfx1201)." >&2
   exit 2
 fi
 
@@ -47,7 +53,7 @@ cmake -S "$ROOT" -B "$BUILD" \
   -DGGML_HIP_GRAPHS=ON \
   -DGGML_HIP_ROCWMMA_FATTN=ON \
   -DGGML_CUDA_FA=ON \
-  -DGPU_TARGETS="$GPU_TARGET" \
+  -DGPU_TARGETS="$GPU_TARGETS" \
   -DGGML_BACKEND_DL=ON \
   -DGGML_CPU_ALL_VARIANTS=ON \
   -DLLAMA_BUILD_TESTS=OFF \
@@ -63,5 +69,5 @@ BIN="$BUILD/bin"
 echo "LLAMA_ROOT=$ROOT"
 echo "LLAMA_BUILD=$BUILD"
 echo "LLAMA_COMMIT=$(git -C "$ROOT" rev-parse HEAD)"
-echo "GPU_TARGET=$GPU_TARGET"
+echo "GPU_TARGETS=$GPU_TARGETS"
 echo "ROCM_PATH=$ROCM_PATH"
