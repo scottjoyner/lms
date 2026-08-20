@@ -5,4 +5,6 @@ ornith-1.5-alt	ornith	1.5	alternate	local	ORNITH15_ALT_MODEL	auto	false	verified
 qwen3.5-35b-a3b	qwen	3.5	35b-a3b-moe	local	QWEN35_35B_A3B_MODEL	auto	false	official-or-verified-local
 qwen3.5-35b-a3b-alt	qwen	3.5	35b-a3b-moe-alt	local	QWEN35_35B_A3B_ALT_MODEL	auto	false	verified-local-only
 qwen3.5-122b-a10b	qwen	3.5	122b-a10b-moe	local	QWEN35_122B_A10B_MODEL	auto	false	verified-local-only
+laguna-s-2.1-q4	laguna	2.1	118b-a8b-moe-q4	local	LAGUNA_S21_Q4_MODEL	auto	false	official-or-verified-local
+laguna-s-2.1-alt	laguna	2.1	118b-a8b-moe-alt	local	LAGUNA_S21_ALT_MODEL	auto	false	verified-local-only
 qwen3.8-27b	qwen	3.8	27b	local	QWEN38_MODEL	auto	false	verified-local-only
