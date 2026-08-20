@@ -2,14 +2,28 @@
 
 ## Objective
 
-Find the Pareto frontier for a single 32 GiB Radeon-class GPU running `llama.cpp` on ROCm/HIP: maximum stable context, highest prompt-processing throughput, highest generation throughput, lowest TTFT, and highest useful concurrent aggregate throughput without silently spilling critical work to CPU or accepting unstable/OOM configurations.
+Find the Pareto frontier for a single 32 GiB Radeon-class GPU running `llama.cpp` on ROCm/HIP: maximum stable context, highest prompt-processing throughput, highest generation throughput, lowest TTFT, highest useful concurrent aggregate throughput, speculative/MTP gains, and quality-adjusted model selection without silently spilling critical work to CPU or accepting unstable/OOM configurations.
 
 The experiment is evidence-first. Every run records the exact model artifact hash, llama.cpp commit, ROCm/GPU inventory, runtime flags, failures, server metrics, and raw benchmark output.
 
-## Model status guardrail
+## Model registry
 
-- `Ornith-1.0-35B`: benchmark when a local GGUF is supplied through `ORNITH_MODEL`.
-- `Qwen3.8-27B`: benchmark only when a real upstream-derived local artifact exists. As of experiment creation, public repositories with this exact name were placeholders and contained no model weights. Never benchmark a placeholder or infer results from an older Qwen release.
+The campaign is variant-driven through `benchmarks/rocm_r9700_models.tsv`. See `docs/ROCM_R9700_MODEL_VARIANTS.md` for the identity/provenance contract and instructions for adding additional quants or Ornith-1.5 variants.
+
+Prepared slots are:
+
+```text
+ORNITH10_35B_MODEL       Ornith 1.0 35B baseline
+ORNITH15_PRIMARY_MODEL   verified Ornith 1.5 primary candidate
+ORNITH15_ALT_MODEL       verified Ornith 1.5 alternate candidate
+QWEN38_MODEL             verified Qwen3.8-27B candidate
+```
+
+The original `ORNITH_MODEL` variable remains accepted as a compatibility alias for `ORNITH10_35B_MODEL`, but new runs should use registry-specific variables. Optional artifacts are skipped when absent. Never benchmark a placeholder or silently substitute another generation.
+
+Every result belongs to the identity tuple:
+
+`family -> generation -> variant -> artifact SHA-256 -> quantization -> MTP capability -> llama.cpp SHA -> ROCm build -> runtime configuration`
 
 ## 1. Build llama.cpp for the actual GPU target
 
@@ -45,24 +59,24 @@ Record `llama-server --version`, `llama-bench --list-devices`, `rocminfo`, `amd-
 ## 2. Supply exact local artifacts
 
 ```bash
-export ORNITH_MODEL=/models/Ornith-1.0-35B/<exact-quant>.gguf
-# Only set this when genuine weights exist locally:
-export QWEN38_MODEL=/models/Qwen3.8-27B/<exact-quant>.gguf
+export ORNITH10_35B_MODEL=/models/Ornith-1.0-35B/<exact-quant>.gguf
+# Set only for verified exact artifacts:
+# export ORNITH15_PRIMARY_MODEL=/models/Ornith-1.5/<exact-artifact>.gguf
+# export ORNITH15_ALT_MODEL=/models/Ornith-1.5/<alternate-artifact>.gguf
+# export QWEN38_MODEL=/models/Qwen3.8-27B/<exact-quant>.gguf
 # Optional compatible draft model:
-export DRAFT_MODEL=/models/<compatible-small-draft>.gguf
+# export DRAFT_MODEL=/models/<compatible-small-draft>.gguf
 ```
 
-The runner hashes every supplied model with SHA-256. Quantization comparisons must be treated as different loadouts; do not combine their numbers under one model label.
+The runner hashes every supplied model with SHA-256 and copies the registry into the evidence directory. Add additional variants as unique registry rows; do not combine different quantizations or conversions under one model label.
 
 ## 3. Microbenchmark PP and TG first
 
-The canonical `llama-bench` sweep measures prompt processing and generation independently. This is the fastest way to identify bad batch/ubatch/KV combinations before expensive server tests.
-
-Baseline command:
+The canonical `llama-bench` sweep measures prompt processing and generation independently:
 
 ```bash
 ~/src/llama.cpp/build-rocm-maxout/bin/llama-bench \
-  -m "$ORNITH_MODEL" \
+  -m "$ORNITH10_35B_MODEL" \
   -ngl all -fa on \
   -p 512,2048,8192,32768 \
   -n 128,512 \
@@ -73,20 +87,13 @@ Baseline command:
   -r 5 --delay 1 -o jsonl
 ```
 
-Important interpretation rules:
-
-1. `llama-bench` PP/TG results intentionally exclude tokenization and sampling; they are kernel/runtime measurements, not end-to-end latency.
-2. Keep PP t/s, TG t/s, TTFT/end-to-end server latency, and aggregate concurrent throughput as separate metrics.
-3. Prefer the smallest KV type that preserves acceptable quality and yields material context/throughput benefit. Do not call q4 KV "free context" without quality testing.
-4. A configuration that OOMs, falls back unexpectedly, or produces unstable repeated measurements is rejected even if one run is fast.
+Keep PP t/s, TG t/s, TTFT/end-to-end latency and aggregate concurrent throughput as separate metrics. Reject OOM, unexpected fallback and unstable configurations even if one repetition is fast.
 
 ## 4. Establish the server baseline
 
-Start with one slot, FlashAttention on, all model layers offloaded, q8 KV, and 32K context:
-
 ```bash
 ~/src/llama.cpp/build-rocm-maxout/bin/llama-server \
-  -m "$ORNITH_MODEL" --alias ornith-1.0-35b \
+  -m "$ORNITH10_35B_MODEL" --alias ornith-1.0-35b \
   --host 127.0.0.1 --port 8080 \
   -ngl all -fa on \
   -c 32768 -np 1 \
@@ -107,36 +114,52 @@ python3 scripts/llama_server_probe.py \
   --output baseline-32k-q8.json
 ```
 
-The probe records TTFT, completion token count, per-request decode rate, aggregate output t/s, failures, and wall time.
+## 5. Context and KV frontier
 
-## 5. Context frontier
-
-Test contexts in increasing order:
+Test increasing context tiers:
 
 ```text
-8K -> 16K -> 32K -> 64K -> 128K -> 256K
+8K -> 32K -> 64K -> 128K -> 256K
 ```
 
-For each context, test `f16`, `q8_0`, then `q4_0` KV. Record whether the server starts, whether a full prompt+generation request succeeds three times, peak VRAM, system RAM, TTFT, PP performance, TG performance, and any fallback/offload messages. Stop declaring a context tier viable when it cannot complete the stability gate.
-
-The published Ornith evaluations use long contexts (including 200K+ regimes), but that does not imply a 32 GiB local quantized loadout can practically sustain them. This experiment measures the local frontier instead of inheriting the model-card maximum.
+At each tier test `f16`, `q8_0`, then `q4_0` KV. Record startup success, full prompt+generation completion, peak VRAM, system RAM, TTFT, PP/TG and fallback/offload messages. KV quantization is not assumed quality-neutral.
 
 ## 6. Batch and ubatch tuning
 
-Once a viable context/KV pair is found, sweep:
+Sweep:
 
 ```text
 batch:  512, 1024, 2048
 ubatch: 256, 512, 1024
 ```
 
-`ubatch <= batch` is mandatory. Compare PP t/s, TTFT, and peak VRAM. Larger batches are not automatically better; retain only configurations that improve the measured objective.
+`ubatch <= batch` is mandatory. Compare PP t/s, TTFT and peak VRAM.
 
-## 7. Speculative decoding
+## 7. Ornith 1.0 -> 1.5 matched comparison
 
-Always compare speculation against the same non-speculative baseline.
+Before enabling speculation or changing quants, compare every verified Ornith-1.5 candidate against Ornith-1.0 using the same:
 
-### Draftless n-gram
+- llama.cpp commit/ROCm build;
+- context and filled-context workload;
+- KV type;
+- batch/ubatch;
+- slot/client concurrency;
+- sampling and prompt/output shape;
+- GPU power/clock state.
+
+This matched baseline is the only clean estimate of the generation/artifact delta. Quantization, MTP and speculation are separate axes.
+
+## 8. Quality gate
+
+Run the same coding/agent suite for Ornith 1.0 and each 1.5 candidate. Preserve raw outputs and scores for instruction following, patch correctness, structured/tool-call reliability, repeated-prefix workloads, long-context retrieval/use and completion stability.
+
+A faster model can win the throughput profile while failing the balanced/quality profile.
+
+## 9. Speculative decoding and MTP
+
+Always compare speculation against the same non-speculative loadout.
+
+Draftless n-gram baseline:
 
 ```bash
 llama-server ... \
@@ -146,11 +169,7 @@ llama-server ... \
   --spec-ngram-mod-n-max 64
 ```
 
-This is cheap to test and does not require loading a second model. It is workload-sensitive; code/repetitive text may benefit much more than unrelated prose.
-
-### Small draft model
-
-Only use a tokenizer/vocabulary-compatible draft artifact. Start conservatively:
+Compatible draft model:
 
 ```bash
 llama-server ... \
@@ -161,74 +180,47 @@ llama-server ... \
   --spec-draft-p-min 0.0
 ```
 
-Sweep draft length `3, 5, 8, 12, 16` only after the baseline works. Record accepted draft tokens and end-to-end speedup. A faster draft model that consumes enough VRAM to force a worse target-model context can lose overall.
-
-### MTP
-
-Current llama.cpp exposes `draft-mtp`, but it is only valid if the selected model artifact/build actually contains and supports the needed MTP heads. Do not force this flag based on model-family naming. Enable the automated attempt with:
+MTP is opt-in:
 
 ```bash
 export ENABLE_MTP=1
 ```
 
-A startup rejection is valid benchmark evidence, not a harness failure.
+Only registry rows whose `mtp` field is not `false` are attempted. A startup rejection is valid evidence. For Ornith 1.5 report native generation delta, MTP incremental delta, speculation incremental delta and each mode's VRAM/context cost separately.
 
-## 8. Concurrency
+## 10. Concurrency
 
-Test `-np 1`, `2`, then `4`, matching client concurrency to server slot count. Optimize two distinct objectives:
+Test `-np 1`, `2`, then `4`, matching client concurrency to slot count. Optimize interactive latency and aggregate throughput as distinct objectives. Record process RSS/system RAM alongside VRAM during longer parallel runs.
 
-- interactive: lowest TTFT + strong single-request TG;
-- throughput: highest aggregate output t/s under parallel load.
-
-ROCm/HIP graph behavior with multiple slots has had recent reports of host-memory growth, so record process RSS/system RAM before and after long concurrency runs. Do not promote a parallel setting solely from a short burst benchmark.
-
-## 9. One-command execution
-
-Smoke/normal sweep:
+## 11. One-command execution
 
 ```bash
 export LLAMA_BUILD=$HOME/src/llama.cpp/build-rocm-maxout
-export ORNITH_MODEL=/models/.../ornith.gguf
+export ORNITH10_35B_MODEL=/models/.../ornith-1.0.gguf
+# export ORNITH15_PRIMARY_MODEL=/models/.../ornith-1.5.gguf
+# export ORNITH15_ALT_MODEL=/models/.../ornith-1.5-alt.gguf
 bash scripts/run_rocm_r9700_maxout.sh
 ```
 
-Deep sweep including 256K and four slots:
+Deep sweep:
 
 ```bash
 DEEP=1 bash scripts/run_rocm_r9700_maxout.sh
 ```
 
-Optional speculation:
+Optional speculation/MTP:
 
 ```bash
 DRAFT_MODEL=/models/.../draft.gguf ENABLE_MTP=1 DEEP=1 \
   bash scripts/run_rocm_r9700_maxout.sh
 ```
 
-## 10. Required handoff evidence
+## 12. Required handoff evidence
 
-Return the entire generated `results/rocm-r9700-maxout-*` directory, not screenshots or manually copied headline numbers. At minimum it must contain:
+Return the entire generated `results/rocm-r9700-maxout-*` directory. It must preserve runtime/GPU/ROCm snapshots, exact llama.cpp commit, the model registry, identity metadata/SHA-256 for every artifact, complete `llama-bench` JSONL, all server probe JSON/logs including failures, `amd-smi` snapshots and `/metrics` output where available.
 
-- runtime/GPU/ROCm snapshot;
-- exact llama.cpp commit;
-- SHA-256 and file metadata for each model;
-- complete `llama-bench` JSONL;
-- every server probe JSON and server log, including failed startups/OOMs;
-- `amd-smi` snapshots and `/metrics` output where available;
-- notes on thermals/power-limit changes or any external process using VRAM.
-
-Do not tune clocks, voltage, power limits, ROCm environment overrides, or model quantization halfway through a comparison without starting a new loadout ID.
+Do not change clocks, voltage, power limits, ROCm overrides or model quantization halfway through a comparison without starting a new loadout identity.
 
 ## Selection rule
 
-Produce a Pareto table instead of one universal winner. At minimum report:
-
-- fastest stable single-stream TG;
-- fastest PP at 2K/8K/32K;
-- lowest TTFT at 8K and 32K;
-- largest stable context with >= 512 generated tokens;
-- highest aggregate throughput at concurrency 2 and 4;
-- best speculative speedup and acceptance behavior;
-- best balanced profile that preserves meaningful VRAM headroom.
-
-Only after those are measured should one profile be promoted as the default.
+Produce a Pareto table rather than one universal winner. Report at minimum fastest stable single-stream TG, PP at 2K/8K/32K, lowest TTFT, max stable context, concurrency 2/4 throughput, speculative/MTP benefit, Ornith 1.0->1.5 matched deltas, quality deltas and the best quality-adjusted balanced profile.
