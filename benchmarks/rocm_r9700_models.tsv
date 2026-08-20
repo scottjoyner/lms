@@ -1,0 +1,5 @@
+id	family	generation	variant	quant	model_env	mtp	required	provenance
+ornith-1.0-35b	ornith	1.0	35b	local	ORNITH10_35B_MODEL	auto	true	official-or-verified-local
+ornith-1.5-primary	ornith	1.5	primary	local	ORNITH15_PRIMARY_MODEL	auto	false	verified-local-only
+ornith-1.5-alt	ornith	1.5	alternate	local	ORNITH15_ALT_MODEL	auto	false	verified-local-only
+qwen3.8-27b	qwen	3.8	27b	local	QWEN38_MODEL	auto	false	verified-local-only
