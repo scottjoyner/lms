@@ -5,6 +5,7 @@ LLAMA_BUILD=${LLAMA_BUILD:-"$HOME/src/llama.cpp/build-rocm-maxout"}
 BIN=${BIN:-"$LLAMA_BUILD/bin"}
 RESULTS=${RESULTS:-"$PWD/results/rocm-r9700-maxout-$(date -u +%Y%m%dT%H%M%SZ)"}
 PROBE=${PROBE:-"$(cd "$(dirname "$0")" && pwd)/llama_server_probe.py"}
+MODEL_REGISTRY=${MODEL_REGISTRY:-"$(cd "$(dirname "$0")/.." && pwd)/benchmarks/rocm_r9700_models.tsv"}
 REPS=${REPS:-5}
 SERVER_PORT=${SERVER_PORT:-8080}
 SERVER_HOST=${SERVER_HOST:-127.0.0.1}
@@ -18,22 +19,30 @@ need_file() { [[ -f "$1" ]] || { echo "missing file: $1" >&2; exit 2; }; }
 need_file "$BIN/llama-bench"
 need_file "$BIN/llama-server"
 need_file "$PROBE"
+need_file "$MODEL_REGISTRY"
 
 snapshot() {
   (date -u +%FT%TZ; uname -a; "$BIN/llama-server" --version || true; "$BIN/llama-bench" --list-devices || true) >"$RESULTS/env/runtime.txt" 2>&1
   rocminfo >"$RESULTS/env/rocminfo.txt" 2>&1 || true
+  cp "$MODEL_REGISTRY" "$RESULTS/env/model-registry.tsv"
   if command -v amd-smi >/dev/null 2>&1; then
     amd-smi static --json >"$RESULTS/env/amd-smi-static.json" 2>&1 || true
     amd-smi metric --json >"$RESULTS/env/amd-smi-metric-before.json" 2>&1 || true
   fi
-  env | LC_ALL=C sort | grep -E '^(ROCM|HIP|HSA|GGML|LLAMA|GPU_|OMP_|MALLOC_)' >"$RESULTS/env/relevant-env.txt" || true
+  env | LC_ALL=C sort | grep -E '^(ROCM|HIP|HSA|GGML|LLAMA|GPU_|OMP_|MALLOC_|ORNITH|QWEN|MODEL_)' >"$RESULTS/env/relevant-env.txt" || true
 }
 
 record_model() {
-  local id=$1 model=$2
+  local id=$1 family=$2 generation=$3 variant=$4 quant=$5 mtp=$6 provenance=$7 model=$8
   local out="$RESULTS/env/${id}.txt"
   {
     echo "id=$id"
+    echo "family=$family"
+    echo "generation=$generation"
+    echo "variant=$variant"
+    echo "declared_quant=$quant"
+    echo "mtp=$mtp"
+    echo "provenance=$provenance"
     echo "path=$model"
     stat "$model"
     sha256sum "$model"
@@ -140,9 +149,9 @@ server_case() {
 }
 
 run_model() {
-  local id=$1 model=$2
+  local id=$1 family=$2 generation=$3 variant=$4 quant=$5 mtp=$6 provenance=$7 model=$8
   [[ -n "$model" && -f "$model" ]] || { echo "SKIP $id: model artifact not present"; return 0; }
-  record_model "$id" "$model"
+  record_model "$id" "$family" "$generation" "$variant" "$quant" "$mtp" "$provenance" "$model"
   microbench "$id" "$model"
 
   local -a contexts=(8192 32768 65536 131072)
@@ -152,23 +161,44 @@ run_model() {
 
   for ctx in "${contexts[@]}"; do
     for np in "${slots[@]}"; do
-      # Start with the highest-throughput practical batching pair. Deeper sweeps
-      # can override BATCH/UBATCH or use the canonical JSON matrix.
       for kv in f16 q8_0 q4_0; do
         server_case "$id" "$model" "$ctx" "$np" 2048 512 "$kv" none
       done
     done
   done
 
-  # Speculation is isolated from baseline so speedups cannot hide regressions.
   server_case "$id" "$model" 32768 1 2048 512 q8_0 ngram-mod
   server_case "$id" "$model" 32768 1 2048 512 q8_0 draft-simple
-  server_case "$id" "$model" 32768 1 2048 512 q8_0 draft-mtp
+  if [[ "$mtp" != "false" ]]; then
+    server_case "$id" "$model" 32768 1 2048 512 q8_0 draft-mtp
+  fi
 }
 
+run_registry() {
+  local header=1 id family generation variant quant model_env mtp required provenance model
+  while IFS=$'\t' read -r id family generation variant quant model_env mtp required provenance; do
+    if (( header )); then header=0; continue; fi
+    [[ -n "$id" ]] || continue
+    model=${!model_env-}
+    if [[ -z "$model" || ! -f "$model" ]]; then
+      if [[ "$required" == "true" ]]; then
+        echo "REQUIRED MODEL MISSING: $id env=$model_env" >&2
+      else
+        echo "DEFER $id: set $model_env to a verified artifact"
+      fi
+      continue
+    fi
+    run_model "$id" "$family" "$generation" "$variant" "$quant" "$mtp" "$provenance" "$model"
+  done <"$MODEL_REGISTRY"
+}
+
+# Backward compatibility for the first experiment instructions.
+if [[ -n "${ORNITH_MODEL:-}" && -z "${ORNITH10_35B_MODEL:-}" ]]; then
+  export ORNITH10_35B_MODEL="$ORNITH_MODEL"
+fi
+
 snapshot
-run_model ornith-1.0-35b "${ORNITH_MODEL:-}"
-run_model qwen3.8-27b "${QWEN38_MODEL:-}"
+run_registry
 
 if command -v amd-smi >/dev/null 2>&1; then
   amd-smi metric --json >"$RESULTS/env/amd-smi-metric-after.json" 2>&1 || true
