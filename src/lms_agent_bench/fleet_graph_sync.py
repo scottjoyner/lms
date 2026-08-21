@@ -238,27 +238,33 @@ def publish_snapshot(driver, db: str, snap: Dict[str, Any], previous_snapshot_id
         snap_props["previous_snapshot_id"] = previous_snapshot_id
 
     with driver.session(database=db) as s:
-        # Snapshot node + chain link to previous.
+        # Snapshot node first.  The previous snapshot is advisory: a stale
+        # cursor must never make an otherwise valid publish fail.
         s.run(
             """
             MERGE (snap:FleetSnapshot {snapshot_id: $snapshot_id})
             SET snap += $props
-            WITH snap
-            OPTIONAL MATCH (prev:FleetSnapshot {snapshot_id: $previous_id})
-            WHERE prev IS NOT NULL
-            MERGE (prev)-[:NEXT_SNAPSHOT]->(snap)
             """,
             snapshot_id=snap["snapshot_id"],
             props=snap_props,
-            previous_id=previous_snapshot_id or "",
         )
+        if previous_snapshot_id:
+            s.run(
+                """
+                MATCH (prev:FleetSnapshot {snapshot_id: $previous_id})
+                MATCH (snap:FleetSnapshot {snapshot_id: $snapshot_id})
+                MERGE (prev)-[:NEXT_SNAPSHOT]->(snap)
+                """,
+                snapshot_id=snap["snapshot_id"],
+                previous_id=previous_snapshot_id,
+            )
 
         # Node states.
         for ns in snap["node_states"]:
             s.run(
                 """
-                MERGE (n:FleetNodeState {snapshot_id: $snapshot_id, node_name: $node_name})
-                SET n += $props
+                MERGE (n:FleetNodeState {node_name: $node_name})
+                SET n += $props, n.snapshot_id = $snapshot_id
                 WITH n
                 MATCH (snap:FleetSnapshot {snapshot_id: $snapshot_id})
                 MERGE (snap)-[:HAS_NODE_STATE]->(n)

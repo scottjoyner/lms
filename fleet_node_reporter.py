@@ -215,15 +215,27 @@ def _http_get_json(url: str, timeout: float = 5.0) -> Optional[Any]:
 
 
 def _loaded_models(lm_url: str) -> List[str]:
-    """Currently-loaded model identifiers via the OpenAI-compatible endpoint."""
-    data = _http_get_json(f"{lm_url.rstrip('/')}/v1/models")
+    """Currently-loaded model identifiers via the LM Studio native API.
+
+    Use /api/v1/models and filter to items where loaded_instances is non-empty
+    (actually resident in VRAM/RAM). The top-level 'loaded' boolean is unreliable.
+    """
+    data = _http_get_json(f"{lm_url.rstrip('/')}/api/v1/models")
     if not isinstance(data, dict):
         return []
-    items = data.get("data") or []
+    items = data.get("models") or []
     out = []
     for m in items:
-        if isinstance(m, dict) and m.get("id"):
-            out.append(str(m["id"]))
+        if not isinstance(m, dict):
+            continue
+        # LM Studio /api/v1/models uses 'key' field (not 'id')
+        mid = m.get("key") or m.get("model_key") or m.get("path") or m.get("id")
+        if not mid:
+            continue
+        # Only include models that are actually resident (loaded_instances non-empty)
+        loaded_instances = m.get("loaded_instances") or []
+        if isinstance(loaded_instances, list) and len(loaded_instances) > 0:
+            out.append(mid)
     return out
 
 
