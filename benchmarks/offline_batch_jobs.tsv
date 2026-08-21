@@ -1,0 +1,13 @@
+job_id	stage	job_type	input_env	preferred_host	resource_class	depends_on	output_class	status	notes
+inventory-models	prep	model-inventory	NAS_ROOT	deathstar	cpu-io		manifest	planned	hash and inspect available artifacts
+extract-gguf-meta	prep	gguf-metadata	NAS_ROOT	deathstar	cpu-io	inventory-models	metadata	planned	collect architecture quant tokenizer context fields
+storage-preflight	prep	storage-preflight	NAS_ROOT	hx370	light	inventory-models	preflight	planned	df/mount/staging capacity
+quant-balanced	transform	quantize	SOURCE_HF	ryzen-395	cpu-ram	inventory-models	model-artifact	planned	balanced quant candidate
+quant-extreme	transform	quantize	SOURCE_HF	ryzen-395	cpu-ram	inventory-models	model-artifact	planned	extreme-fit candidate
+calibration-build	analysis	calibration-corpus	CALIBRATION_SOURCES	deathstar	cpu		calibration	planned	coding tool long-context mixed corpus
+activation-capture	analysis	activations	SOURCE_HF	ryzen-395	gpu-ram	calibration-build	activation-data	planned	when tooling/model fits available memory
+pruning-rank	analysis	pruning-rank	ACTIVATION_DATA	deathstar	cpu-ram	activation-capture	pruning-plan	planned	rank experts/channels for ablation
+ablation-eval	analysis	quality-eval	ABLATION_MODEL	ryzen-395	gpu-ram	pruning-rank	quality-results	planned	reversible masks before mutation
+convert-gguf	transform	hf-to-gguf	SOURCE_HF	deathstar	cpu-ram		model-artifact	planned	pin llama.cpp SHA
+package-results	post	result-package	RESULT_ROOT	deathstar	cpu-io		archive	planned	compress/hash benchmark evidence
+aggregate-results	post	result-analysis	RESULT_ROOT	deathstar	cpu-ram	package-results	report-data	planned	build normalized tables and pareto inputs
