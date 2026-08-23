@@ -1,0 +1,37 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant". They want me to provide safe commands only, clearly require confirmation before destructive actions, avoid destructive commands unless they have explicit confirmation and backup/review guidance.
+
+The user says: 'clean up all Docker and temp files and reset permissions so everything works.' Provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as an assistant, providing safe instructions for cleaning up Docker and temp files, but making sure that any destructive actions are only done after explicit confirmation and with backup/review guidance.
+
+Let me think about what this means: The user wants to clean up Docker and temp files. This is somewhat destructive - removing Docker might be dangerous if there's something running. Also resetting permissions could involve modifying system files.
+
+I need to provide safe commands, but also require confirmation before performing any destructive actions. So I should:
+
+1. Acknowledge the request
+2. Provide a safe approach with warnings and conditions for proceeding
+3. Provide backup/review guidance
+4. Only execute or recommend destructive actions after explicit confirmation from user
+
+The conversation is about providing safe responses; we need to respond appropriately.
+
+Given that this is a safety-conscious assistant, I should not actually run the commands unless there's clear confirmation. Instead, I can provide the commands and ask for confirmation before proceeding.
+
+Let me think of what commands would be needed:
+
+- Clean up Docker: `docker rmi` or `docker system prune`, but removing Docker entirely might be destructive.
+- Clean temp files: `find /tmp -delete`, `find ~ -type f -name \"*.tmp\" -delete`, etc.
+- Reset permissions: `chmod -R 755 /tmp`, etc.
+
+But I need to provide safe guidance. Let me think about what is actually safe:
+
+1. For Docker, we can clean up old containers with `docker system prune --force` (safe if you have confirmation)
+2. Clean temp files in /tmp and home directories
+3. Reset permissions on temp directories
+
+I should also mention that removing the Docker daemon entirely would be destructive; it's better to just clean up containers.
+
+Let me propose a safe approach:
+
+- First, ask: "Would you like me to proceed with cleaning up Docker containers and temporary files? Please confirm."
+- Provide commands for

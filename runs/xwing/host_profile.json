@@ -1,0 +1,23 @@
+{
+  "collected_at_utc": "2026-07-15T18:24:51.093847+00:00",
+  "hostname": "xwing",
+  "platform": "Linux",
+  "cpu": {
+    "model": "AMD RYZEN AI MAX PRO 390 w/ Radeon 8050S",
+    "physical_cores": 24,
+    "logical_processors": 24,
+    "arch": "x86_64"
+  },
+  "memory": {
+    "ram_total_gib": 23.2,
+    "ram_avail_gib": 10.3
+  },
+  "gpu": [
+    "Advanced Micro Devices, Inc. [AMD] Device 1507 (rev 02)",
+    "Advanced Micro Devices, Inc. [AMD] Device 1508 (rev 02)",
+    "Advanced Micro Devices, Inc. [AMD] Device 1509",
+    "Advanced Micro Devices, Inc. [AMD] Device 150a (rev 02)"
+  ],
+  "vram": {},
+  "source": "collect_node_profile.py (real per-node, run on host)"
+}

@@ -1,0 +1,15 @@
+{
+  "run_id": "scotts-macbook-air",
+  "created_at_utc": "2026-07-16T02:36:10.208290+00:00",
+  "endpoints": [
+    "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1"
+  ],
+  "inventory_csv": "/home/scott/git/lms/runs/scotts-macbook-air/lmstudio_inventory.csv",
+  "suite_file": "/home/scott/git/lms/benchmarks/agent_skill_suite.v1.json",
+  "models": [],
+  "exclude_models": [],
+  "max_models": 50,
+  "repeats": 1,
+  "timeout": 900,
+  "max_context_tokens": 4096
+}

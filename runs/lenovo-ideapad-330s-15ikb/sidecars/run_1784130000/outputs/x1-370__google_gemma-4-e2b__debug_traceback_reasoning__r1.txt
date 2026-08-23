@@ -1,0 +1,55 @@
+## Root Cause
+
+The error `TypeError: 'NoneType' object is not subscriptable` occurs because one of the intermediate keys in the dictionary access chain (`payload['user']` or `payload['user']['id']`) does not exist, resulting in a value of `None`. When the script attempts to treat this `None` value as a dictionary (by trying to use the subscript operator `[]`), it fails.
+
+Likely scenario: The `payload` dictionary is missing the `'user'` key, or the value associated with `'user'` is `None`.
+
+## Safe Fix
+
+Use the `.get()` method to safely access nested dictionary keys. This prevents the script from crashing if a key is missing by providing a default value (in this case, an empty dictionary `{}` or `None` which can be handled gracefully).
+
+**Original (Failing) Code:**
+```python
+user_id = payload['user']['id'] # Fails if 'user' or 'id' is missing/None
+```
+
+**Safe Fix:**
+```python
+# Safely retrieve the 'user' dictionary, defaulting to an empty dict if not found
+user_data = payload.get('user', {}) 
+
+# Safely retrieve 'id' from user_data, defaulting to None or a default value if not found
+user_id = user_data.get('id') 
+
+# Or, combined into one line for brevity:
+user_id = payload.get('user', {}).get('id')
+```
+
+## Regression Tests
+
+These tests ensure the script handles both valid and invalid data structures correctly.
+
+### Test 1: Successful Data Path (Valid Input)
+
+**Goal:** Verify that the script correctly extracts `user_id` when the expected data is present.
+
+```python
+# Setup: Valid payload
+payload_valid = {'user': {'id': 12345, 'name': 'Alice'}}
+
+# Execution using the safe fix logic
+user_data = payload_valid.get('user', {})
+user_id = user_data.get('id')
+
+# Assertion
+assert user_id == 12345
+print("Test 1 Passed: Successfully extracted ID from valid data.")
+```
+
+### Test 2: Missing Data Path (Invalid Input)
+
+**Goal:** Verify that the script does not raise an error when keys are missing, and returns a safe default value (`None` in this case).
+
+```python
+# Setup: Payload missing the 'user' key entirely
+payload_missing = {'other_data':

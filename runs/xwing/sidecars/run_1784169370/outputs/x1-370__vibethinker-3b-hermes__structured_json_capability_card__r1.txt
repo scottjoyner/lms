@@ -1,0 +1,25 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1 (e.g., 0.8)
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular task; they just want me to produce a JSON object with those fields. Usually, I'd interpret this as providing generic information about best practices for producing JSON responses or something like that. But it's ambiguous: maybe they're testing if I can follow the format.
+
+Given typical patterns in these tasks, they might be expecting some content like:
+
+- task_fit could list things like "Format output strictly as JSON", "No markdown", etc.
+- limitations could mention constraints such as token limits, language support, etc.
+- recommended_max_context_tokens would likely be something like 4096 or 8192.
+
+Given the instruction is to produce a JSON object with those keys and no extra keys. So I need to output plain text that is valid JSON.
+
+Let me construct:
+
+{
+  "task_fit":

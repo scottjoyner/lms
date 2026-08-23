@@ -1,0 +1,19 @@
+<think>The user wants me to create an implementation plan for adding several features to a FastAPI service: user authentication, API key rotation, audit logging, admin dashboards.
+
+They want the plan organized as P0 (planning), P1 (design/requirements), and P2 (implementation). Each task must include acceptance criteria and test expectations. They also mention "Do not ask clarifying questions unless absolutely blocked." So I should just produce a comprehensive implementation plan without asking for clarification.
+
+I need to think about the structure:
+
+- P0: Planning tasks - high-level overview, requirements gathering, architecture decisions
+- P1: Design/Requirements tasks - detailed design, database schema, API contract, security considerations
+- P2: Implementation tasks - actual code implementation steps
+
+Each task should have acceptance criteria and test expectations.
+
+I need to be thorough. Let's outline:
+
+P0:
+1. Project Overview & Requirements Document
+2. Architecture Decision Matrix (API layers, data store choices)
+3. Data Schema Design for Auth, API Keys, Audits
+4. Security Consider

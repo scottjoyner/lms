@@ -1,0 +1,27 @@
+{
+  "suite_name": "agent_loop_quick",
+  "description": "Quick agent-loop tests with small contexts and short timeouts",
+  "max_context_tokens": 2048,
+  "timeout_seconds": 30,
+  "repeats": 1,
+  "tasks": [
+    {
+      "name": "simple_chat",
+      "task_family": "operational_health",
+      "prompt": "What is 2+2?",
+      "expected_format": "json"
+    },
+    {
+      "name": "structured_output",
+      "task_family": "structured_output",
+      "prompt": "Return a JSON object with keys: name, version, status",
+      "expected_format": "json"
+    },
+    {
+      "name": "simple_coding",
+      "task_family": "coding",
+      "prompt": "Write a Python function that adds two numbers",
+      "expected_format": "code"
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably with country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown formatting. So just plain text containing the Python code.
+
+Let's design function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # If empty or contains non-digit after stripping? Actually we already have only digits.
+    # Validate length and leading 1 optional
+    if len(digits) == 0:
+        raise ValueError("Empty phone number")
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip country code
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, brackets, etc. Should be stripped.
+- Leading/trailing whitespace should be handled by stripping non-digits anyway.
+
+Potential issues: If input is something like "1234567890abc", after stripping digits we get 10-digit number; that's valid. That seems okay.
+
+If input has only digits but length not 10 or 11, raise error.
+
+Raise ValueError with appropriate message.
+
+Now test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert normalize_phone_number('+1 (123) 456-7890') == '1234567890'
+    assert normalize_phone_number('123456789012') raises ValueError
+    # Actually we need to write with explicit assertion:
+    try:
+        normalize_phone_number('123456789012')
+    except ValueError:
+        pass
+
+But they want at least five asserts. Let's do:
+
+assert normalize_phone_number('555-1234') == '5551234'
+assert normalize_phone_number('555 1234') == '5551234'
+assert normalize_phone_number('555.1234') == '5551234'
+assert normalize_phone_number('+1-555-1234') == '5551234'
+assert normalize_phone_number('1234567890') == '1234567890'
+
+That's five asserts. Also we could add a test for invalid input:
+
+try:
+    normalize_phone_number('not-a-number')
+except ValueError as e:
+    assert f'Invalid input raised: {e}', 'Invalid input should raise ValueError'
+But that would be 6 asserts.
+
+Let me think about the best approach to include at least five asserts. We'll do exactly five or more; it's okay if we have more.
+
+We need to ensure code runs correctly and passes all assertions.
+
+Potential issues:
+
+- The assert with try/except must use correct syntax: `try: ... except ValueError as e: assert ...` but that is not valid Python syntax. Instead, we can do:
+
+try:
+    normalize_phone_number('not-a-number')
+except ValueError as e:
+    assert 'Invalid input' in str(e), 'Invalid input should raise ValueError'
+
+But better to just use the earlier ones.
+
+Let's write code accordingly.
+
+We

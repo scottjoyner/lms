@@ -1,0 +1,10 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,refinedtoolcallv5-3b,7.161,2.429,8.644,1.00,0.50,0.7238,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,text-embedding-nomic-embed-text-v1.5,1.186,2.389,8.518,1.00,0.50,0.7238,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,orinth-1.0-9b,31.368,105.374,0.692,1.00,0.20,0.6254,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,liquid/lfm2.5-1.2b,4.309,0.690,18.617,1.00,0.60,0.8988,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,qwen3.6-28b-reap20-a3b,30.563,393.124,0.171,1.00,0.10,0.2583,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,vibethinker-3b-heretic_decensored,6.113,1.983,13.554,1.00,0.30,0.5967,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,google/gemma-4-12b-qat,30.739,284.443,0.931,1.00,0.20,0.6071,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,vibethinker-3b-hermes,11.133,1.890,10.390,1.00,0.30,0.6737,10
+1784130000,beelink-ryzen-7-mini-pc,192.168.1.241,http://100.85.72.121:1234/v1,qwen3.6-14b-a3b-vibeforged-v2,2.008,,,0.00,0.00,0.0000,10

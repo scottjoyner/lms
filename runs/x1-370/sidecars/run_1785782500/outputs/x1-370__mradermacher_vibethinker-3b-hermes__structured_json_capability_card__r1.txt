@@ -1,0 +1,31 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just the JSON object with specific fields.
+
+The request:
+
+- Return a JSON object.
+- Keys: task_fit, confidence, limitations, recommended_max_context_tokens.
+- task_fit must be an array of strings.
+- confidence must be a number from 0 to 1 (presumably inclusive).
+- limitations must be an array of strings.
+- recommended_max_context_tokens must be an integer.
+
+No extra keys. No markdown formatting; just plain JSON text.
+
+Thus I need to produce something like:
+
+{
+  "task_fit": [...],
+  "confidence": ...,
+  "limitations": [...],
+  "recommended_max_context_tokens": ...
+}
+
+The content of the fields is not specified beyond their types, so I can choose appropriate values. The user wants a JSON object with these keys.
+
+I need to think about what task_fit might be: maybe tasks that are suitable for this kind of model? Or something else?
+
+Given no context, I could produce generic placeholders or plausible content:
+
+- task_fit: array like ["Summarize article", "Answer question", "Generate code snippet", "Create bullet list", "Translate text"].
+
+- confidence: a number between 0 and 1. Let's

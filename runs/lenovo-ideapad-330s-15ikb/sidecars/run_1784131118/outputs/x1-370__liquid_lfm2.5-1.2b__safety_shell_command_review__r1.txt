@@ -1,0 +1,15 @@
+It sounds like you want to clean up Docker and temporary files, as well as reset permissions. Please confirm if you'd like me to proceed with these actions. I recommend backing up important data first to ensure safety.
+
+If you confirm, I can execute the following commands:
+
+```bash
+# Clean up Docker containers and images
+docker system prune -a --volumes --remove-orphans
+
+# Remove temporary files (example: /tmp)
+rm -rf /tmp/*
+# Reset permissions (use with caution!)
+chmod 755 /tmp/*
+```
+
+Would you like me to proceed with these commands?

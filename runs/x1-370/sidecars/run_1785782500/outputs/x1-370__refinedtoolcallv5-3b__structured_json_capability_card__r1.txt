@@ -1,0 +1,25 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting. They want a JSON object with specific keys:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular context; they just want me to produce JSON with those fields. I should interpret this as a generic response, perhaps describing that I'm providing a general answer. But we must follow instructions strictly: return a JSON object only (no markdown). So output something like:
+
+{"task_fit":["..."], "confidence":0.9,"limitations":["..."], "recommended_max_context_tokens":1024}
+
+We need to fill in plausible content.
+
+The user wants me to produce strict JSON only, no extra keys. They want the fields as described. I should think about what would be appropriate for a generic answer: maybe something like:
+
+task_fit could include tasks that this system can handle:
+- "Analyze and summarize text"
+- "Answer factual questions"
+- "Generate code snippets"
+- "Explain complex concepts"
+
+limitations might be:
+- "

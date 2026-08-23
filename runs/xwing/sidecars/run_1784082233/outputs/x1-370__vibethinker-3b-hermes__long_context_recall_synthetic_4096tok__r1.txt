@@ -1,0 +1,10 @@
+<think>
+The context contains many "Project note" entries that all say: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+I need to find a specific sentence that proves this. Looking at the text, I can see:
+
+1. "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly." (This appears multiple times)
+
+Let me search through the context more carefully.
+</think>
+{"control_code": "ORION-7429", "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."}

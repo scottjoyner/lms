@@ -1,0 +1,109 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical), P1 (high), and P2 (medium/low) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what these features entail:
+
+1. **User Authentication**: JWT tokens, user registration, login, password hashing, session management.
+2. **API Key Rotation**: Generate new API keys, rotate old ones, invalidate old keys, secure key storage.
+3. **Audit Logging**: Log all auth-related and system changes with timestamps, user IDs, actions.
+4. **Admin Dashboards**: UI for admin to view user stats, API key usage, audit logs, etc.
+
+The plan should be organized into P0 (must-haves), P1 (should-haves), P2 (nice-to-haves). Each task needs acceptance criteria and test expectations.
+
+I need to produce a clear, well-structured document. Let's think about the ordering:
+
+P0 tasks are those that must be done first; they're dependencies for later tasks.
+P1 tasks can be done in parallel or after some P0 work is complete.
+P2 tasks are optional enhancements.
+
+Let me design this plan carefully.
+
+First, let's consider the existing FastAPI service context. The user says "existing FastAPI service" but doesn't provide details about what it already has. I'll assume a typical FastAPI app with async routes, maybe some database models, and they need to add these features on top of that.
+
+Let me outline tasks:
+
+**P0: Core Infrastructure** - This is foundational:
+- P0-1: Set up secure secret management (OS-level secrets or environment variables).
+- P0-2: Install and configure JWT library (PyJWT) with proper configuration.
+- P0-3: Create database schemas for users, auth tokens, audit logs.
+
+**P0: Authentication Core** - Must be done before anything else:
+- P0-4: Implement password hashing using bcrypt/argon2.
+- P0-5: Create user registration endpoint (POST /auth/register).
+- P0-6: Create login endpoint (POST /auth/login) returning token.
+- P0-7: Create protected route decorator and middleware for JWT validation.
+
+**P0: Audit Logging Infrastructure** - Required for auth features:
+- P0-8: Implement audit log model with timestamp, action type, user ID, resource, details.
+- P0-9: Set up database migration for audit table creation.
+
+**P0: API Key Management** - Must be set up before rotation:
+- P0-10: Create API key storage mechanism (database or external DB).
+- P0-11: Implement API key validation middleware.
+- P0-12: Create rotate_api_key endpoint (POST /auth/rotate-api-key).
+
+That's 12 tasks. But we need to organize into P0, P1, and P2 categories.
+
+Let me think about the ordering:
+
+P0 should be tasks that are dependencies for all other tasks:
+- Secret management is needed before JWT config.
+- JWT library setup is needed before auth endpoints.
+- Database schemas for users, tokens, audit logs - needed early.
+- Password hashing - needed before login.
+- API key storage - needed before rotation.
+
+Actually, let me think about dependency graph:
+
+1. **Secrets** -> needed for JWT and API key encryption (if we use encryption).
+2. **JWT library config** -> needed for auth endpoints and token validation.
+3. **User models & audit log model** -> needed for all auth-related data storage.
+4. **Password hashing** -> needed before login endpoint can work.
+5. **API key storage** -> needed before rotate endpoint works.
+
+So P0 tasks could be:
+- [P0] Secret management setup
+- [P0] JWT library installation & configuration
+- [P0] Database schema creation for users, auth tokens, audit logs
+- [P0] Password hashing integration (bcrypt/argon2)
+- [P0] API key storage mechanism
+
+Then P1 tasks could be:
+- [P1] User registration endpoint
+- [P1] Login endpoint & token generation
+- [P1] Protected route decorator & middleware
+- [P1] Audit log creation on auth actions (login, register, token expiration)
+- [P1] API key rotation flow with validation and invalidation
+- [P1] Error handling for failed auth operations
+
+Then P2 tasks could be:
+- [P2] Admin dashboard UI development (React/TypeScript)
+- [P2] API key usage reporting endpoint
+- [P2] Audit log filtering & search functionality
+- [P2] Notification system for audit events
+- [P2] Performance optimization and security hardening
+
+But the user asked to organize as P0, P1, and P2 tasks. They want each task includes acceptance criteria and test expectations.
+
+I need to produce a plan document with clear sections:
+
+**Implementation Plan: Adding User Authentication, API Key Rotation, Audit Logging, and Admin Dashboards to FastAPI Service**
+
+Then break into P0 (Critical), P1 (High), P2 (Medium/Low) tasks. Each task should have:
+- Task ID / Title
+- Description
+- Dependencies
+- Acceptance Criteria
+- Test Expectations
+
+Let me design the plan:
+
+**P0: Infrastructure & Foundation** - Must be done before anything else.
+
+- **P0-1**: Set up secret management (environment variables, secrets manager integration). Acceptance criteria: All secrets stored in environment variables; no hard-coded credentials; ability to rotate secrets. Test expectations: unit tests for secret validation; integration test verifying token generation works with new secrets.
+  
+- **P0-2**: Install and configure JWT library (PyJWT) with proper configuration. Acceptance criteria: JWT algorithm set (RS256), secret loaded from environment, correct claims schema defined. Test expectations: unit tests for jwt.encode/decode; integration test verifying token validation on protected routes.
+
+- **P0-3**: Create database models for users, auth_tokens, audit_logs. Acceptance criteria: Full Pydantic models with proper types and validation; audit_log includes timestamp, action_type, user_id, resource, details fields. Test expectations: unit tests for model validation; integration test creating and querying audit records.
+
+- **P0-4**: Implement password hashing using bcrypt/argon2 library. Acceptance criteria: Hashed passwords stored in DB; compare hashed passwords on login; support optional salt generation. Test expectations: unit tests for hash/verify cycle; integration test full auth flow with hashed passwords.
+

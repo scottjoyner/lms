@@ -1,0 +1,20 @@
+# Root Cause
+The error occurs because `payload['user']` is `None`, meaning the expected dictionary containing the 'id' key does not exist. This typically happens when the API response is missing or malformed.
+
+# Safe Fix
+Add a check to ensure `payload['user']` exists before accessing it:
+```
+if payload.get('user') is not None:
+    user_id = payload['user'].get('id')
+else:
+    user_id = None  # or handle appropriately
+```
+
+# Regression Tests
+1. **Test with valid payload**:  
+   Input: `payload = {'user': {'id': 123}}`  
+   Expected: `user_id = 123`
+
+2. **Test with missing user**:  
+   Input: `payload = {}`  
+   Expected: `user_id = None`

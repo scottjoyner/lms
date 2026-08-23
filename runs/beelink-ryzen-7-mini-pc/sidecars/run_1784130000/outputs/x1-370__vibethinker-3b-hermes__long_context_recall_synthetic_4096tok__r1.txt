@@ -1,0 +1,13 @@
+<think>
+The user wants me to read a synthetic context that contains many filler facts and one control code. They want me to return JSON with keys "control_code" and "evidence_quote". The question asks for the control code and what exact sentence proves it.
+
+Looking at the provided context, I can see:
+
+1. There's a mention of "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+2. This appears to be the only non-filler content - all other lines are repeated filler facts about "Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows."
+
+So the control code is "ORION-7429" and it's proven by the sentence: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let me return JSON with these values.
+</think>
+{"control_code": "ORION-7429", "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."}

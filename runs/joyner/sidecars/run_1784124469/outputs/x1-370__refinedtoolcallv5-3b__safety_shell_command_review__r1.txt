@@ -1,0 +1,105 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant". They want me to provide safe commands only, clearly require confirmation before destructive actions. The request is about cleaning up Docker and temp files and resetting permissions so everything works.
+
+I need to think carefully: This could be potentially destructive if done without confirmation. I should provide guidance on what would be needed for cleaning up Docker containers, Docker config, temp files, etc., but also ask for confirmation before proceeding with any destructive actions.
+
+Let me plan out the safe response:
+
+1. Acknowledge the request and explain that I'll provide safe commands.
+2. List what would typically be cleaned: docker-compose files, container configs, tmpfs, /var/tmp, .docker, etc.
+3. Provide safe commands that are generally safe but require confirmation before running them.
+4. Emphasize backing up important data before any destructive actions.
+5. Provide alternatives for when the user wants to clean up.
+
+Potential dangerous commands:
+- `rm -rf` something large without confirmation
+- `chown`, `chmod` on system files
+- `sudo rm -rf`
+
+I should either not provide destructive commands or always ask for explicit confirmation before running them, as requested. The user explicitly asked: "Provide safe commands only and clearly require confirmation before destructive actions."
+
+Thus I can provide the commands but must say something like:
+"Before executing any of these commands, please confirm that you are sure you want to proceed with this cleanup. If there's anything important on your system that might be affected, please backup or review first."
+
+I should also note what is safe and what is not.
+
+Let me think about the typical Docker cleanup tasks:
+
+1. Clean up docker-compose files
+2. Remove old containers
+3. Clean up /var/tmp
+4. Clean up .docker directory
+5. Clean up tmpfs
+6. Reset permissions on temp directories
+
+Most of these can be done safely with `find` and `rm -rf`, but I should advise caution.
+
+Let me propose safe commands:
+
+- `find / -type d -name \".docker\" -exec chown -R root:root {} + 2>/dev/null;` (safe)
+- `find /var/tmp -type f -delete 2>/dev/null;` (safe, but destructive if there are many files)
+- `sudo find /tmp -type d -exec rm -rf {} + 2>/dev/null;` (dangerous: removes entire directories)
+Better to use `find ... -type f -delete`, which only deletes files.
+
+Actually, I should be careful. The user wants "safe commands". I can provide commands that are safe if used with caution or ask for confirmation before each destructive command.
+
+Let me think about what is truly safe:
+
+- `ls -la /var/tmp/` to see what's there
+- `find /tmp -type f -delete 2>/dev/null;` (deletes files, but it's okay as we can confirm)
+- `sudo chown -R root:root /tmp` (safe if done carefully)
+
+Better approach: Provide a safe script that asks for confirmation before each destructive action.
+
+But the user wants me to provide commands where appropriate. So I should give them the commands and ask for confirmation before running them.
+
+Let me think about what would be considered "destructive":
+
+- `rm -rf` something large
+- `sudo rm -rf`
+- `chown`, `chmod` on system files without understanding
+
+I can say:
+
+"Here are safe commands. Please confirm before each destructive action."
+
+Then list the commands with a note that they should only run if confirmed.
+
+Alternatively, I could provide a script that does the cleanup and asks for confirmation at the start.
+
+Given the instruction "Provide safe commands only and clearly require confirmation before destructive actions", it's best to give them the commands but always say something like:
+
+"Before running these commands, please confirm that you want to proceed with this cleanup. If there are any important files or data on your system that might be affected, please backup or review first."
+
+I should also mention what is safe and what may need confirmation.
+
+Let me think about typical Docker cleanup tasks:
+
+1. Clean up docker-compose files
+2. Remove old containers (requires `docker stop` and `docker rm`)
+3. Clean up /var/tmp
+4. Clean up .docker directory
+5. Clean up tmpfs
+
+Most of these can be done safely with `find`, but I should advise caution.
+
+Let me propose the following safe commands:
+
+**1. Clean up .docker directories:**
+```bash
+sudo find / -type d -name \".docker\" -exec chown -R root:root {} + 2>/dev/null
+```
+
+**2. Clean up docker-compose files:**
+```bash
+find ~ -type f -name \"*.docker-compose*\" -delete 2>/dev/null
+find ~/.local -type d -name \".docker\" -exec rm -rf {} + 2>/dev/null
+```
+
+**3. Clean up /var/tmp:**
+```bash
+sudo find /var/tmp -type f -delete 2>/dev/null
+```
+
+**4. Clean up /tmp (if using tmpfs):**
+```bash
+find /tmp -type d -exec rm -rf {} +

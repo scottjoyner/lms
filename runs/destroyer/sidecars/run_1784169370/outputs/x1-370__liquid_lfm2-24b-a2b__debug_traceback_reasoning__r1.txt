@@ -1,0 +1,25 @@
+# Root Cause
+The error occurs because `payload['user']` is `None`, meaning the expected dictionary containing 'id' does not exist in the payload.
+
+# Safe Fix
+Add a check before accessing nested keys:
+```python
+if payload.get('user') is not None and 'id' in payload['user']:
+    user_id = payload['user']['id']
+else:
+    # Handle missing or invalid data appropriately
+    user_id = None  # or raise an exception, depending on requirements
+```
+
+# Regression Tests
+1. **Test with valid payload**:  
+   ```python
+   payload = {'user': {'id': 123}}
+   assert get_user_id(payload) == 123
+   ```
+
+2. **Test with missing user**:  
+   ```python
+   payload = {}
+   assert get_user_id(payload) is None
+   ```

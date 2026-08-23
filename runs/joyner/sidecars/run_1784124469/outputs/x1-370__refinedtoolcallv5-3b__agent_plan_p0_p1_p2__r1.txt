@@ -1,0 +1,86 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning/assessments), P1 (short-term, doable now), and P2 (medium/long term) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what a typical implementation plan looks like for these features in FastAPI context:
+
+1. **User Authentication**: JWT token-based auth, user registration, login, password hashing, session management.
+2. **API Key Rotation**: API key management, rotation mechanism, revocation, audit logs of changes.
+3. **Audit Logging**: Logging all auth-related actions, request/response tracking, data changes.
+4. **Admin Dashboards**: UI for admin to view stats, user lists, API key usage, audit logs.
+
+Organize into P0 (Planning & Assessment), P1 (Core Implementation), P2 (Enhancements & Optimization).
+
+Each task should have:
+- Task ID/Title
+- Priority level (P0/P1/P2)
+- Description
+- Acceptance Criteria
+- Test Expectations
+
+Let me think about the logical ordering:
+
+**P0: Planning & Assessment**
+- Current state audit of existing auth, API keys, logging infrastructure.
+- Dependencies and integration points.
+- Risk assessment.
+
+**P1: Core Infrastructure Setup (Week 1-2)**
+- Set up JWT library, password hashing, session store.
+- Create auth routes (POST /auth/register, POST /auth/login).
+- Basic audit logging setup for auth actions.
+- API key registration and basic validation.
+
+**P2: Advanced Features & Enhancements (Week 3-6)**
+- API key rotation mechanism with schedule-based or manual triggers.
+- Comprehensive audit logging (request/response tracking, data changes).
+- Admin dashboard UI with stats, user counts, API key usage, audit logs.
+- Performance optimization and security hardening.
+
+Let me flesh out each P0/P1/P2 tasks. Each should be a distinct task item; I can have multiple tasks per priority level.
+
+I'll aim for around 5-7 tasks total across all priorities.
+
+**P0: Planning & Assessment**
+1. **Current State Audit** - assess existing auth, API key management, logging, admin capabilities.
+2. **Dependency Mapping** - map new features to existing infrastructure (database, Redis, etc.).
+3. **Security Risk Assessment** - identify potential security gaps before implementation.
+
+**P1: Core Infrastructure Setup**
+4. **Set Up JWT Authentication Stack** - JWT library, secret management, token signing/verification.
+5. **User Database Models & Hashing** - Pydantic models, bcrypt/Argon2 for passwords, user schema.
+6. **Session Management** - in-memory or Redis-backed session store with refresh tokens.
+7. **Basic Auth Routes** - /auth/register, /auth/login, protected route decorator.
+
+**P2: Advanced Features & Enhancements**
+8. **API Key Rotation System** - rotation schedule, per-app keys, revocation, audit log entries.
+9. **Comprehensive Audit Logging** - request/response logging, data modification tracking, log retention policy.
+10. **Admin Dashboard** - React/Flask API endpoint for stats, user counts, key usage, logs.
+
+Let me write this out clearly with acceptance criteria and test expectations per task.
+
+I'll format it as a structured plan document.</think>## Implementation Plan â FastAPI Service: Auth, APIâKey Rotation, Audit Logging & Admin Dashboard  
+
+| Priority | Task ID | Title | Description |
+|----------|---------|-------|-------------|
+| **P0** | P0â01 | **Current State Audit** | Perform a comprehensive audit of the existing FastAPI service to understand its current auth, key, logging, and admin stack. | â |
+| | P0â02 | **Dependency Mapping & Integration Points** | Map each new feature to existing infrastructure (database, Redis, external services, thirdâparty auth providers). | â |
+| | P0â03 | **Security Risk Assessment** | Identify security gaps that could be introduced by the new features; prioritize remediation. | â |
+| **P1** | P1â01 | **JWT Authentication Stack** | Implement JWT library, secret management, token signing/verification, and refresh token handling. | â |
+| | P1â02 | **User Database Models & Password Hashing** | Define Pydantic models for users, passwords; integrate bcrypt/Argon2 for password storage; create user schema migrations. | â |
+| | P1â03 | **Session Management** â InâMemory + Redis Backâfill | Implement a session store (starting in memory, migrating to Redis); expose `get_current_user` and `set_session` endpoints. | â |
+| | P1â04 | **Basic Auth Routes** â Register & Login | Build `/auth/register`, `/auth/login`, protected route decorator; add error handling and rateâlimiting. | â |
+| | P1â05 | **Audit Logging â Core** | Set up structured JSON audit log with fields: `action_type`, `user_id`, `timestamp`, `request_id`, `path`, `method`, `data`. | â |
+| | P1â06 | **Integration & Validation** | Wire auth routes into the existing API; add unit & integration tests for all auth flow. | â |
+| **P2** | P2â01 | **API Key Rotation System** | Build perâapp key rotation (scheduleâbased + manual trigger), revocation, and audit log entries on each change. | â |
+| | P2â02 | **Audit Logging â Advanced** | Add request/response tracking, data-modification logging (create, update, delete), log retention policy & cleanup job. | â |
+| | P2â03 | **Admin Dashboard API Endpoints** | Create REST endpoints for admin: `/admin/users`, `/admin/api-keys/{key_id}`, `/admin/audit-logs`; expose a simple frontâend UI. | â |
+| | P2â04 | **Data Validation & Input Sanitization** | Validate all auth, key, and audit data; enforce type constraints; add input sanitization for security. | â |
+| | P2â05 | **Performance & Security Hardening** | Optimize query performance (indexing, caching); add rate limiting on auth endpoints; implement audit log compression. | â |
+
+---
+
+## Detailed Task Descriptions  
+
+### P0 â Planning & Assessment
+
+#### P0â01: Current State Audit
+| Item | Action | Accept

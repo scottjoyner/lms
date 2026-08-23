@@ -1,0 +1,36 @@
+## Root Cause
+
+The error `TypeError: 'NoneType' object is not subscriptable` occurs because one of the intermediate dictionary lookups failed to find a key, resulting in a value of `None`. Specifically, it is highly likely that either `payload['user']` is `None`, or `payload['user']['id']` is `None`, and the script attempts to access a key on that `None` object.
+
+## Safe Fix
+
+Use `.get()` methods to safely access nested dictionary keys, providing default values (like an empty dictionary `{}`) if a key is missing, preventing the script from crashing when data is incomplete.
+
+```python
+# Original problematic line: user_id = payload['user']['id']
+
+# Safe Fix: Use .get() for safe navigation
+user_data = payload.get('user', {})  # Get 'user' or an empty dict if missing
+user_id = user_data.get('id')        # Get 'id' from the result, defaults to None if not found
+
+# Or, more concisely:
+user_id = payload.get('user', {}).get('id')
+```
+
+## Regression Tests
+
+### Test 1: Missing Nested Key (Failure Case)
+
+**Goal:** Ensure the script handles missing keys gracefully without raising an error.
+
+*   **Input Payload:** `{'user': {'name': 'Alice'}}` (Missing the `'id'` key)
+*   **Expected Output:** `user_id` should be `None`.
+*   **Assertion:** Verify that no `TypeError` is raised and `user_id` is correctly assigned `None`.
+
+### Test 2: Missing Intermediate Key (Failure Case)
+
+**Goal:** Ensure the script handles missing intermediate dictionary keys gracefully.
+
+*   **Input Payload:** `{'other_data': 'value'}` (Missing the `'user'` key entirely)
+*   **Expected Output:** `user_id` should be `None`.
+*   **Assertion:** Verify that no `KeyError` is raised and `user_id` is correctly assigned `None`.

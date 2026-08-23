@@ -1,0 +1,19 @@
+[
+  {
+    "base_url": "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0449,
+    "model_count": 7,
+    "models": [
+      "vibethinker-3b-heretic-i1",
+      "google/gemma-4-e2b",
+      "qwopus3.5-4b-coder-mtp",
+      "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch",
+      "liquid/lfm2.5-1.2b",
+      "text-embedding-nomic-embed-text-v1.5"
+    ],
+    "error": null
+  }
+]

@@ -1,0 +1,37 @@
+# Safe Cleanup Instructions
+
+## Step 1: Docker Image Pruning (Safe)
+
+```bash
+# Remove stale Docker images
+docker rmi -f $(docker image ls --format='{{.Names}}' | grep -v 'latest')
+
+# Clean up temporary files
+docker system prune -a
+
+# Verify cleanup
+docker ps
+```
+
+## Step 2: Permission Reset (Requires Confirmation)
+
+```bash
+# Reset permissions to default
+sudo chown root:root /var/log/* /var/tmp/* /tmp/*
+
+# If you want specific directories reset, specify them
+sudo chown -R root:root /home/* /usr/local/*
+```
+
+## Step 3: Backup (Recommended)
+
+```bash
+# Create a backup of your system state
+sudo cp /etc/hosts /etc/hosts.bak
+sudo cp /var/log/* /var/log/bak.*
+sudo cp /tmp/* /tmp/bak.*
+```
+
+---
+
+**Please confirm you want to proceed with these steps.** I'll wait for your approval before executing any changes.

@@ -1,0 +1,74 @@
+
+
+# Safe Cleanup Commands â Review & Confirm Before Proceeding
+
+## â ï¸ Important: Resetting Permissions Requires Confirmation
+
+Resetting file/directory permissions on the entire system can break services, applications, and your own files. **Do not run a blanket `chmod` command without explicit confirmation.** Please confirm what you want to do before I provide it.
+
+---
+
+## 1. Docker Cleanup (Safe)
+
+These commands remove unused Docker resources. They are generally safe but will permanently delete data.
+
+```bash
+# View current usage
+docker system df -v
+
+# Remove unused containers, networks, images, and dangling volumes
+# â ï¸ This is destructive â confirm before running:
+echo "Are you sure? (yes/no)" | docker system prune --force
+
+# More aggressive: also remove unused volumes
+# â ï¸ Volumes may contain important data â confirm carefully:
+echo "Are you sure about removing unused volumes? (yes/no)" | \
+  docker system prune --volumes --force
+```
+
+**What each removes:**
+| Command | Removes |
+|---|---|
+| `docker system prune` | Unused containers, networks, images, dangling volumes |
+| `--volumes` flag | Also unused named/volume data (â ï¸ may contain important files) |
+| `--force` | Bypasses interactive prompt |
+
+**Backup recommendation:** Before running any of these, consider exporting critical data:
+```bash
+# Backup a specific volume before pruning it
+docker run --rm -v <volume_name>:/data alpine tar czf /backup.tar.gz /data
+```
+
+---
+
+## 2. Temporary File Cleanup (Safe)
+
+These commands clean common temporary directories. **Do not delete files you don't recognize.**
+
+```bash
+# List temp directories to review what's there
+ls -la /tmp/ /var/tmp/ /run/
+
+# Safe cleanup of known temp locations
+find /tmp -type f -mtime +7 -delete  # Delete files older than 7 days in /tmp
+find /var/tmp -type f -mtime +14 -delete  # Delete files older than 2 weeks in /var/tmp
+```
+
+**â ï¸ Warning:** Some temp directories are managed by the system (e.g., `/run/` contains PID files). Do not delete anything you don't understand.
+
+---
+
+## 3. Permission Reset â Requires Your Confirmation
+
+Resetting permissions on the entire filesystem is **highly dangerous**. It can:
+- Break services and applications
+- Lock your own files
+- Cause data corruption
+
+**Please confirm what you want to do:**
+
+1. **Just reset permissions for a specific directory?** (e.g., `/var/log`, `/home`)
+2. **Reset permissions on all user-owned directories only?**
+3. **Something else entirely?**
+
+Once you confirm, I'll provide the safe command with proper safeguards.

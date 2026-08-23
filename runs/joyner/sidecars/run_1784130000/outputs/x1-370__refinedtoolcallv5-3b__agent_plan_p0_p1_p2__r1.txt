@@ -1,0 +1,110 @@
+<think>The user wants me (as a delivery-focused software architecture agent) to create an implementation plan for adding user authentication, API key rotation, audit logging, and admin dashboards to an existing FastAPI service. They want the plan organized as P0, P1, and P2 tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what P0, P1, P2 mean in this context: typically:
+- P0: Must-have, critical, immediate tasks
+- P1: Should-have, important but not critical
+- P2: Nice-to-have, optional
+
+But the user didn't specify exact definitions. I'll assume typical software engineering prioritization levels:
+
+- **P0** (Critical/Must-Have): The core features that are essential for the service to work correctly - authentication and audit logging at minimum.
+- **P1** (High-Priority/Should-Have): API key rotation, admin dashboards
+- **P2** (Optional/Nice-to-Have): Maybe advanced security features or performance optimizations.
+
+But actually they want all four features: user authentication, API key rotation, audit logging, and admin dashboards. So I need to map these across the three priority levels appropriately.
+
+Let me think about what each feature entails:
+
+1. **User Authentication** - JWT tokens, password hashing, login, register, role-based access control
+2. **API Key Rotation** - Secure rotation mechanism for API keys, validation, revocation
+3. **Audit Logging** - Log all user actions (login, password changes, API calls, etc.) with timestamps and user IDs
+4. **Admin Dashboards** - UI for admins to view audit logs, user stats, API key usage, etc.
+
+Implementation plan should be organized as P0 tasks, P1 tasks, P2 tasks.
+
+Each task must include acceptance criteria and test expectations.
+
+Let me design a comprehensive implementation plan:
+
+### P0: Core Authentication & Basic Audit Logging
+
+These are critical for the service to function correctly:
+- P0-1: Set up user model, password hashing (bcrypt), JWT library integration
+- P0-2: Implement login/register endpoints with token generation and validation
+- P0-3: Create audit log entry endpoint that logs all user actions; integrate with database
+- Acceptance Criteria & Test Expectations
+
+### P0 also includes:
+- P0-4: Ensure JWT refresh mechanism works (refresh tokens, expiration handling)
+- P0-5: Implement role-based access control middleware
+
+But maybe we should keep P0 manageable. Let's think about the order:
+
+**P0** - Must-have for service to be usable:
+1. User authentication (login/register, protected routes)
+2. Audit logging (basic log of actions)
+3. JWT token management (issue, validate, refresh)
+
+**P1** - Important but not critical; enhances security and operational capabilities:
+4. API key rotation mechanism
+5. Admin dashboard for monitoring audit logs, user stats, API key usage
+
+**P2** - Nice-to-have / advanced features:
+- Rate limiting on auth endpoints
+- Session management
+- Multi-factor authentication support
+- API key revocation
+- Comprehensive test coverage for these features
+
+But the request is to add "API key rotation" and "admin dashboards". Those could be P1 tasks. Let me map:
+
+**P0**: Authentication (login/register, JWT), Audit Logging (basic)
+**P1**: API Key Rotation, Admin Dashboards
+**P2**: Advanced security enhancements for auth & audit logging
+
+Let's create a detailed plan.
+
+I'll produce the plan in a clear structured format with sections: P0 Tasks, P1 Tasks, P2 Tasks. Each task includes:
+- Task ID/Title
+- Description
+- Acceptance Criteria (what must be verified)
+- Test Expectations (what tests should pass)
+
+Let me write this out now.
+
+Given I need to produce the plan as final output; no clarifying questions needed.
+</think>
+## Implementation Plan: User Authentication, API Key Rotation & Admin Dashboards  
+
+| Priority | Level | Task ID | Description |
+|----------|-------|---------|-------------|
+| **P0** | Critical / MustâHave | P0-1 | Set up user model, password hashing, and JWT integration for login/register |
+|          |       | P0-2 | Implement protected routes with token validation and refresh logic |
+|          |       | P0-3 | Create audit log endpoint that records every user action (login, password change, API call) |
+|          |       | P0-4 | Add audit log persistence to the database; ensure logs are searchable by date/user |
+| **P1** | HighâPriority / ShouldâHave | P1-1 | Build API key rotation mechanism with secure key exchange and revocation |
+|          |       | P1-2 | Implement admin endpoint for rotating, revoking, and listing API keys |
+|          |       | P1-3 | Design and build admin dashboard UI for monitoring audit logs, user statistics, and API key usage |
+| **P2** | NiceâtoâHave / Advanced | P2-1 | Add rate limiting on auth & API endpoints to prevent brute-force attacks |
+|          |       | P2-2 | Implement multi-factor authentication (MFA) support for critical endpoints |
+|          |       | P2-3 | Add comprehensive test suites and performance benchmarks for all new features |
+|          |       | P2-4 | Document security best practices, audit log formatting standards, and key rotation policies |
+
+---
+
+## P0: Core User Authentication & Basic Audit Logging  
+
+### P0â1: Set up user model, password hashing, and JWT integration  
+
+**Description:**  
+Create the database schema for `User`, configure a password hashing library (bcrypt), and integrate PythonâJWT for token generation, validation, and refresh.
+
+**Acceptance Criteria:**  
+- `[A01]` User model with `id`, `email`, `username`, `password_hash`, `is_active`, `roles` is created in the database.  
+- `[A02]` `bcrypt` (or Argon2) is used for password hashing; `passwords` are stored as hashes, never plain text.  
+- `[A03]` `jwt` library is imported and configured with:  
+  - Secret key & algorithm (`HS256`).  
+  - `access_token_expiration` (e.g., 1 hour).  
+  - `refresh_token_expiration` (e.g., 7 days).  
+- `[A04]` `get_current_user()` middleware successfully extracts the current user from a valid JWT and returns `{id, email, username}`.  
+- `[A05]`

@@ -1,0 +1,96 @@
+
+
+## Root Cause Analysis
+
+The error occurs because `payload` contains a dictionary, but its value for key `'user'` is `None`. This means the script expects a user object with an 'id' field (likely of type int or similar), but instead received a None value instead.
+
+This could happen if:
+- A missing key in the payload dictionary
+- An exception was caught and silently ignored
+- The data source is returning empty/null values for user fields
+- There's an issue with how the payload was constructed
+
+---
+
+## Safe Fix
+
+Use Python 3.7+ `defaultdict` to automatically handle None values, or wrap access in a try-except block:
+
+```python
+# Option 1: Using defaultdict (recommended)
+from collections import defaultdict
+
+payload = {
+    'user': {'id': 42}  # Valid data
+}
+
+try:
+    user_id = payload['user']['id']
+except KeyError as e:
+    print(f"Key error: {e}")
+```
+
+Or with explicit None handling:
+
+```python
+payload = {}
+if 'user' in payload and payload['user']:  # Check if value exists before accessing
+    user_id = payload['user'].get('id')  # Get default value if None
+else:
+    user_id = None
+```
+
+---
+
+## Regression Tests
+
+### Test 1: Normal Operation with Valid Data
+```python
+def test_normal_payload():
+    payload = {
+        'user': {'id': 42},
+        'other_field': 'value'
+    }
+    
+    # Should work without error
+    user_id = payload['user']['id']
+    assert user_id == 42, f"Expected 42, got {user_id}"
+    print("â Normal operation passed")
+
+test_normal_payload()
+```
+
+### Test 2: Edge Case - Missing 'user' Key
+```python
+def test_missing_user_key():
+    payload = {'other_field': 'value'}
+    
+    # Should raise KeyError instead of TypeError
+    try:
+        user_id = payload['user']['id']
+        assert False, "Should have raised KeyError"
+    except KeyError as e:
+        print(f"â Correctly caught KeyError: {e}")
+
+test_missing_user_key()
+```
+
+### Test 3: Edge Case - Empty Payload
+```python
+def test_empty_payload():
+    payload = {}
+    
+    # Should raise TypeError for accessing user field
+    try:
+        user_id = payload['user']['id']
+        assert False, "Should have raised TypeError"
+    except TypeError as e:
+        print(f"â Correctly caught TypeError: {e}")
+
+test_empty_payload()
+```
+
+### Test 4: Edge Case - Invalid User ID Type
+```python
+def test_invalid_user_id_type():
+    payload = {'user': {'id': 'not

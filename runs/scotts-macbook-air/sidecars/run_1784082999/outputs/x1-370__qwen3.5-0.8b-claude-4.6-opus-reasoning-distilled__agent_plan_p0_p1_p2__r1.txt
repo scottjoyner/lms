@@ -1,0 +1,127 @@
+
+
+# Implementation Plan: FastAPI Authentication & System Enhancements
+
+## Executive Summary
+
+This plan addresses critical security enhancements to an existing FastAPI service. The implementation focuses on user authentication (JWT-based), secure API key rotation, comprehensive audit logging, and a minimal admin dashboard for system management. Each component follows best practices with clear acceptance criteria and test expectations.
+
+---
+
+## P0: Core Authentication & API Key Rotation
+
+### Task 1: JWT-Based User Authentication
+- **Objective**: Implement secure authentication using JSON Web Tokens (JWT) with refresh token mechanism
+- **Scope**: Login, register, verify tokens, handle token expiration gracefully
+
+#### Acceptance Criteria:
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Token format validation | Pass | Must validate header.payload.signature in body |
+| Refresh token generation | Pass | Generate valid refresh token with user ID |
+| Token expiry handling | Pass | Reject expired tokens gracefully (503) |
+| Login response format | Pass | Return JSON with user info, claims, and refresh token |
+| Password verification | Pass | Use bcrypt for password hashing |
+
+#### Test Expectations:
+```python
+# Expected behavior - should accept valid JWT login
+response = app.post("/login", json={"username": "testuser"})
+assert response.status_code == 200
+assert response.json()["user"] is not None
+assert response.json()["refresh_token"] in tokens
+
+# Expected behavior - should reject invalid token
+response = app.post("/login", json={"token": "invalid"})
+assert response.status_code == 401
+```
+
+---
+
+### Task 2: Secure API Key Rotation
+- **Objective**: Implement rotation mechanism for sensitive credentials (API keys, passwords)
+- **Scope**: Generate new keys, rotate current ones, log rotation events
+
+#### Acceptance Criteria:
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| New key generation | Pass | Create unique 32-character alphanumeric key |
+| Current key rotation | Pass | Replace old key with new one |
+| Rotation logging | Pass | Log timestamp, old/new keys, user ID |
+| Rate limiting on rotation | â ï¸ Pending | Implement basic limit (10/sec) |
+
+#### Test Expectations:
+```python
+# Expected behavior - should generate new API key
+response = app.post("/rotate-api-key", json={"old_key": "abc123"})
+assert response.status_code == 200
+assert response.json()["new_key"] != "abc123"
+
+# Expected behavior - should log rotation event
+app.logger.info("API Key Rotation", old_key="old_value", new_key="new_value")
+```
+
+---
+
+### Task 3: Basic User Registration
+- **Objective**: Implement secure user registration with validation
+- **Scope**: Create user, validate email format, store in database (mocked for now)
+
+#### Acceptance Criteria:
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Email format validation | Pass | Reject invalid formats |
+| Password confirmation | Pass | Validate password matches |
+| User creation success | Pass | Return user ID and registration status |
+| Duplicate prevention | â ï¸ Pending | Prevent duplicate registrations |
+
+#### Test Expectations:
+```python
+# Expected behavior - should create valid user
+response = app.post("/register", json={"email": "test@example.com"})
+assert response.status_code == 201
+assert response.json()["user_id"] is not None
+assert response.json()["status"] == "registered"
+
+# Expected behavior - should reject invalid email
+response = app.post("/register", json={"email": "invalid-email"})
+assert response.status_code == 400
+```
+
+---
+
+## P1: Audit Logging System
+
+### Task 4: Comprehensive Authentication Log
+- **Objective**: Track all authenticated user actions with full audit trail
+- **Scope**: Log login, logout, API calls, file uploads, etc.
+
+#### Acceptance Criteria:
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Login timestamp | Pass | Include in log entry |
+| User ID tracking | Pass | Track user across all actions |
+| IP address logging | â ï¸ Pending | Log client IP (not backend) |
+| API call details | Pass | Include request method, path, status code |
+| File upload logs | â ï¸ Pending | Log uploaded files with size and timestamp |
+
+#### Test Expectations:
+```python
+# Expected behavior - should log login event
+app.logger.info("Login", user_id=12345, ip="192.168.1.1")
+
+# Expected behavior - should track logout
+app.logger.info("Logout", user_id=12345)
+```
+
+---
+
+### Task 5: File Upload Audit Logging
+- **Objective**: Log all file uploads with metadata for security and compliance
+- **Scope**: Record upload timestamp, filename, size, destination path
+
+#### Acceptance Criteria:
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Timestamp recording | Pass | Include ISO8601 format timestamp |
+| Filename validation

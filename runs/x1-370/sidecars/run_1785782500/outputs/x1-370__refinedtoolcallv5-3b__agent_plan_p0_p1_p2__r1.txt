@@ -1,0 +1,128 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical/must have), P1 (should have), and P2 (nice-to-have) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what a typical FastAPI service looks like before adding these features, but since I don't know specifics, I'll create a comprehensive plan that covers the core implementation steps for each feature with realistic ordering.
+
+Let me break down:
+
+1. User Authentication
+2. API Key Rotation
+3. Audit Logging
+4. Admin Dashboards
+
+Each of these will have tasks at P0 (critical), P1 (important but not critical), and P2 (nice-to-have). I need to think about the typical implementation steps for each.
+
+User Authentication:
+- P0: Set up JWT token generation & verification, user model, password hashing
+- P1: Implement login/logout flows, refresh tokens, password reset flow
+- P2: Social login integrations (Google, GitHub)
+
+API Key Rotation:
+- P0: API key validation middleware, rotation mechanism
+- P1: Secure storage of keys, rotation schedule, fallback handling
+- P2: Multi-tenant key management, key revocation
+
+Audit Logging:
+- P0: Log all auth-related events, request/response logging
+- P1: Log user actions, system events, security events
+- P2: Detailed audit trails per user, compliance reporting
+
+Admin Dashboards:
+- P0: API key management UI, user stats overview
+- P1: Activity logs view, permission-based filtering
+- P2: Custom report generation, notification system
+
+I should also think about dependencies between tasks. For example, you need auth before audit logging; rotation may depend on having keys to rotate.
+
+Let me structure the plan clearly:
+
+**Project Overview**: FastAPI service with existing backend logic.
+
+**P0 Tasks (Critical - Must be done before any other work)**:
+- P0-1: User Authentication Core
+  - Generate JWT tokens, user model, password hashing
+  - Implement authentication middleware
+
+- P0-2: API Key Validation Middleware
+  - Validate API keys on every request
+  - Detect invalid/missing keys and raise errors
+
+- P0-3: Audit Logging Framework
+  - Create structured audit log model
+  - Implement logging middleware (request/response)
+  - Set up log storage (database or external)
+
+**P1 Tasks (Important but Not Critical)**:
+- P1-1: User Authentication Advanced Features
+  - Password reset flow with email verification
+  - Token refresh endpoint
+
+- P1-2: API Key Rotation System
+  - Secure key storage (encrypted DB)
+  - Rotation workflow (old â new, rotation schedule)
+
+- P1-3: Audit Logging Enhancements
+  - Log user actions (login, updates, permissions changed)
+  - Log system events (service start, errors, timeouts)
+
+- P1-4: Admin Dashboard Core
+  - API key management UI
+  - User activity overview
+
+**P2 Tasks (Nice-to-Have)**:
+- P2-1: Social Authentication
+  - Google/GitHub OAuth integration for new users
+
+- P2-2: Multi-Tenant Key Management
+  - Separate key storage per tenant
+  - Key revocation across tenants
+
+- P2-3: Advanced Audit Features
+  - Detailed audit trail per user
+  - Compliance reporting (audit report generation)
+
+- P2-4: Dashboard Enhancements
+  - Custom report generation
+  - Notification system for critical events
+
+For each task, I need acceptance criteria and test expectations.
+
+Let me write this out clearly.</think>## Implementation Plan â FastAPI Service: Auth, API Key Rotation, Audit Logging & Admin Dashboards  
+
+| Level | Task ID | Description |
+|-------|---------|-------------|
+| **P0** | P0â1 | User Authentication Core |
+|       | P0â2 | API Key Validation Middleware |
+|       | P0â3 | Audit Logging Framework |
+| **P1** | P1â1 | User Authentication Advanced Features |
+|       | P1â2 | API Key Rotation System |
+|       | P1â3 | Audit Logging Enhancements |
+|       | P1â4 | Admin Dashboard Core |
+| **P2** | P2â1 | Social Authentication |
+|       | P2â2 | MultiâTenant Key Management |
+|       | P2â3 | Advanced Audit Features |
+|       | P2â4 | Dashboard Enhancements |
+
+---  
+
+## P0 â Critical Tasks (Must be Done Before Any Other Work)
+
+### P0â1. User Authentication Core
+**Purpose:** Provide the foundational auth infrastructure so that all other features can build on it.
+
+| # | Task | Details |
+|---|------|---------|
+| **P0â1â1** | Define & Implement User Model & Password Hashing | â¢ Create `User` / `UserInDB` Pydantic models  <br>â¢ Use `bcrypt` (or Argon2) for password hashing  <br>â¢ Implement `create_user`, `login`, `verify_password` endpoints  <br>â¢ Generate a secret key for JWT signing |
+| **P0â1â2** | JWT Token System | â¢ Implement `token_generator()` â `short_token()`, `long_token()`  <br>â¢ Create `TokenRequest` / `TokenResponse` Pydantic schemas  <br>â¢ Build `authenticate_user` middleware that extracts Bearer token, validates signature & payload  <br>â¢ Return `access_token` + optional `refresh_token` on success |
+| **P0â1â3** | Session/State Management | â¢ Store user ID in DB per request (e.g., Redis or DB session)  <br>â¢ Implement `set_session(user_id)` / `get_session()` middleware  <br>â¢ Handle token expiration & refresh flow |
+
+**Acceptance Criteria**
+- [ ] `POST /auth/login` returns `201` with `access_token`, `refresh_token`, `user_id`
+- [ ] `GET /api/v1/me` returns current user data and valid JWT
+- [ ] `DELETE /auth/token` removes refresh token from session
+- [ ] Invalid credentials raise `401` (bad token or wrong password)
+- [ ] Missing/invalid JWT raises `401`
+
+**Test Expectations**
+| Test | Tool | Expected Result |
+|------|------|-----------------|
+| Auth success flow | pytest + `pytest-asyncio` | Pass: 20

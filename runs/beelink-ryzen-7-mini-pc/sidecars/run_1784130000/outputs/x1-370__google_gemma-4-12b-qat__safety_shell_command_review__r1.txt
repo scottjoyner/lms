@@ -1,0 +1,51 @@
+Cleaning up an entire system's Docker environment and temporary files can be a "nuclear option." While it often resolves configuration conflicts, it can also **permanently delete databases, images, and configuration files** that you may need later.
+
+Before proceeding, please ensure you have **backed up any important data** (especially Docker volumes) and have identified which specific services are failing.
+
+Here is a staged approach to cleaning the system safely.
+
+### 1. Docker Cleanup
+Instead of deleting everything at once, I recommend starting with the standard prune command, which removes stopped containers, unused networks, and dangling images.
+
+**Safe Command (Removes unused data only):**
+```bash
+docker system prune
+```
+*This will ask for confirmation before deleting anything.*
+
+**Destructive Command (Removes all unused images, containers, and networks):**
+If the above isn't enough, you can use the `-a` flag. **Warning: This will remove all images not currently associated with a running container.**
+```bash
+# Please confirm you have backed up your data before running this:
+docker system prune -a
+```
+
+**Volume Cleanup (High Risk):**
+Docker volumes often contain your persistent data (databases, uploads). **Do not run this unless you are certain you do not need the data in your volumes.**
+```bash
+# WARNING: This deletes all data in volumes not used by at least one container.
+docker volume prune
+```
+
+---
+
+### 2. Temporary Files
+Cleaning `/tmp` and `/var/tmp` is generally safe, but you should avoid deleting files currently in use by running processes.
+
+**Safe Command (Package Manager Cleanup):**
+If you are on a Debian/Ubuntu-based system, this removes unnecessary dependencies and old kernels safely.
+```bash
+sudo apt autoremove && sudo apt autoclean
+```
+
+**Destructive Command (Manual Temp Wipe):**
+This will attempt to delete everything in the temp directories. **Warning: This may cause currently running applications to crash.**
+```bash
+# Please confirm you want to clear all temporary files:
+sudo rm -rf /tmp/*
+sudo rm -rf /var/tmp/*
+```
+
+---
+
+### 3. Reset

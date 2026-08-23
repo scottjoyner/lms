@@ -1,0 +1,29 @@
+### Root Cause
+The error occurs because `payload['user']` evaluates to `None`. In Python, you cannot use square brackets (`[]`) to access keys on a `NoneType` object. This typically happens when the input data (like a JSON response) contains the key `"user"`, but its value is explicitly null.
+
+### Safe Fix
+Use the `.get()` method with a default empty dictionary `{}`. This allows you to chain lookups safely without raising an exception if a key is missing or null.
+
+```python
+# Safe approach: returns None if 'user' is missing or None, 
+# and returns None if 'id' is missing.
+user_id = payload.get('user', {}).get('id') if payload.get('user') else None
+
+# Alternative (more concise if you just want a default value):
+user_id = (payload.get('user') or {}).get('id')
+```
+
+### Regression Tests
+You can use these test cases to ensure the fix handles both missing keys and null values.
+
+```python
+def test_get_user_id():
+    # Test Case 1: 'user' key is None (The original bug)
+    payload_null = {'user': None}
+    assert (payload_null.get('user') or {}).get('id') is None
+    
+    # Test Case 2: 'user' key is missing entirely
+    payload_missing = {}
+    assert (payload_missing.get('user') or {}).get('id') is None
+    
+    #

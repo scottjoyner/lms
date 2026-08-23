@@ -1,0 +1,94 @@
+## Root Cause
+
+The error occurs because the `payload` dictionary contains a `'user'` key, but its value is `None`. The script attempts to access `.id()` on this `None` object, triggering the TypeError. This could happen if:
+- A user was deleted from the system
+- The payload was corrupted during transmission
+- An API returned an empty response for that user
+
+## Safe Fix
+
+```python
+# Option 1: Try-except approach (most robust)
+try:
+    user_id = payload['user']['id']
+except KeyError as e:
+    print(f"User not found in payload: {e}")
+    # Handle appropriately - log, retry, or return error code
+
+# Option 2: Use default value when 'user' is None
+if 'user' in payload and payload['user']:
+    user_id = payload['user']['id']
+else:
+    user_id = "None"  # Or handle gracefully
+```
+
+## Regression Tests
+
+```python
+import json
+from unittest.mock import Mock, patch
+
+def test_valid_user_payload():
+    """Test with valid user data"""
+    payload = {
+        'status': 'success',
+        'data': {
+            'user_id': 12345,
+            'name': 'John Doe',
+            'email': 'john@example.com'
+        }
+    }
+    
+    with patch('sys.modules[__name__].json') as mock_json:
+        mock_json.return_value = payload
+        
+        from app import main
+        try:
+            main()
+            print("â Valid user test passed")
+        except Exception as e:
+            print(f"â Valid user test failed: {e}")
+
+def test_missing_user_key():
+    """Test with missing 'user' key in payload"""
+    payload = {
+        'status': 'success',
+        'data': {}  # No user data at all
+    }
+    
+    with patch('sys.modules[__name__].json') as mock_json:
+        mock_json.return_value = payload
+        
+        from app import main
+        try:
+            main()
+            print("â Missing user key test failed - should have raised error")
+        except KeyError as e:
+            print(f"â Missing user key test passed (correctly caught): {e}")
+
+def test_empty_payload():
+    """Test with empty payload"""
+    payload = {}
+    
+    with patch('sys.modules[__name__].json') as mock_json:
+        mock_json.return_value = payload
+        
+        from app import main
+        try:
+            main()
+            print("â Empty payload test failed - should have raised error")
+        except TypeError as e:
+            if 'NoneType' in str(e):
+                print(f"â Empty payload test passed (correctly caught None error): {e}")
+
+def test_nonexistent_user_id():
+    """Test with non-existent user ID"""
+    payload = {
+        'status': 'success',
+        'data': {
+            'user_id': 99999,  # Non-existent
+            'name': 'Unknown User'
+        }
+    }
+    
+    with patch('sys

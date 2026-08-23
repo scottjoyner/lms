@@ -1,0 +1,17 @@
+import re
+
+def normalize_phone_number(value: str) -> str:
+    """
+    Strips non-digits from a string and validates if it represents a 10-digit US number
+    or an 11-digit number starting with '1'. Raises ValueError otherwise.
+    """
+    # Extract only digits
+    digits = "".join(filter(str.isdigit, value))
+    N = len(digits)
+
+    if N == 10:
+        return digits
+    elif N == 11 and digits.startswith('1'):
+        return digits
+    else:
+        raise ValueError("Invalid phone number format. Must be 10 digits

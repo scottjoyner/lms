@@ -1,0 +1,51 @@
+## Root Cause
+
+The error occurs because one of the nested dictionary lookups returns `None` â most likely `payload['user']` is `None`. This happens when:
+
+- The API response contains no `user` field (e.g., empty or malformed JSON)
+- A middleware stripped the user data before it reached this line
+- The payload was initialized as `{}` and never populated with a `user` key
+
+Attempting to subscript `None['id']` raises `'NoneType' object is not subscriptable`.
+
+## Safe Fix
+
+Add defensive checks before accessing nested keys:
+
+```python
+# Line 42 â safe access pattern
+if payload.get('user') is None or 'id' not in payload['user']:
+    raise ValueError("Missing user.id in payload")
+
+user_id = payload['user']['id']
+```
+
+Or use `.get()` with a default:
+
+```python
+user_data = payload.get('user', {})
+if not user_data:
+    raise ValueError("Invalid or missing user data in payload")
+
+user_id = user_data['id']
+```
+
+## Regression Tests
+
+**Test 1 â Missing `user` key:**
+
+```python
+def test_missing_user_key():
+    payload = {}  # no 'user' field at all
+    with pytest.raises(ValueError, match="Missing user.id"):
+        process_payload(payload)
+```
+
+**Test 2 â `user` is `None`:**
+
+```python
+def test_user_is_none():
+    payload = {'user': None}
+    with pytest.raises(ValueError, match="Invalid or missing user data"):
+        process_payload(payload)
+```

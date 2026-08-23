@@ -1,0 +1,876 @@
+{
+  "cpu": {
+    "architecture": "x86_64",
+    "cores_per_socket": "12",
+    "cpu_mhz_max_observed": 4511.62,
+    "cpu_mhz_min_observed": 2838.813,
+    "cpu_op_modes": "32-bit, 64-bit",
+    "flags": [
+      "fpu",
+      "vme",
+      "de",
+      "pse",
+      "tsc",
+      "msr",
+      "pae",
+      "mce",
+      "cx8",
+      "apic",
+      "sep",
+      "mtrr",
+      "pge",
+      "mca",
+      "cmov",
+      "pat",
+      "pse36",
+      "clflush",
+      "mmx",
+      "fxsr",
+      "sse",
+      "sse2",
+      "ht",
+      "syscall",
+      "nx",
+      "mmxext",
+      "fxsr_opt",
+      "pdpe1gb",
+      "rdtscp",
+      "lm",
+      "constant_tsc",
+      "rep_good",
+      "amd_lbr_v2",
+      "nopl",
+      "xtopology",
+      "nonstop_tsc",
+      "cpuid",
+      "extd_apicid",
+      "aperfmperf",
+      "rapl",
+      "pni",
+      "pclmulqdq",
+      "monitor",
+      "ssse3",
+      "fma",
+      "cx16",
+      "sse4_1",
+      "sse4_2",
+      "movbe",
+      "popcnt",
+      "aes",
+      "xsave",
+      "avx",
+      "f16c",
+      "rdrand",
+      "lahf_lm",
+      "cmp_legacy",
+      "svm",
+      "extapic",
+      "cr8_legacy",
+      "abm",
+      "sse4a",
+      "misalignsse",
+      "3dnowprefetch",
+      "osvw",
+      "ibs",
+      "skinit",
+      "wdt",
+      "tce",
+      "topoext",
+      "perfctr_core",
+      "perfctr_nb",
+      "bpext",
+      "perfctr_llc",
+      "mwaitx",
+      "cpuid_fault",
+      "cpb",
+      "cat_l3",
+      "cdp_l3",
+      "hw_pstate",
+      "ssbd",
+      "mba",
+      "perfmon_v2",
+      "ibrs",
+      "ibpb",
+      "stibp",
+      "ibrs_enhanced",
+      "vmmcall",
+      "fsgsbase",
+      "tsc_adjust",
+      "bmi1",
+      "avx2",
+      "smep",
+      "bmi2",
+      "erms",
+      "invpcid",
+      "cqm",
+      "rdt_a",
+      "avx512f",
+      "avx512dq",
+      "adx",
+      "smap",
+      "avx512ifma",
+      "clflushopt",
+      "clwb",
+      "avx512cd",
+      "sha_ni",
+      "avx512bw",
+      "avx512vl",
+      "xsaveopt",
+      "xsavec",
+      "xgetbv1",
+      "xsaves",
+      "cqm_llc",
+      "cqm_occup_llc",
+      "cqm_mbm_total",
+      "cqm_mbm_local",
+      "user_shstk",
+      "avx_vnni",
+      "avx512_bf16",
+      "clzero",
+      "irperf",
+      "xsaveerptr",
+      "rdpru",
+      "wbnoinvd",
+      "cppc",
+      "arat",
+      "npt",
+      "lbrv",
+      "svm_lock",
+      "nrip_save",
+      "tsc_scale",
+      "vmcb_clean",
+      "flushbyasid",
+      "decodeassists",
+      "pausefilter",
+      "pfthreshold",
+      "avic",
+      "v_vmsave_vmload",
+      "vgif",
+      "x2avic",
+      "v_spec_ctrl",
+      "vnmi",
+      "avx512vbmi",
+      "umip",
+      "pku",
+      "ospke",
+      "avx512_vbmi2",
+      "gfni",
+      "vaes",
+      "vpclmulqdq",
+      "avx512_vnni",
+      "avx512_bitalg",
+      "avx512_vpopcntdq",
+      "rdpid",
+      "bus_lock_detect",
+      "movdiri",
+      "movdir64b",
+      "overflow_recov",
+      "succor",
+      "smca",
+      "fsrm",
+      "avx512_vp2intersect",
+      "flush_l1d",
+      "amd_lbr_pmc_freeze"
+    ],
+    "logical_processors": 24,
+    "lscpu": {
+      "lscpu": [
+        {
+          "data": "x86_64",
+          "field": "Architecture:"
+        },
+        {
+          "data": "32-bit, 64-bit",
+          "field": "CPU op-mode(s):"
+        },
+        {
+          "data": "48 bits physical, 48 bits virtual",
+          "field": "Address sizes:"
+        },
+        {
+          "data": "Little Endian",
+          "field": "Byte Order:"
+        },
+        {
+          "data": "24",
+          "field": "CPU(s):"
+        },
+        {
+          "data": "0-23",
+          "field": "On-line CPU(s) list:"
+        },
+        {
+          "data": "AuthenticAMD",
+          "field": "Vendor ID:"
+        },
+        {
+          "data": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+          "field": "Model name:"
+        },
+        {
+          "data": "26",
+          "field": "CPU family:"
+        },
+        {
+          "data": "36",
+          "field": "Model:"
+        },
+        {
+          "data": "2",
+          "field": "Thread(s) per core:"
+        },
+        {
+          "data": "12",
+          "field": "Core(s) per socket:"
+        },
+        {
+          "data": "1",
+          "field": "Socket(s):"
+        },
+        {
+          "data": "0",
+          "field": "Stepping:"
+        },
+        {
+          "data": "enabled",
+          "field": "Frequency boost:"
+        },
+        {
+          "data": "88%",
+          "field": "CPU(s) scaling MHz:"
+        },
+        {
+          "data": "5157.8950",
+          "field": "CPU max MHz:"
+        },
+        {
+          "data": "605.2640",
+          "field": "CPU min MHz:"
+        },
+        {
+          "data": "3992.42",
+          "field": "BogoMIPS:"
+        },
+        {
+          "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d amd_lbr_pmc_freeze",
+          "field": "Flags:"
+        },
+        {
+          "data": "AMD-V",
+          "field": "Virtualization:"
+        },
+        {
+          "data": "576 KiB (12 instances)",
+          "field": "L1d cache:"
+        },
+        {
+          "data": "384 KiB (12 instances)",
+          "field": "L1i cache:"
+        },
+        {
+          "data": "12 MiB (12 instances)",
+          "field": "L2 cache:"
+        },
+        {
+          "data": "24 MiB (2 instances)",
+          "field": "L3 cache:"
+        },
+        {
+          "data": "1",
+          "field": "NUMA node(s):"
+        },
+        {
+          "data": "0-23",
+          "field": "NUMA node0 CPU(s):"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Gather data sampling:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Ghostwrite:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Indirect target selection:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Itlb multihit:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability L1tf:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Mds:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Meltdown:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Mmio stale data:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Old microcode:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Reg file data sampling:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Retbleed:"
+        },
+        {
+          "data": "Mitigation; IBPB on VMEXIT only",
+          "field": "Vulnerability Spec rstack overflow:"
+        },
+        {
+          "data": "Mitigation; Speculative Store Bypass disabled via prctl",
+          "field": "Vulnerability Spec store bypass:"
+        },
+        {
+          "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization",
+          "field": "Vulnerability Spectre v1:"
+        },
+        {
+          "data": "Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected",
+          "field": "Vulnerability Spectre v2:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Srbds:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Tsa:"
+        },
+        {
+          "data": "Not affected",
+          "field": "Vulnerability Tsx async abort:"
+        },
+        {
+          "data": "Mitigation; IBPB on VMEXIT",
+          "field": "Vulnerability Vmscape:"
+        }
+      ]
+    },
+    "lscpu_command": {
+      "available": true,
+      "command": [
+        "lscpu",
+        "--json"
+      ],
+      "json_error": null,
+      "ok": true,
+      "returncode": 0,
+      "stderr": ""
+    },
+    "model_name": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "sockets": "1",
+    "source": "lscpu+proc_cpuinfo",
+    "threads_per_core": "2",
+    "vendor_id": "AuthenticAMD"
+  },
+  "created_at_utc": "2026-07-15T15:40:00.232332+00:00",
+  "gpu": {
+    "lspci_command": {
+      "available": true,
+      "command": [
+        "lspci"
+      ],
+      "json_error": null,
+      "ok": true,
+      "returncode": 0,
+      "stderr": ""
+    },
+    "lspci_gpus": [
+      {
+        "lspci_line": "c6:00.0 Display controller: Advanced Micro Devices, Inc. [AMD/ATI] Device 150e (rev c1)"
+      }
+    ],
+    "nvidia": {
+      "available": false,
+      "command": {
+        "available": false,
+        "command": [
+          "nvidia-smi",
+          "--query-gpu=index,name,driver_version,memory.total,memory.used,memory.free,temperature.gpu,power.draw,power.limit,utilization.gpu",
+          "--format=csv,noheader,nounits"
+        ],
+        "json_error": null,
+        "ok": false,
+        "returncode": null,
+        "stderr": "command not found: nvidia-smi"
+      },
+      "devices": [],
+      "ok": false
+    },
+    "rocm": {
+      "available": false,
+      "command": {
+        "available": false,
+        "command": [
+          "rocm-smi",
+          "--showall",
+          "--json"
+        ],
+        "json_error": null,
+        "ok": false,
+        "returncode": null,
+        "stderr": "command not found: rocm-smi"
+      },
+      "data": null,
+      "ok": false
+    },
+    "vainfo_command": {
+      "available": false,
+      "command": [
+        "vainfo"
+      ],
+      "json_error": null,
+      "ok": false,
+      "returncode": null,
+      "stderr": "command not found: vainfo"
+    },
+    "vainfo_summary": "",
+    "vulkan_command": {
+      "available": false,
+      "command": [
+        "vulkaninfo",
+        "--summary"
+      ],
+      "json_error": null,
+      "ok": false,
+      "returncode": null,
+      "stderr": "command not found: vulkaninfo"
+    },
+    "vulkan_summary": ""
+  },
+  "host": {
+    "fqdn": "x1-370",
+    "hostname": "x1-370",
+    "machine": "x86_64",
+    "platform": "Linux-6.17.0-40-generic-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "release": "6.17.0-40-generic",
+    "system": "Linux",
+    "version": "#40~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Jun 23 16:48:12 UTC 2"
+  },
+  "lmstudio": {
+    "endpoint_probes": [
+      {
+        "base_url": "http://100.85.72.121:1234/v1",
+        "elapsed_s": 0.033832,
+        "error": null,
+        "model_count": 9,
+        "models": [
+          "refinedtoolcallv5-3b",
+          "text-embedding-nomic-embed-text-v1.5",
+          "orinth-1.0-9b",
+          "liquid/lfm2.5-1.2b",
+          "qwen3.6-28b-reap20-a3b",
+          "vibethinker-3b-heretic_decensored",
+          "google/gemma-4-12b-qat",
+          "vibethinker-3b-hermes",
+          "qwen3.6-14b-a3b-vibeforged-v2"
+        ],
+        "models_url": "http://100.85.72.121:1234/v1/models",
+        "reachable": true,
+        "status": 200
+      }
+    ],
+    "inventory_csv": "/home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/lmstudio_inventory.csv",
+    "inventory_row_count": 9,
+    "unique_endpoint_count": 1
+  },
+  "memory": {
+    "mem_available_bytes": 82328776704,
+    "mem_total_bytes": 98723422208,
+    "mem_used_estimate_bytes": 16394645504,
+    "raw_kib": {
+      "Active": 16828968,
+      "Active(anon)": 11857692,
+      "Active(file)": 4971276,
+      "AnonHugePages": 0,
+      "AnonPages": 12382916,
+      "Balloon": 0,
+      "Bounce": 0,
+      "Buffers": 5493232,
+      "Cached": 42630368,
+      "CmaFree": 0,
+      "CmaTotal": 0,
+      "CommitLimit": 73370612,
+      "Committed_AS": 46073536,
+      "DirectMap1G": 9437184,
+      "DirectMap2M": 85870592,
+      "DirectMap4k": 2858224,
+      "Dirty": 33620,
+      "FileHugePages": 75776,
+      "FilePmdMapped": 0,
+      "HardwareCorrupted": 0,
+      "HugePages_Free": 0,
+      "HugePages_Rsvd": 0,
+      "HugePages_Surp": 0,
+      "HugePages_Total": 0,
+      "Hugepagesize": 2048,
+      "Hugetlb": 0,
+      "Inactive": 43498072,
+      "Inactive(anon)": 782100,
+      "Inactive(file)": 42715972,
+      "KReclaimable": 7736736,
+      "KernelStack": 58064,
+      "Mapped": 2131392,
+      "MemAvailable": 80399196,
+      "MemFree": 25989872,
+      "MemTotal": 96409592,
+      "Mlocked": 208020,
+      "NFS_Unstable": 0,
+      "PageTables": 111584,
+      "Percpu": 37152,
+      "SReclaimable": 7736736,
+      "SUnreclaim": 1343288,
+      "SecPageTables": 7308,
+      "Shmem": 229664,
+      "ShmemHugePages": 0,
+      "ShmemPmdMapped": 0,
+      "Slab": 9080024,
+      "SwapCached": 384368,
+      "SwapFree": 22747344,
+      "SwapTotal": 25165816,
+      "Unaccepted": 0,
+      "Unevictable": 208020,
+      "VmallocChunk": 0,
+      "VmallocTotal": 34359738367,
+      "VmallocUsed": 135880,
+      "Writeback": 40,
+      "WritebackTmp": 0,
+      "Zswap": 0,
+      "Zswapped": 0
+    },
+    "swap_free_bytes": 23293280256,
+    "swap_total_bytes": 25769795584
+  },
+  "os_release": {
+    "BUG_REPORT_URL": "https://bugs.launchpad.net/ubuntu/",
+    "HOME_URL": "https://www.ubuntu.com/",
+    "ID": "ubuntu",
+    "ID_LIKE": "debian",
+    "LOGO": "ubuntu-logo",
+    "NAME": "Ubuntu",
+    "PRETTY_NAME": "Ubuntu 24.04.1 LTS",
+    "PRIVACY_POLICY_URL": "https://www.ubuntu.com/legal/terms-and-policies/privacy-policy",
+    "SUPPORT_URL": "https://help.ubuntu.com/",
+    "UBUNTU_CODENAME": "noble",
+    "VERSION": "24.04.1 LTS (Noble Numbat)",
+    "VERSION_CODENAME": "noble",
+    "VERSION_ID": "24.04"
+  },
+  "recommendations": [
+    "System RAM is suitable for heavier local model testing and multi-model benchmark sweeps.",
+    "GPU hardware is visible, but no NVIDIA/ROCm runtime was confirmed; expect CPU or limited acceleration unless LM Studio reports otherwise.",
+    "1 LM Studio endpoint(s) were reachable during profiling; benchmark these first."
+  ],
+  "schema_version": "machine_profile.v1",
+  "storage": {
+    "lsblk": {
+      "blockdevices": [
+        {
+          "children": [
+            {
+              "fstype": null,
+              "model": null,
+              "mountpoints": [
+                null
+              ],
+              "name": "sda1",
+              "serial": null,
+              "size": 16759808,
+              "type": "part"
+            },
+            {
+              "fstype": "exfat",
+              "model": null,
+              "mountpoints": [
+                "/media/scott/NAS5"
+              ],
+              "name": "sda2",
+              "serial": null,
+              "size": 88003726802944,
+              "type": "part"
+            }
+          ],
+          "fstype": null,
+          "model": "SSI H/W RAID5",
+          "mountpoints": [
+            null
+          ],
+          "name": "sda",
+          "serial": "7K9Y8BL3S3V9R3JIE1HI",
+          "size": 88003745677312,
+          "type": "disk"
+        },
+        {
+          "children": [
+            {
+              "fstype": "ext4",
+              "model": null,
+              "mountpoints": [
+                "/media/scott/SSD_4TB"
+              ],
+              "name": "nvme0n1p1",
+              "serial": null,
+              "size": 4000786136064,
+              "type": "part"
+            }
+          ],
+          "fstype": null,
+          "model": "Samsung SSD 990 PRO with Heatsink 4TB",
+          "mountpoints": [
+            null
+          ],
+          "name": "nvme0n1",
+          "serial": "S7DSNJ0Y611670A",
+          "size": 4000787030016,
+          "type": "disk"
+        },
+        {
+          "children": [
+            {
+              "fstype": "vfat",
+              "model": null,
+              "mountpoints": [
+                "/boot/efi"
+              ],
+              "name": "nvme1n1p1",
+              "serial": null,
+              "size": 1073741824,
+              "type": "part"
+            },
+            {
+              "fstype": null,
+              "model": null,
+              "mountpoints": [
+                null
+              ],
+              "name": "nvme1n1p2",
+              "serial": null,
+              "size": 16777216,
+              "type": "part"
+            },
+            {
+              "fstype": "ntfs",
+              "model": null,
+              "mountpoints": [
+                null
+              ],
+              "name": "nvme1n1p3",
+              "serial": null,
+              "size": 966367641600,
+              "type": "part"
+            },
+            {
+              "fstype": "ntfs",
+              "model": null,
+              "mountpoints": [
+                null
+              ],
+              "name": "nvme1n1p4",
+              "serial": null,
+              "size": 120973164544,
+              "type": "part"
+            },
+            {
+              "fstype": "ntfs",
+              "model": null,
+              "mountpoints": [
+                null
+              ],
+              "name": "nvme1n1p5",
+              "serial": null,
+              "size": 1298137088,
+              "type": "part"
+            },
+            {
+              "fstype": "ext4",
+              "model": null,
+              "mountpoints": [
+                "/"
+              ],
+              "name": "nvme1n1p6",
+              "serial": null,
+              "size": 958677385216,
+              "type": "part"
+            }
+          ],
+          "fstype": null,
+          "model": "KINGSTON OM8TAP42048K1-A00",
+          "mountpoints": [
+            null
+          ],
+          "name": "nvme1n1",
+          "serial": "50026B7383D33305",
+          "size": 2048408248320,
+          "type": "disk"
+        }
+      ]
+    },
+    "lsblk_command": {
+      "available": true,
+      "command": [
+        "lsblk",
+        "--json",
+        "--bytes",
+        "-o",
+        "NAME,TYPE,SIZE,MODEL,SERIAL,MOUNTPOINTS,FSTYPE"
+      ],
+      "json_error": null,
+      "ok": true,
+      "returncode": 0,
+      "stderr": ""
+    },
+    "mounts": [
+      {
+        "device": "tmpfs",
+        "free_bytes": 9820880896,
+        "fstype": "tmpfs",
+        "mountpoint": "/run",
+        "total_bytes": 9872343040,
+        "used_bytes": 51462144
+      },
+      {
+        "device": "/dev/nvme1n1p6",
+        "free_bytes": 867346493440,
+        "fstype": "ext4",
+        "mountpoint": "/",
+        "total_bytes": 942476685312,
+        "used_bytes": 27179548672
+      },
+      {
+        "device": "tmpfs",
+        "free_bytes": 49354964992,
+        "fstype": "tmpfs",
+        "mountpoint": "/dev/shm",
+        "total_bytes": 49361711104,
+        "used_bytes": 6746112
+      },
+      {
+        "device": "tmpfs",
+        "free_bytes": 5226496,
+        "fstype": "tmpfs",
+        "mountpoint": "/run/lock",
+        "total_bytes": 5242880,
+        "used_bytes": 16384
+      },
+      {
+        "device": "efivarfs",
+        "free_bytes": 71420,
+        "fstype": "efivarfs",
+        "mountpoint": "/sys/firmware/efi/efivars",
+        "total_bytes": 131072,
+        "used_bytes": 54532
+      },
+      {
+        "device": "systemd-1",
+        "free_bytes": 0,
+        "fstype": "autofs",
+        "mountpoint": "/proc/sys/fs/binfmt_misc",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "configfs",
+        "free_bytes": 0,
+        "fstype": "configfs",
+        "mountpoint": "/sys/kernel/config",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "fusectl",
+        "free_bytes": 0,
+        "fstype": "fusectl",
+        "mountpoint": "/sys/fs/fuse/connections",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "nfsd",
+        "free_bytes": 0,
+        "fstype": "nfsd",
+        "mountpoint": "/proc/fs/nfsd",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "/dev/nvme0n1p1",
+        "free_bytes": 2465186189312,
+        "fstype": "ext4",
+        "mountpoint": "/media/scott/SSD_4TB",
+        "total_bytes": 3936819834880,
+        "used_bytes": 1271577563136
+      },
+      {
+        "device": "/dev/nvme1n1p1",
+        "free_bytes": 997449728,
+        "fstype": "vfat",
+        "mountpoint": "/boot/efi",
+        "total_bytes": 1069547520,
+        "used_bytes": 72097792
+      },
+      {
+        "device": "sunrpc",
+        "free_bytes": 0,
+        "fstype": "rpc_pipefs",
+        "mountpoint": "/run/rpc_pipefs",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "tmpfs",
+        "free_bytes": 9872187392,
+        "fstype": "tmpfs",
+        "mountpoint": "/run/user/1000",
+        "total_bytes": 9872338944,
+        "used_bytes": 151552
+      },
+      {
+        "device": "gvfsd-fuse",
+        "free_bytes": 0,
+        "fstype": "fuse.gvfsd-fuse",
+        "mountpoint": "/run/user/1000/gvfs",
+        "total_bytes": 0,
+        "used_bytes": 0
+      },
+      {
+        "device": "/dev/sda2",
+        "free_bytes": 67431932821504,
+        "fstype": "exfat",
+        "mountpoint": "/media/scott/NAS5",
+        "total_bytes": 87998353899520,
+        "used_bytes": 20566421078016
+      },
+      {
+        "device": "rustdesk-cliprdr-fs",
+        "free_bytes": 0,
+        "fstype": "fuse",
+        "mountpoint": "/tmp/RustDesk/cliprdr-server",
+        "total_bytes": 0,
+        "used_bytes": 0
+      }
+    ],
+    "root_free_bytes": 867346493440,
+    "root_total_bytes": 942476685312,
+    "root_used_bytes": 27179548672
+  },
+  "warnings": [
+    "nvidia runtime probe unavailable or failed: command not found: nvidia-smi",
+    "rocm runtime probe unavailable or failed: command not found: rocm-smi"
+  ]
+}

@@ -1,0 +1,51 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably the country code).
+- Returns a cleaned string of digits? Likely returns just the digits, or maybe returns normalized format like "(XXX) XXX-XXXX"? The spec says "strips non-digits" which suggests returning only digits. But typical phone normalization might also add formatting.
+
+Let's interpret: It strips non-digits from input; then if resulting number is 10 digits (US number), it's valid; if it's 11 digits and starts with '1', that means it has an optional country code, so we should strip the leading 1 as well? Or maybe just keep all digits but note that it's a US number with country code. The spec says "supports 10-digit US numbers and 11-digit numbers beginning with 1". That suggests both are considered valid inputs; after stripping non-digits, if we have exactly 10 digits (or 11 starting with '1'), then the normalized output should be just those digits? Or maybe for 11-digit numbers beginning with 1, we strip the leading 1 as well and return the remaining 10 digits.
+
+Let's think: The typical normalization would produce a standard format like "(XXX) XXX-XXXX". But the spec says "strips non-digits" which is more about removing everything that isn't a digit. It doesn't mention adding formatting characters; just stripping non-digits. So likely they want to return only digits.
+
+But then what's the point of supporting 10-digit US numbers and 11-digit numbers beginning with 1? That would be validation: after stripping, if we have exactly 10 digits -> valid; if we have 11 digits starting with '1' -> also valid (maybe representing an international number). If any other length or pattern -> raise ValueError.
+
+Thus the function should:
+
+- Input a string value.
+- Remove all characters that are not digits using str.isdigit filter, join them into a new string.
+- Validate: if len(digits) == 10: OK; elif len(digits) == 11 and digits[0] == '1': OK; else raise ValueError.
+
+Then return the cleaned digits (maybe just digits). That seems straightforward.
+
+We also need an if __name__ == '__main__' test block with at least five asserts. So we write a main guard block that runs tests using assert statements.
+
+The code should be pure Python, no external dependencies needed.
+
+Let's produce:
+
+```python
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # Validate US numbers (10-digit) or international 11-digit starting with '1'
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading country code
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+```
+
+But note that raising with f-string may need Python 3.6+. That's fine.
+
+Now test block:
+
+```python
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('1234567890') == '1234567890'
+    assert normalize_phone_number('1-234-567-890') == '234567890'  # leading 1 stripped
+    assert normalize_phone_number('+1 (800) 555-1234') == '8005551234'
+    assert normalize_phone_number('abc123def') == '123'
+    # This

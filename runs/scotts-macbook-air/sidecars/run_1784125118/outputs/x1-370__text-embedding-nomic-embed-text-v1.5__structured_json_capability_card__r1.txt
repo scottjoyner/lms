@@ -1,0 +1,6 @@
+{
+  "task_fit": ["The input aligns well with the capabilities of the model."],
+  "confidence": 0.92,
+  "limitations": ["May struggle with highly ambiguous contexts."],
+  "recommended_max_context_tokens": 500
+}

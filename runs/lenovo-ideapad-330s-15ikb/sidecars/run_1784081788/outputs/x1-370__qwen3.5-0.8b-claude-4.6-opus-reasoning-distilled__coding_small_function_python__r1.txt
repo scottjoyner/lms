@@ -1,0 +1,12 @@
+
+
+import re
+
+
+def normalize_phone_number(value: str) -> str:
+    """
+    Normalize a phone number string by stripping non-digits and supporting 
+    10-digit US numbers and 11-digit numbers beginning with 1.
+    
+    Args:
+        value: The phone number string to

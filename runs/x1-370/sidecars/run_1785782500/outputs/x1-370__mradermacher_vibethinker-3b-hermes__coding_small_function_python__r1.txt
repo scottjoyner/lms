@@ -1,0 +1,47 @@
+<think>The user wants me to write a Python function named normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers (i.e., exactly 10 digits).
+- Supports 11-digit numbers beginning with 1 (presumably area code "1" for international numbers, like +1 or 1(??) but they want to support 11-digit numbers starting with '1').
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+The user wants only the code output (no markdown). So I need to produce plain text containing Python code. The function should be robust, handle edge cases like empty strings? Probably raise ValueError for empty string or non-string input as well.
+
+We must not use any markdown formatting; just raw code lines.
+
+Let me think about what exactly they want:
+
+- Input: a string value
+- Output: normalized phone number (string of digits only)
+- Should strip all characters that are not digits.
+- Then check if the resulting string is either:
+  - length == 10 -> US number, return it as is or maybe format? Probably just return digits.
+
+- Or length == 11 and first digit is '1' -> support 11-digit numbers beginning with 1 (like international numbers). Should we remove the leading '1'? The description says "supports 10-digit US numbers and 11-digit numbers beginning with 1". It doesn't specify whether to keep or strip that leading 1. Usually, for normalization you might want to return just digits; but if it's an 11-digit number starting with 1 (like +1-XXX-XXX-XXXX), the '1' is likely the country code and may be removed. However "supports" could mean they accept both lengths as valid inputs.
+
+The function should raise ValueError for anything else: i.e., any string that after stripping non-digits does not have length 10 or (length 11 and starts with '1').
+
+Potential edge cases:
+
+- Input is None -> raise TypeError? But spec says raises ValueError. Could treat None as invalid input, raising ValueError.
+- Input contains spaces, hyphens, parentheses, plus signs, etc., should strip them all.
+- Input like "555-1234" => "5551234"
+- Input like "+1 (800) 555-1234" => after stripping non-digits: "18005551234". That's length 11 and starts with '1', so valid. Should we return "18005551234"? Or maybe remove the leading 1? The spec says supports 11-digit numbers beginning with 1, but doesn't say to strip them. I'd just accept them as is.
+
+But typical normalization would be: if length == 11 and starts with '1', then return digits[1:] (i.e., remove the leading 1). However that might produce a 10-digit number for international numbers. But they said "supports" both types, not necessarily to strip the country code.
+
+Let's interpret as:
+
+- Accept any string containing only digits after stripping non-digits.
+- If length is 10 -> return those digits (US number).
+- If length is 11 and first digit is '1' -> also valid; maybe we can optionally remove that leading 1. But the spec doesn't specify removal, just "supports". So I'd probably keep it as is.
+
+But typical normalization would want to standardize to a consistent format: either always return exactly 10 digits (for US numbers). If you have an 11-digit number starting with '1', removing that leading 1 yields the same 10-digit US number. That seems logical.
+
+Let's read spec carefully:
+
+"Write a Python function named normalize_phone_number(value: str) -> str that strips non-digits, supports 10-digit US numbers and 11-digit numbers beginning with 1, and raises ValueError for anything else."
+
+Interpretation: The function should strip all non-digit characters from the input. Then it must accept either a 

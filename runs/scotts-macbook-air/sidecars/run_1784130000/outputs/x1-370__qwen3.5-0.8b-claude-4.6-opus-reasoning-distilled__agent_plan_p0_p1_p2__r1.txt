@@ -1,0 +1,163 @@
+
+
+# Implementation Plan: Authentication & Security Features
+
+## Executive Summary
+
+This plan implements a comprehensive authentication and security framework for the FastAPI service, focusing on user management, API key rotation, audit logging, and admin dashboards with role-based access control.
+
+---
+
+## P0: Core Authentication & API Key Rotation
+
+### Task 1: User Registration System
+**Priority:** P0 (Critical - foundational to all features)
+
+#### Implementation Details:
+- **Backend**: FastAPI with SQLAlchemy ORM for database modeling
+- **Frontend**: React/Next.js component-based architecture
+- **Database**: PostgreSQL with foreign key relationships
+- **Security Headers**: HSTS, CSP, CSRF protection, XSS filtering
+
+```python
+# Authentication Model Design
+class User(Base):
+    __tablename__ = 'users'
+    
+    id = Column(Integer, primary_key=True)
+    username = Column(String(50), unique=True, nullable=False)
+    email = Column(String(128), unique=True, nullable=False)
+    password_hash = Column(String(64))
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    role = ForeignKey('roles', ondelete='CASCADE')  # Optional: separate roles
+```
+
+#### Acceptance Criteria:
+- User registration creates unique accounts with hashed passwords
+- Login attempts are rejected after failed password attempt (3x)
+- Password reset functionality works via email link
+- Admin can create multiple user roles (admin, editor, viewer)
+- All new users receive a temporary token for 1 hour
+
+#### Test Expectations:
+```python
+# Test User Registration
+def test_user_registration():
+    # Create valid user with unique username and password hash
+    assert db.query(User).filter_by(username='testuser').count() == 0
+    
+    # Register new user
+    user = User(
+        username='newuser',
+        email='test@example.com',
+        password_hash=hashlib.md5('password'.encode()).hexdigest(),
+        is_active=True
+    )
+    db.add(user)
+    assert user.username == 'newuser'
+    
+# Test Login with valid credentials
+def test_valid_login():
+    # Create user and register it
+    User(username='test', email='test@example.com').save()
+    
+    # Attempt login - should fail after 3 failed attempts
+    assert db.query(User).filter_by(email='test@example.com').count() == 1
+    
+# Test Password Reset
+def test_password_reset():
+    user = User(username='reset_test', email='reset@test.com')
+    user.password_hash = hashlib.md5('secret'.encode()).hexdigest()
+    user.save()
+    
+    # Send reset email
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = 'Password Reset'
+    msg['From'] = 'support@example.com'
+    msg['To'] = user.email
+    msg.attach(MIMEText('Reset Link', 'plain'))
+    
+    # Send email
+    from sendmail import send_mail
+    send_mail(msg, 'test@example.com')
+    
+    # Verify reset link was sent
+    assert db.query(User).filter_by(email='reset@test.com').count() == 1
+```
+
+---
+
+### Task 2: API Key Rotation System
+**Priority:** P0 (Critical - essential for security)
+
+#### Implementation Details:
+- **Token Format**: JWT with short expiration (30 minutes) + rotation interval
+- **Rotation Logic**: Automatic token refresh on expiry, manual rotation via admin portal
+- **Rate Limiting**: Prevent abuse of API key service
+- **Token Refresh Mechanism**: Use `jwt.refresh()` for automatic renewal
+
+```python
+# Token Structure
+class TokenType:
+    TOKEN = 'api_key'
+    
+    @staticmethod
+    def create_token(user_id, token_type):
+        # Generate JWT with user ID embedded
+        import jwt
+        payload = {
+            'sub': str(user_id),
+            'iat': int(time.time()),
+            'exp': time.time() + 30 * 60  # 1 hour expiry
+        }
+        
+        token = jwt.encode(
+            payload, 
+            os.environ.get('API_KEY'),
+            algorithm='HS256'
+        )
+        return token
+    
+    @staticmethod
+    def get_token(token):
+        try:
+            decoded = jwt.decode(token, os.environ['API_KEY'], algorithms=['HS256'])
+            # Verify user ID matches stored user
+            assert decoded['sub'] == str(user_id)
+            return token
+        except jwt.ExpiredSignatureError:
+            raise APIKeyRotationError('Token expired')
+        except jwt.InvalidTokenError as e:
+            raise AuthenticationError(f'Invalid token: {e}')
+
+# Rotation Schedule
+class TokenRotator:
+    def __init__(self, rotation_interval_minutes=15):
+        self.rotation_interval = rotation_interval_minutes
+    
+    def rotate_token(self, token):
+        """Rotate token if expired or within rotation window"""
+        try:
+            # Check if token is valid and user exists
+            decoded = jwt.decode(token, os.environ['API_KEY'], algorithms=['HS256'])
+            
+            # If token expired AND user doesn't exist in database
+            if (time.time() - decoded['iat'] > self.rotation_interval) \
+               and not User.query.filter_by(sub=decoded['sub']).first():
+                
+                new_token = TokenType.create_token(decoded['sub'], TokenType.TOKEN)
+                return new_token
+            
+        except jwt.ExpiredSignatureError:
+            raise APIKeyRotationError('Token expired')
+```
+
+#### Acceptance Criteria:
+- Automatic token rotation within 15-minute window
+-

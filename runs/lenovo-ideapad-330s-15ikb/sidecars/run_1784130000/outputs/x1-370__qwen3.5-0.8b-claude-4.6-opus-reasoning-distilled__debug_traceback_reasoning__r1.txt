@@ -1,0 +1,56 @@
+
+
+## Root Cause
+
+The error occurs because the `payload` dictionary contains a `'user'` key, but its value is `None`. The script attempts to access `.id()` on this `None` object, which raises a `TypeError: 'NoneType' object is not subscriptable`. This typically happens when an API returns no user data for that request.
+
+## Safe Fix
+
+Replace the direct access with a safe lookup method:
+
+```python
+user_id = payload.get('user', {}).get('id')  # or payload.get('user_id')
+```
+
+This uses `.get()` to handle missing keys gracefully, returning `None` instead of raising an error.
+
+## Regression Tests
+
+### Test 1: Normal Case (valid user data)
+```python
+import json
+
+payload = {
+    "id": 12345,
+    "user_id": 67890,
+    "name": "Test User"
+}
+
+# This should work without error
+assert payload['user']['id'] == 67890
+print("â Test 1 passed: Normal case with valid user data")
+```
+
+### Test 2: Missing 'user' key in payload
+```python
+payload = {
+    "id": 12345,
+    # No 'user' key present
+}
+
+# This should not raise TypeError
+assert payload['user']['id'] == None  # Returns None instead of raising
+print("â Test 2 passed: Missing 'user' key handled gracefully")
+```
+
+### Test 3: Payload with valid user data (alternative approach)
+```python
+payload = {
+    "id": 12345,
+    "user_id": 67890,
+}
+
+# Alternative safe access using get() on the whole payload
+assert payload.get('user', {}).get('id') == 67890
+print("â Test 3 passed: Using get() on full payload")
+```

@@ -1,0 +1,22 @@
+{
+  "collected_at_utc": "2026-07-15T18:00:00+00:00",
+  "hostname": "scotts-macbook-air",
+  "platform": "Darwin",
+  "cpu": {
+    "model": "Apple Silicon (owner-provided)",
+    "logical_processors": null,
+    "arch": "arm64"
+  },
+  "memory": {
+    "ram_total_gib": 8.0,
+    "ram_avail_gib": null
+  },
+  "gpu": [
+    "Apple Silicon GPU (unified memory)"
+  ],
+  "vram": {
+    "vram_total_mib": 8192,
+    "vendor": "apple-unified"
+  },
+  "source": "manual (owner-provided 2026-07-15): 8 GiB unified RAM, struggles >3-4 GiB; Apple Silicon GPU shares system RAM"
+}

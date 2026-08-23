@@ -1,0 +1,36 @@
+## Root Cause
+`payload['user']['id']` raises `TypeError: 'NoneType' object is not subscriptable` because **`payload['user']` returned `None`**, not a dictionary. This typically happens when:
+
+1. **`payload` itself is `None`** (the outer dict didnât exist or was missing)
+2. **The key `'user' is missing** from the payload dict
+3. **`payload` isn't a dict at all** (e.g., it's an empty list, string, etc.)
+
+Python tries to treat `None` as if it were a subscriptable object, which fails.
+
+---
+
+## Safe Fix
+Use explicit existence checks or `dict.get()` with a default before indexing:
+
+```python
+# SAFE: Check that 'user' exists and is a dict first
+if 'user' in payload and isinstance(payload['user'], dict):
+    user_id = payload['user']['id']
+else:
+    # Handle missing data gracefully
+    user_id = None  # or raise a clear error
+
+# Alternative: One-liner with default value (safer for most useâcases)
+user_id = payload.get('user', {}).get('id')   # returns None if any level is missing
+```
+
+---
+
+## Regression Tests
+
+| Test # | Before (buggy) code | Expected error / behavior | After (fixed) code | Expected result |
+|--------|-------------------|---------------------------|--------------------|-----------------|
+| 1ï¸â£ | `payload = None`<br>`user_id = payload['user']['id']` | `TypeError: 'NoneType' object is not subscriptable` | `if 'user' in payload and isinstance(payload['user'], dict): user_id = payload['user']['id'] else: user_id = None` | No exception; `user_id` is `None` (or handled gracefully) |
+| 2ï¸â£ | `payload = {"name": "alice"}`<br>`user_id = payload['user']['id']` | `TypeError: 'NoneType' object is not subscriptable` | `if 'user' in payload and isinstance(payload['user'], dict): user_id = payload['user']['id'] else: user_id = None` | No exception; `user_id` is `None` (or handled gracefully) |
+
+Both tests demonstrate that the fix prevents the `TypeError` by verifying the nested keys exist before attempting to index them.

@@ -1,0 +1,21 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting. They want a JSON object with specific keys:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular context; they just gave instructions for output format. So we can produce generic content that fits those fields, but it's unclear if there's a specific task. Usually in these kinds of prompts, I'd respond with something like:
+
+{
+  "task_fit": ["understanding the request", "formatting constraints", "json output only"],
+  "confidence": 0.9,
+  "limitations": ["JSON must be valid and properly formatted"], 
+  "recommended_max_context_tokens": 8192
+}
+
+But we need to think about what they'd want.
+
+The user says: "Return a JSON object with keys: task_fit, confidence, limitations, recommended_max_context_tokens. task_fit must be an array of strings. confidence must be a number from 0 to 1. limitations must be an array of strings. recommended_max

@@ -1,0 +1,32 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably area code prefix).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown formatting. So plain text code.
+
+Let's think about the function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Accept 10-digit numbers (US)
+    if len(digits) == 10:
+        return digits
+    
+    # Accept 11-digit numbers beginning with '1' (international format: +1 (xxx) xxx-xxxx or similar)
+    if len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading 1
+        
+    raise ValueError(f"Invalid phone number: {value!r}")
+    
+That's it.
+
+Now test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('555-1

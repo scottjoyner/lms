@@ -1,0 +1,60 @@
+# Implementation Plan: Auth, API Key Rotation, Audit Logging & Admin Dashboards
+
+## Priority Definitions
+
+| Tier | Definition |
+|------|------------|
+| **P0** | Blocks other work; must ship first to enable secure development and operational visibility |
+| **P1** | Depends on P0 completion or enables production readiness |
+| **P2** | Enhancements, polish, and advanced features after core functionality is stable |
+
+---
+
+## P0 â Authentication & Core Audit Logging
+
+### P0-1: User Registration & Login (JWT-Based)
+
+**Scope:** Implement secure user registration, login, password reset, and JWT-based session management.
+
+| # | Task | Acceptance Criteria | Test Expectations |
+|---|------|---------------------|-------------------|
+| 1.1 | Register endpoint (`POST /auth/register`) with email validation and unique constraint | - Returns `201 Created` on success<br>- Rejects duplicate emails (409)<br>- Rejects invalid input (422) | - Successful registration returns valid JWT in response headers<br>- Duplicate email triggers 409 Conflict<br>- Missing fields return 422 with validation errors |
+| 1.2 | Login endpoint (`POST /auth/login`) with password verification | - Returns `200 OK` with access/refresh tokens on success<br>- Rejects invalid credentials (401)<br>- Supports optional rate limiting | - Valid credentials return JWT pair<br>- Invalid credentials return 401 Unauthorized<br>- Refresh token can be used to obtain new access token |
+| 1.3 | Password reset flow (`POST /auth/forgot-password`, `POST /auth/reset-password`) | - Reset link expires after configurable TTL (default: 1 hour)<br>- Only one pending reset per user at a time<br>- Token is single-use | - Expired tokens return 401<br>- Reused tokens return 401<br>- Successful reset updates password without requiring login |
+| 1.4 | JWT middleware & token refresh mechanism | - Access token validates on every request (except public routes)<br>- Refresh token has 7-day expiry, access token has 15-minute expiry<br>- Token claims include `sub`, `iat`, `exp`, `jti` | - Missing/invalid tokens return 403 Forbidden<br>- Expired refresh token returns 401<br>- Token payload contains expected claims |
+| 1.5 | Dependency injection for auth context in route handlers | - `get_current_user()` dependency extracts user from Bearer token<br>- Returns user object with id, email, created_at fields | - Request without Authorization header fails at middleware level<br>- Invalid signature returns 403 before handler execution |
+
+**Database Schema (P0):**
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    token_hash VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+---
+
+### P0-2: Audit Logging Framework
+
+**Scope:** Centralized audit logging middleware that captures all state-changing operations with tamper-evident design.
+
+| # | Task | Acceptance Criteria | Test Expectations |
+|---|------|---------------------|-------------------|
+| 2.1 | Audit event schema and storage layer | - Events stored in `audit_log` table with immutable ordering<br>- Each record includes: timestamp, actor_id, action, resource_type, resource_id, old_value, new_value, ip_address, user_agent | - Records are append-only (no UPDATE/DELETE)<br>- All required fields populated on write<br>- Records ordered by creation time |
+| 2.2 | Audit middleware (`@audit_log` decorator) | - Automatically captures request context for all state-changing endpoints<br>- Logs both successful and failed operations<br>- Captures before/after values for mutations | - Decorated endpoint logs event on every request<br>- Failed requests log with `status_code: 4xx`<br>- GET-only endpoints do not generate audit events |
+| 2.3 | Audit event types taxonomy | - Standardized action codes: `CREATE`, `UPDATE`, `DELETE`, `LOGIN_SUCCESS`, `LOGIN_FAILURE`, `TOKEN_ROTATED`, `API_KEY_CREATED`, etc.<br>- Resource type enum: `USER`, `API_KEY`, `ORGANIZATION`, `CONFIGURATION` | - All actions map to consistent string constants<br>- No custom action codes outside the taxonomy |
+| 2.4 | Audit log query API (`GET /audit-log`) | - Supports filtering by date range, actor_id, resource_type, action<br>- Pagination with cursor-based navigation (default: 100/page)<br>- Returns paginated response with `total`, `page`, `items` | - Filters correctly narrow results<br>- Cursor pagination returns consistent ordering<br>- Empty result set returns empty array with correct metadata |
+| 2.5 | Audit log retention and archival policy | - Active logs retained for 90 days in primary store<br>- Logs older than 90 days archived to cold storage (S3/GCS)<br>- Archival is idempotent and verifiable | - Querying beyond retention window returns empty results<br>- Archive status can be verified via admin endpoint<br>- No data loss

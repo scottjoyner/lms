@@ -1,0 +1,8 @@
+```json
+{
+    "task_fit": ["Task fit: High", "Task fit: Very high"],
+    "confidence": 0.95,
+    "limitations": ["Limitation: May struggle with very long context sequences beyond the recommended maximum tokens.", "Limitation: Performance may degrade for tasks requiring deep contextual understanding beyond the specified token limit."],
+    "recommended_max_context_tokens": 512
+}
+```

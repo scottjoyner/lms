@@ -1,0 +1,33 @@
+[
+  {
+    "base_url": "http://100.64.43.123:8088/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0157,
+    "model_count": 21,
+    "models": [
+      "lmstudio-xwing.ornith-1.0-9b",
+      "lmstudio-deathstar.qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "lmstudio-deathstar.refinedtoolcallv5-3b",
+      "lmstudio-x1-370.ornith-1.0-35b",
+      "lmstudio-x1-370.refinedtoolcallv5-3b",
+      "lmstudio-x1-370.qwen3.5-9b-neo-heretic-i1",
+      "lmstudio-beelink-ryzen-7-mini-pc.vibethinker-3b-hermes",
+      "lmstudio-scotts-macbook-air.qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "lmstudio-scotts-macbook-air.refinedtoolcallv5-3b",
+      "lmstudio-destroyer.lfm2.5-8b-a1b",
+      "lmstudio-destroyer.vibethinker-3b-hermes",
+      "auto/fast",
+      "auto/flash-start",
+      "auto/high-quality",
+      "auto/code",
+      "auto/review",
+      "auto/iterate",
+      "auto/finalize",
+      "auto/local",
+      "auto/sophia",
+      "auto/backlog-burn"
+    ],
+    "error": null
+  }
+]

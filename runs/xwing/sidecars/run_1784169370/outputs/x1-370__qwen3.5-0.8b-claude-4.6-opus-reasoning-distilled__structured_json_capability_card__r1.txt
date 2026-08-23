@@ -1,0 +1,4 @@
+```json
+{
+  "task_fit": ["analyze", "evaluate", "generate"],
+  "confidence": 0.8

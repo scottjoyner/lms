@@ -1,0 +1,8 @@
+
+
+{
+  "task_fit": ["complex", "moderate", "low"],
+  "confidence": 0.75,
+  "limitations": ["requires validation", "may vary by context"],
+  "recommended_max_context_tokens": 2048
+}

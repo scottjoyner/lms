@@ -1,0 +1,15 @@
+<think>
+The user wants me to read a synthetic context and return JSON with keys `control_code` and `evidence_quote`. The context contains many filler facts about a "benchmark runner" that records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. It also mentions a "LMS control code" which is ORION-7429.
+
+I need to find the exact sentence that proves it (i.e., confirms or explains what the control code is). Let me search through the context:
+
+Looking at the text:
+- There's a line: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+That seems like the relevant information. However, I need to check if there are any other sentences that might also mention the control code.
+
+Let me read through the context carefully:
+
+1. The first line: "<#>Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 0."
+2. ... many similar lines with "Project note: the benchmark runner records..." repeated
+3. Then: "The LMS control code for this benchmark is ORION-7429 and it must

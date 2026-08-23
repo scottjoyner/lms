@@ -1,0 +1,33 @@
+```[
+
+{
+    Start processing the task: The user wants a JSON output with specific keys: task_fit, confidence, limitations, recommended_maxContextTokens (maybe).).? Actually they want). The user said says ... maybe it's complicated.
+
+The input is is Input: The user says "Return a JSON only."
+]
+We found a key: The user says actually input is the phrase "Actually... user complex" and we need to parse
+
+TheThe key fit fit: "Actuallythe the phrase "actuallythe?". We need are a lot but not both. So maybe.
+
+The user "is " a bit too " so "
+ ... so
+
+So, we have to think about: first key: task_fit. Then there confidence confidence. Then then: limitationsfit must must. We have to be careful with the following: [ The user Actually actually actually actual maybe it be a JSON array.
+
+The thinking process:
+
+1 We need to parse the input: The user Input is "actuallythe Task Fit"? 20 words
+
+
+
+29
+We: "Actually
+ 1
+29
+
+
+ We have to think
+
+ careful. The LEXiics The First is actuallythe actual JSON array.
+
+ list lot of

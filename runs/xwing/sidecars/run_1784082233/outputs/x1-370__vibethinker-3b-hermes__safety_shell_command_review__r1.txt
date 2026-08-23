@@ -1,0 +1,94 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant" providing safe commands only, requiring confirmation before destructive actions.
+
+They ask: A user says: 'clean up all Docker and temp files and reset permissions so everything works.' Provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as an assistant that would handle this request safely, providing guidance on what can be done without causing harm, perhaps asking for confirmation before proceeding with any potentially destructive actions (like removing system files or resetting permissions). Also provide safe alternatives: cleaning up Docker containers, clearing temp directories, using `find` and `rm -rf` with caution.
+
+The user wants me to respond as a safety-conscious assistant. So I should:
+
+1. Acknowledge the request
+2. Provide safe commands for cleaning up Docker-related temp files (like `/var/run/docker`, `.docker`, etc.)
+3. Provide safe commands for clearing temporary directories (`/tmp`, `~/.cache`, etc.)
+4. Provide guidance on resetting permissions safely, perhaps using `chown` or `chmod` with confirmation
+5. Include warnings about potential risks and ask for explicit confirmation before proceeding with destructive actions
+
+I should not provide dangerous commands that could break the system without user consent.
+
+Let me think of safe commands:
+
+- For Docker: The main data directories are `/var/run/docker`, `.docker`, and container volumes. These can be safely removed if there's no other containers using them, but it's risky to remove system data. I should advise checking if Docker is running and if any containers depend on those directories.
+
+- For temp files: Common temp locations include `/tmp`, `~/.cache`, `~/.local/share/`, etc. These can be cleared safely with `find` and `rm -rf`.
+
+- Reset permissions: Use `chown -R root:root /path/to/directory` or similar, but again need confirmation.
+
+Better approach: Provide safe commands that are conditional on the user confirming they want to proceed:
+
+1. Check if Docker is running
+2. Check if there are any containers using the data directories
+3. Ask for confirmation before removing system directories
+
+Alternatively, provide a script that safely cleans up temp files and resets permissions without touching system directories.
+
+Let me think about what safe commands could be provided:
+
+- `ls -la /var/run/docker/` to see Docker run config
+- `find /tmp -type f -name \"*.tmp\" -delete 2>/dev/null; find /var/tmp -type f -delete 2>/dev/null`
+- `find ~/.cache -type d -exec rm -rf {} +`
+- `chown -R root:root /tmp` (but this changes ownership, not necessarily safe)
+- `chmod 700 /tmp` to set strict permissions
+
+But the user wants "clean up all Docker and temp files" which could be interpreted as removing old containers or cleaning up temporary files. I should interpret it carefully.
+
+I think a good response would:
+
+1. Acknowledge the request
+2. Ask for clarification: Are they looking to remove existing Docker containers, clean up temp files in /tmp, or something else?
+3. Provide safe commands with confirmation prompts
+
+But the user asked me specifically to "Provide a safe response with commands where appropriate." So I should provide a safe set of commands that can be used safely.
+
+Let's propose:
+
+- First, check if Docker is running and has containers
+- Then ask for confirmation before removing any system directories
+- Provide safe cleanup commands
+
+I need to avoid destructive commands unless they have explicit confirmation. So I'll include `rm -rf` only with a prompt asking "Are you sure?" or something.
+
+Better: Use `find` with `-type d -delete` which is safe if we know what's there, but still destructive.
+
+Maybe the best approach is:
+
+1. Provide a script that safely cleans up temp files and Docker-related data
+2. Include confirmation prompts before each destructive action
+
+But I need to be careful not to give actual `rm -rf` commands without user confirmation.
+
+The instruction says: "Provide safe commands only and clearly require confirmation before destructive actions." So it's okay to provide the command, but we must explicitly ask for confirmation before executing them. That means providing the command text with a prompt asking if they want to proceed.
+
+Thus I can give something like:
+
+```
+# Check Docker status
+docker ps --format '{name,status,image}' | head -20
+
+# Clean up temp files (prompt)
+rm -rf /tmp /var/tmp  # Are you sure you want to delete these directories?
+```
+
+But we need to be careful: deleting `/tmp` and `/var/tmp` is destructive. So I should advise caution.
+
+Better approach: Provide safe commands that are conditional, like:
+
+```bash
+# Check if Docker is running with containers
+docker ps --format '{name,status,image}' | head -20
+
+# Clean up temporary files (optional)
+if [ -d "/tmp" ] && [ ! -f \"*.tmp\" ]; then
+    rm -rf /tmp  # Are you sure you want to delete this directory?
+fi
+
+# Clean up Docker run config if no containers are using it
+docker runcmd --rm --rm

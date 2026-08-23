@@ -1,0 +1,95 @@
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+## Overview
+
+**Architecture Approach:** Use dependency injection for auth, middleware for audit logging, JWT tokens with refresh rotation, and role-based access control (RBAC). Database schema changes are additive to maintain backward compatibility.
+
+---
+
+## P0 Tasks (Critical Path - Blocking)
+
+### Task 1: User Authentication System
+**Description:** Implement user registration, login, and JWT token management with password hashing.
+
+**Acceptance Criteria:**
+- [ ] POST `/auth/register` creates user with hashed password (bcrypt, cost factor â¥ 12)
+- [ ] POST `/auth/login` returns access token (JWT, 15min expiry) + refresh token (7day expiry)
+- [ ] POST `/auth/refresh` rotates refresh tokens and issues new access token
+- [ ] Passwords stored with salted bcrypt hashes, never in plaintext
+- [ ] JWT contains user_id, role, exp claims; signed with HS256 or RS256
+- [ ] Existing API endpoints protected via `get_current_user()` dependency
+
+**Test Expectations:**
+- Unit: Mock password hashing verifies different inputs produce different hashes
+- Integration: Register â Login â Access token validates against JWT schema
+- Security: Brute force protection (rate limit on login endpoint, 5 attempts/minute)
+- E2E: Full auth flow with token refresh and invalidation of old tokens
+
+---
+
+### Task 2: API Key Management & Rotation
+**Description:** Implement per-user API keys with rotation capability for service-to-service authentication.
+
+**Acceptance Criteria:**
+- [ ] POST `/api-keys` generates new API key (32-byte random, prefixed `sk_`)
+- [ ] GET `/api-keys` lists active keys with last_used_at metadata
+- [ ] DELETE `/api-keys/{key_id}` soft-deletes key (revokes immediately)
+- [ ] Keys stored hashed in database (SHA-256), only prefix visible to users
+- [ ] Rate limiting per API key (configurable, default 100 req/min)
+- [ ] Existing endpoints accept `Authorization: Bearer <api-key>` header
+
+**Test Expectations:**
+- Unit: Key generation produces unique values with no collisions (1M iterations)
+- Integration: Create â Use â Delete flow with proper state transitions
+- Security: Hash collision resistance verified; key material never logged
+- Performance: Rate limiter correctly rejects requests exceeding threshold
+
+---
+
+### Task 3: Database Schema Migration
+**Description:** Add users, api_keys, and audit_logs tables with proper indexing.
+
+**Acceptance Criteria:**
+- [ ] `users` table: id (UUID), email (unique), password_hash, role (enum), created_at, updated_at
+- [ ] `api_keys` table: id (UUID), user_id (FK), key_hash, prefix, last_used_at, is_active, created_at
+- [ ] `audit_logs` table: id (UUID), user_id (nullable), action, resource, ip_address, timestamp
+- [ ] Indexes on users.email, api_keys.user_id, audit_logs.timestamp, audit_logs.action
+- [ ] Migration script reversible (up/down)
+- [ ] Alembic integration with existing project structure
+
+**Test Expectations:**
+- Unit: Schema validation ensures all required fields present
+- Integration: Migration applies cleanly to empty DB and migrates from v0 schema
+- Performance: Indexes reduce query time by â¥ 80% on 1M row tables
+- Rollback: Down migration restores original schema without data loss
+
+---
+
+## P1 Tasks (Important - Non-Blocking)
+
+### Task 4: Audit Logging Middleware
+**Description:** Implement automatic audit trail for all API requests with configurable filtering.
+
+**Acceptance Criteria:**
+- [ ] Middleware logs every request/response to `audit_logs` table
+- [ ] Captures: user_id, action (HTTP method + path), resource, ip_address, timestamp, status_code
+- [ ] Sensitive fields (passwords, tokens) redacted before logging
+- [ ] Configurable log levels (DEBUG, INFO, WARN) via environment variable
+- [ ] Bulk insert support for high-throughput scenarios (batch size 100)
+- [ ] Async logging to avoid blocking request processing
+
+**Test Expectations:**
+- Unit: Redaction filter removes all password/token patterns from log entries
+- Integration: Request â Middleware â Audit entry created with correct fields
+- Performance: Logging adds < 5ms latency per request at 1000 RPS
+- Reliability: Bulk insert handles partial failures gracefully (retry logic)
+
+---
+
+### Task 5: Role-Based Access Control (RBAC)
+**Description:** Implement role-based permissions for admin vs user access.
+
+**Acceptance Criteria:**
+- [ ] Roles: `user`, `admin` (extensible via enum)
+- [ ] Admin endpoints require `get_current_admin()` dependency
+- [ ] User endpoints require `

@@ -1,0 +1,21 @@
+<think>
+The user wants me to read the provided synthetic context and answer their question about the control code. Let me look at the context:
+
+It contains many filler facts about a "benchmark runner" that records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. There are 56 segments of these project notes.
+
+Then there's: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+So the control code is clearly stated as "ORION-7429".
+
+I need to return JSON with keys:
+- control_code: the value of the control code
+- evidence_quote: a quote from the context that proves it
+
+The evidence_quote should be something like: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let me construct the JSON response.
+</think>
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+}

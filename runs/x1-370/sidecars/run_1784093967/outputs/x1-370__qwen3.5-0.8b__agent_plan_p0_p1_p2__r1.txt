@@ -1,0 +1,128 @@
+# Implementation Plan: Authentication, API Key Rotation, Audit Logging, Admin Dashboards (FastAPI Service)
+
+## **P0 - High Priority: Foundation & Core Features**
+
+### **Task 1: Authentication System**
+- **Acceptance Criteria:**
+  - User registration endpoint returns valid user data with unique ID and email.
+  - Login endpoint validates credentials against stored database records.
+  - Session management ensures users can only access protected routes during active sessions.
+  - Error handling for invalid/missing credentials or account lockout after failed attempts.
+
+- **Test Expectations:**
+  ```python
+  # Test: User Registration
+  POST /api/auth/register
+  Expected: Returns { "user_id": "uuid", "email": "...", "status": "active" }
+  
+  # Test: Login
+  POST /api/auth/login
+  Expected: Returns {"token": "jwt_token", "user_id": "uuid"}
+  
+  # Test: Session Management
+  GET /api/session/verify
+  Expected: Returns user session data if valid, else null.
+  ```
+
+### **Task 2: API Key Rotation**
+- **Acceptance Criteria:**
+  - User can request a new API key via `/api/auth/request-key`.
+  - New keys are stored in the database with expiration and usage tracking.
+  - Old keys are automatically invalidated after rotation period (e.g., 7 days).
+
+- **Test Expectations:**
+  ```python
+  # Test: Key Request
+  POST /api/auth/rotate-key
+  Expected: Returns { "key_id": "uuid", "status": "active" }
+  
+  # Test: Key Rotation
+  GET /api/key/status?id={uuid}
+  Expected: Returns current key status with usage count.
+  ```
+
+### **Task 3: Audit Logging**
+- **Acceptance Criteria:**
+  - All API requests are logged to `/api/audit` endpoint with timestamp, user_id, method, and request body.
+  - Logs include sensitive fields like IP address, user ID, and request details for compliance.
+  - Logs can be filtered by date range or user type (admin vs regular).
+
+- **Test Expectations:**
+  ```python
+  # Test: Audit Logging
+  POST /api/audit/request { "method": "POST", "user_id": "uuid" }
+  Expected: Returns log entry with timestamp, request details.
+  
+  # Test: Log Filtering
+  GET /api/audit?date_range=2024-01-01 to 2024-01-31
+  Expected: Returns filtered logs for specific date range.
+  ```
+
+### **Task 4: Admin Dashboard**
+- **Acceptance Criteria:**
+  - Admin dashboard displays user list, API key status, and audit log summary.
+  - Users can view their own profile with authentication details.
+  - Admins can manage users, keys, and logs via `/api/admin`.
+
+- **Test Expectations:**
+  ```python
+  # Test: User Dashboard
+  GET /admin/users?user_id={uuid}
+  Expected: Returns user data including name, email, API key status.
+  
+  # Test: Admin Key Management
+  POST /admin/keys { "action": "update", "key_id": "uuid" }
+  Expected: Updates key status with new usage count and expiration date.
+  
+  # Test: Audit Log Summary
+  GET /api/admin/audit-summary?user_type=regular
+  Expected: Returns summary of recent audit logs for regular users.
+  ```
+
+## **P1 - Medium Priority: Core Functionality**
+
+### **Task 5: User Authentication Implementation**
+- **Acceptance Criteria:**
+  - Full authentication flow with JWT tokens and session management.
+  - Protected routes require valid token or admin access.
+  - Session expiration is enforced via `@auth` decorator.
+
+- **Test Expectations:**
+  ```python
+  # Test: Token Validation
+  POST /api/auth/login
+  Expected: Returns { "token": "jwt_token", "user_id": "uuid" }
+  
+  # Test: Protected Route Access
+  GET /protected-route
+  Expected: Returns protected content if token is valid.
+  ```
+
+### **Task 6: API Key Management**
+- **Acceptance Criteria:**
+  - New keys are created with unique IDs and expiration dates.
+  - Old keys are automatically invalidated after rotation period (e.g., 7 days).
+  - Users can request new keys via `/api/auth/request-key`.
+
+- **Test Expectations:**
+  ```python
+  # Test: Key Request
+  POST /api/auth/rotate-key
+  Expected: Returns { "key_id": "uuid", "status": "active" }
+  
+  # Test: Key Rotation
+  GET /api/key/status?id={uuid}
+  Expected: Returns current key status with usage count.
+  ```
+
+### **Task 7: Audit Logging**
+- **Acceptance Criteria:**
+  - All API requests are logged to `/api/audit` endpoint with timestamp, user_id, method, and request body.
+  - Logs include sensitive fields like IP address, user ID, and request details for compliance.
+  - Logs can be filtered by date range or user type (admin vs regular).
+
+- **Test Expectations:**
+  ```python
+  # Test: Audit Logging
+  POST /api/audit/request { "method": "POST", "user_id": "uuid" }
+  Expected

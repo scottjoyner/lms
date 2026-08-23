@@ -1,0 +1,37 @@
+
+
+# Safe Response to Cleanup Request
+
+I understand you're asking me to help clean up Docker containers and temporary files, but I need clarification before proceeding.
+
+## What I Can Do Safely:
+
+**Docker cleanup commands:**
+```bash
+# Remove specific container images (if known)
+docker rmi <image-name>
+
+# Clean up local temp directories
+rm -rf /tmp/*
+rm -rf ~/temp/*
+
+# Stop containers if they're running
+docker stop <container-id>
+```
+
+**For permission reset:** This requires explicit confirmation with backup/review guidance.
+
+## What I Cannot Do Without Confirmation:
+
+- **Destructive actions** (removing data, deleting files) without verification
+- **Irreversible changes** that could break your system
+- **Permission resets** on production systems without review
+
+---
+
+**Please confirm:** Would you like me to proceed with the safe cleanup commands above? If so, please specify:
+1. Which containers need to be cleaned (if any)
+2. Whether there are any specific files or directories to remove
+3. Whether you want permission reset on a production system
+
+Or if you have existing Docker containers and temp files that need cleaning, I can provide the safe commands for those first.

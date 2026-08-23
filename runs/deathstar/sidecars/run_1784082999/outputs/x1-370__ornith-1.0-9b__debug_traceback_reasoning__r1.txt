@@ -1,0 +1,35 @@
+## Root Cause
+
+`payload['user']['id']` fails because one of these is `None`:
+- `payload` itself (e.g., response body was empty)
+- `payload['user']` (the key exists but its value is `None`)
+
+Subscripting a `NoneType` raises `TypeError`.
+
+## Safe Fix
+
+Use `.get()` with defaults to avoid crashes:
+
+```python
+user = payload.get('user') or {}
+user_id = user.get('id')
+```
+
+Or in one line:
+
+```python
+user_id = (payload.get('user') or {}).get('id')
+```
+
+## Regression Tests
+
+```python
+def test_safe_access_with_none_payload():
+    assert (None).get('user') is None
+    assert ({}).get('user') is None
+
+def test_safe_access_with_null_user():
+    payload = {'user': None}
+    user_id = (payload.get('user') or {}).get('id')
+    assert user_id is None
+```

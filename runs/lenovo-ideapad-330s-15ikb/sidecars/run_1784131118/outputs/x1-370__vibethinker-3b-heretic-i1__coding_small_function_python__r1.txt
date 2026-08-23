@@ -1,0 +1,58 @@
+``We need to produce a Python string. The phone number number function is named: normalize, it's a..
+ We have to write a function function python We must return code only string, no markdown, and include the final code in a file block.
+
+ at least five asserts name  # name_ = '
+   print('a')  #name_ = "test"
+We So for the function def We:
+ 
+ We We
+
+ """
+
+We We a a
+
+"""
+ We 
+ # We'll a
+ # We'll   
+ # We'll
+ #
+ # # We
+ # # We'll
+
+
+ We We'll do it.
+
+ # We'll
+ #
+ # We'll
+ # We
+ # We
+ # # We'll
+ # We'll
+ # We'll
+ #
+
+
+
+
+
+
+ # We'll
+ # We'll
+ # We'll
+ # We'll
+
+
+ # We
+ # We
+ #We
+ # # We
+ #We
+ #We We
+
+ # # We
+ # We # 
+ # We # # We # # We # We # # We # # # We # # We # # We # # We # # We # # # # We # # We # # # # # We # # We # # # # # We # # # We # We # # We # # # # # We # # We # # # # # We # # We # # We # # We # # # # # We # # We # # # # # We # # We # We # # # We # # We # # # # # We # # # We # # We # # # # # # We # # We #
+ # # We'll # # We # # # # # # # # # # # We # We # We # # # We # # # # # # # # # # # # # a a a a # We # We # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # We # # # # # # # # # # # # # # # # # # # # # # #
+ We # # We # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # We We # # # # # # # # # # # # # We # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # # # # # # # # # # # # # # # # # # # # # # # # # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # We #

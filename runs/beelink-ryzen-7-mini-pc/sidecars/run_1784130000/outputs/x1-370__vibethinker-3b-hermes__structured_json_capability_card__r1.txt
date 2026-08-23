@@ -1,0 +1,25 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want:
+
+- task_fit: an array of strings (task fit description)
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys. Must be valid JSON object.
+
+We need to think about what the "task" is? The user didn't specify any particular task, just wants me to produce a JSON with those fields. I can interpret this as providing generic information about best practices for using language models or something like that. Or maybe they want me to fill in placeholders?
+
+Given no context, I'll provide a reasonable set of values: confidence around 0.9 (high confidence), task_fit describing what kind of tasks the model is good at, limitations being typical constraints, and recommended_max_context_tokens as an integer.
+
+The user wants "strict JSON only" - so we must output just the JSON text without any code fences or markdown formatting.
+
+Thus I'll produce:
+
+{
+  "task_fit": [
+    "Answering general knowledge questions",
+    "Summarizing written texts",
+    "Generating creative writing and stories",
+    "Explaining technical concepts in plain

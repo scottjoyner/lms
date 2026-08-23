@@ -1,0 +1,50 @@
+## Root Cause
+
+`payload['user']` returns `None`, so the subsequent `['id']` subscript fails. This happens when:
+
+- The request body is missing or malformed, e.g., `{}` or `{"email": "x"}` (no `"user"` key)
+- An upstream service returned a response without the expected structure
+
+The error occurs at `payload['user']` â Python evaluates left-to-right and tries to subscript `None`.
+
+## Safe Fix
+
+Use `.get()` with defaults, then validate before accessing nested fields:
+
+```python
+# Line 42 â safe version
+user = payload.get('user') or {}
+user_id = user.get('id')
+if not user_id:
+    raise ValueError("Missing required field: user.id")
+```
+
+Or with Python 3.10+ optional chaining:
+
+```python
+user_id = (payload.get('user') or {}).get('id')
+```
+
+## Regression Tests
+
+**Test 1 â Missing `user` key:**
+
+```python
+def test_missing_user_key():
+    payload = {"email": "test@example.com"}
+    user = payload.get("user") or {}
+    assert user == {}
+    with pytest.raises(ValueError, match="Missing required field: user.id"):
+        _extract_user_id(payload)  # your helper function
+```
+
+**Test 2 â `user` present but missing `id`:**
+
+```python
+def test_missing_user_id():
+    payload = {"user": {"email": "test@example.com"}}
+    user = payload.get("user") or {}
+    assert user.get("id") is None
+    with pytest.raises(ValueError, match="Missing required field: user.id"):
+        _extract_user_id(payload)
+```

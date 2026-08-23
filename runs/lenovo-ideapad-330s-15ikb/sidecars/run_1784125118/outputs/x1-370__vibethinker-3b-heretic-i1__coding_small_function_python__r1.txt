@@ -1,0 +1,58 @@
+We needWe are writing a senior Python engineer.
+We need to write a function `normalize_phone` that takes named 'numberThe function should be take string  and return a a It strips non non-digit characters and it is for number , and then 11 digit number beginning and beginning with.  number and it raises ValueError for anything anything anything else things else
+We need need to write a small function function main function that has at name a small a
+ We need to write a a code We need 1 a small function  and test it
+
+ Let me re write the function function in a way that it can clear, and then we have at at least five asserts
+
+
+
+ We We need to write a function function function of the function
+We'll define the final
+ the function function
+ the f
+
+ We need to write a function the the le function
+ and return the function
+
+We need to write a the the function
+
+Let me write a function function that takes a string input and returns a a string:
+
+The function should:
+ the non-digit characters and it is number to the end of the line break
+
+ the string
+
+We that the function the of the
+
+
+
+
+
+ a and then
+
+
+
+We the of the f
+
+ return the string
+
+ the f
+
+ the
+
+ 
+
+We need a a function of def of the the
+
+We we a a function that has 
+  # It is a simple function to write a a function
+
+ We'll of the of the f of the f the the function
+
+ Let me write let then, then and, but we then on,, at, it etc etc,, of of
+
+ We need a a function that which  #   #, . a a function  #, #, #,, #, #, #, #, #, a, a, a, a, a, a, a, a, r, i,
+
+ a, a, a, a # #, a, a a, a,, a #, #, #, #, #, # # #, #, #, #, #, #, #, #,, a, a, a, a, a, a, a #, a, a, a, a, a #,, # #, #, #, #, # # # #, # #, # #, # #, # # #, #, #, #, #, # #, # #, #, #, #, # #, #, #, # #, # #, # #, #, # #, # # We, a, a a, a, # #, #, # #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, # #, # #, #, # #, #, #, # #, #, # #, #, # #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, #, # #, #, #, # #, #, #, #, #, #, #, #, # #, #, # #, #,, # #, #, # #, #, # #, #, #, #, #, #, #, # # #, #,, # # #, #, #, #, # #, #, #, #, #,, #, # #, # #, # #, #, #, #, #, #, #, #, # #, # #, #, #, #, #, # #, #,, #,, a, a, a, #, # #, #, #, # #, #, # #, #, #, # # #, #, #, # #,, #, # #, #, #, #, #, #, # #, #, #, #, #, # # # #, #, # #, #, #, #, #, #,, #, # #, #, # # # # #, #, #, # #,

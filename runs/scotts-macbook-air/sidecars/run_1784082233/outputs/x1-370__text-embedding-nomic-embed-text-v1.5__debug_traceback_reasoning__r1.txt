@@ -1,0 +1,93 @@
+
+
+## Root Cause
+
+The error occurs because **the dictionary key `'user'` exists in the payload, but its value is `None`.** When Python tries to access `payload['user']['id']`, it attempts to subscript a `None` object, which raises `TypeError: 'NoneType' object is not subscriptable`.
+
+This typically happens when:
+- The user data was fetched from an API that returns `None` for some field (e.g., authentication status)
+- A default value wasn't set in the payload structure
+- There's a bug in how the payload was constructed or parsed
+
+---
+
+## Safe Fix
+
+Use `.get()` method to safely access values:
+
+```python
+user_id = payload['user'].get('id')  # Returns None if not present, otherwise gets it
+```
+
+Or use try-except with default value:
+
+```python
+try:
+    user_id = payload['user']['id']
+except (KeyError, TypeError):
+    user_id = None  # Default behavior
+```
+
+---
+
+## Regression Tests
+
+```python
+# Test 1: Normal case - 'user' exists and has valid ID
+def test_normal_payload():
+    payload = {
+        "status": True,
+        "user": {"id": 123},
+        "other_data": "test"
+    }
+    assert payload['user']['id'] == 123
+
+# Test 2: 'user' exists but is None (common case)
+def test_none_user():
+    payload = {
+        "status": True,
+        "user": None,
+        "other_data": "test"
+    }
+    assert payload['user'].get('id') == None
+
+# Test 3: 'user' doesn't exist in payload
+def test_missing_user():
+    payload = {
+        "status": True,
+        "other_data": "test"
+    }
+    # Should not raise an error
+    assert payload['user']['id'] is None
+
+# Test 4: Nested structure with None value
+def test_nested_none():
+    payload = {
+        "level1": {
+            "level2": {"status": True, "user": None}
+        }
+    }
+    # Should not raise an error
+    assert payload['level1']['level2'].get('id') is None
+
+# Test 5: Multiple levels with mixed values
+def test_mixed_levels():
+    payload = {
+        "level1": {
+            "status": True,
+            "user": {"id": 456}
+        },
+        "level2": {
+            "data": None
+        }
+    }
+    assert payload['level1']['user']['id'] == 456
+
+# Test 6: Empty user object (not None)
+def test_empty_user():
+    payload = {
+        "status": True,
+        "user": {}
+    }
+    # Should not raise an error
+    assert payload['user'].get('

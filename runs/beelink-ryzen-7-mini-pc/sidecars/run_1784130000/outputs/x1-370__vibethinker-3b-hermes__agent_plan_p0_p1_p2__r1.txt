@@ -1,0 +1,110 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning), P1 (implementation), and P2 (testing) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to produce a comprehensive implementation plan with these categories. I should not ask clarifying questions unless absolutely blocked. The user didn't provide any details about their existing FastAPI service, but they want me to create a generic yet realistic implementation plan that covers the four features (authentication, API key rotation, audit logging, admin dashboards). Let's structure it clearly.
+
+I'll organize:
+
+- P0: Planning & Requirements Gathering
+- P1: Architecture Design & Implementation
+  - Authentication module
+  - API Key Rotation module
+  - Audit Logging module
+  - Admin Dashboards
+
+- P2: Testing & Verification
+
+Each task should have acceptance criteria and test expectations. I can also include a timeline estimate.
+
+Let me produce this as a well-structured document.</think>## Implementation Plan â FastAPI Service Enhancements  
+
+| Level | Category | Task ID | Description |
+|-------|----------|---------|-------------|
+| **P0** | Planning & Requirements | P0âR1 | Define requirements, tech stack, and decision matrix |
+|       |          | P0âR2 | Set up project scaffold, dependency injection, environment variables |
+|       |          | P0âR3 | Create configuration files (Pydantic models, settings) |
+| **P1** | Architecture & Implementation | P1âA1 | Core authentication layer (JWT + password hashing) |
+|       |          | P1âA2 | API key management & rotation service |
+|       |          | P1âA3 | Centralized audit logging system |
+|       |          | P1âA4 | Admin dashboard UI & data visualization |
+| **P2** | Testing & Verification | P2âT1 | Unit tests â authentication logic, auth middleware |
+|       |          | P2âT2 | Integration tests â API endpoints with auth & key rotation |
+|       |          | P2âT3 | Endâtoâend tests â admin dashboard UI flow |
+|       |          | P2âT4 | Security & compliance testing (penetration, audit trail) |
+
+---
+
+## P0 â Planning & Requirements  (Dayâ¯1â2)
+
+### Task: Define Requirements, Tech Stack, and Decision Matrix  
+**Description:**  
+- Document the full feature set (authentication, API key rotation, audit logging, admin dashboard).  
+- Choose technology stack decisions (e.g., JWT vs. sessionâbased auth; Redis for caching; PostgreSQL for user data).  
+- Define acceptance criteria for each feature.
+
+**Acceptance Criteria**  
+| Requirement | Detail |
+|-------------|--------|
+| **User authentication** | 1) Password hashing with bcrypt; 2) JWT token issuance on login; 3) Refresh token storage; 4) Token expiration (15â¯min refresh, 7âday access); 5) Role-based access control (admin, user). |
+| **API key rotation** | 1) Store current API key per environment; 2) Generate new random API key on rotation; 3) Rotate within 90âday window; 4) Autoârotate after 60 days; 5) Verify keys in all requests. |
+| **Audit logging** | 1) Log every auth event (login, logout, token expiration); 2) Log every API key change; 3) Log every user profile update; 4) Log every admin dashboard view; 5) Log all external API calls for compliance. |
+| **Admin dashboards** | 1) User count & statistics page; 2) API keys usage & rotation history; 3) User activity log; 4) Role distribution; 5) Exportable CSV/JSON reports. |
+
+**Test Expectations**  
+- Verify all 8 acceptance criteria pass unit tests before moving to integration.  
+- No external services required for these tests (selfâcontained).  
+
+---
+
+### Task: Set Up Project Scaffold & Dependency Injection (Dayâ¯1â2)
+
+**Description:**  
+- Create a clean project structure (`app/`, `services/`, `models/`).  
+- Implement dependency injection for auth, key rotation, and audit services.  
+- Set up environment variable management with PythonâPydanticâenv.
+
+**Acceptance Criteria**  
+| Criterion | Details |
+|-----------|---------|
+| **Dependency injection layer** | `AuthService` receives `User` model; `KeyRotationService` receives `APIKey` model; `AuditService` receives `User` and `Token` models. |
+| **Configuration module** | All settings (database URL, JWT secret, API key base URL) loaded from environment variables (`API_KEY_BASE_URL`, `JWT_SECRET`, etc.). |
+| **Testable services** | Each service is fully testable with mock dependencies; no external DB calls in unit tests. |
+
+**Test Expectations**  
+- `AuthService.test()` â verify dependency injection and JWT creation logic.  
+- `KeyRotationService.test()` â verify key generation, storage, and rotation logic.  
+- `AuditService.test()` â verify log entry creation for each event type.  
+
+---
+
+### Task: Create Configuration Files (Dayâ¯1â2)
+
+**Description:**  
+- `config.py` â Pydantic settings with environment variable overrides.  
+- `models/` â Pydantic models for User, Token, APIKey, AuditEvent, DashboardReport.  
+- `database.py` â Base database session factory and connection pooling.
+
+**Acceptance Criteria**  
+| Model | Description |
+|-------|-------------|
+| `User` | Full user profile (id, email, hashed_password, roles). |
+| `Token` | JWT payload with sub/exp, access_type. |
+| `APIKey` | Base URL + API key string. |
+| `AuditEvent` | Timestamped event with fields: id, type, user_id, action, details. |
+| `DashboardReport` | Aggregated statistics (users, keys, activity). |
+
+**Test Expectations**  
+- All Pydantic models pass validation tests (`models/test/`).  
+- Config module validates required env vars and raises sensible errors if missing.
+
+---
+
+## P1 â Architecture & Implementation  (Daysâ¯3â8)
+
+### Task: Core Authentication Layer (Dayâ¯3â4)
+
+#### `auth/services/auth_service.py`
+```python
+from typing import AsyncGenerator, Optional
+
+import jwt
+import bcrypt

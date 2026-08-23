@@ -1,0 +1,23 @@
+<think>
+The context contains many repeated "Project note" statements about a benchmark runner, and one line that says:
+
+"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+This is the only statement containing a control code. Let me extract that information.
+
+The question asks:
+1. What is the control code?
+2. What exact sentence proves it?
+
+From the context, I can see:
+
+**Control Code:** ORION-7429
+
+**Exact Sentence Proving It:** "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let me format this as JSON with keys `control_code` and `evidence_quote`.
+</think>
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+}

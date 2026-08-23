@@ -1,0 +1,43 @@
+This implementation plan follows a "Security-First" delivery model. We will establish the identity and observability foundation (P0) before moving into lifecycle management (P1) and visualization (P2).
+
+### **P0: Core Security & Observability (Foundation)**
+*Goal: Establish the ability to identify users and track every action taken within the system.*
+
+#### **Task 1: JWT-based User Authentication**
+*   **Description:** Implement a standard OAuth2/JWT authentication flow including user registration, password hashing (Argon2), and a dependency-based permission check for FastAPI routes.
+*   **Acceptance Criteria:**
+    *   Users can register with a password (hashed in DB).
+    *   Users can receive a JWT upon successful login.
+    *   A `get_current_user` dependency exists to protect sensitive endpoints.
+    *   Tokens have a defined expiration time (e.g., 1 hour).
+*   **Test Expectations:**
+    *   `POST /auth/register`: Returns 201 on success; 400 on duplicate email.
+    *   `POST /auth/login`: Returns 200 with a valid JWT; 401 on incorrect credentials.
+    *   `GET /protected-route`: Returns 401 if no token is provided; 200 if valid.
+
+#### **Task 2: Structured Audit Logging**
+*   **Description:** Implement a middleware or decorator to capture "Who, What, When, and Result" for all state-changing operations (POST, PUT, DELETE, PATCH).
+*   **Acceptance Criteria:**
+    *   Logs are stored in a structured format (JSON).
+    *   Logs include: `timestamp`, `user_id`, `action_type`, `resource_id`, `ip_address`, and `status` (Success/Failure).
+    *   Logs are persisted to a dedicated `audit_logs` table/stream.
+*   **Test Expectations:**
+    *   Triggering a `DELETE` request results in a new row in the `audit_logs` table.
+    *   Failed login attempts are logged as "Auth_Failure" with the associated IP.
+
+---
+
+### **P1: Credential Lifecycle Management**
+*Goal: Provide secure, rotatable access for programmatic clients and automated systems.*
+
+#### **Task 3: API Key Management & Rotation**
+*   **Description:** Create a system to generate, store (hashed), and rotate API keys. Support "Active" and "Pending" states to allow for zero-downtime rotation.
+*   **Acceptance Criteria:**
+    *   Users can generate a new API key via the backend.
+    *   The system supports "Grace Periods" (Old key works for X minutes after new key is generated).
+    *   Keys are stored as hashes (never in plain text).
+    *   Revocation of a key immediately invalidates it.
+*   **Test Expectations:**
+    *   `POST /keys/generate`: Returns a plain-text key once (to be shown to user) and stores the hash.
+    *   `GET /keys`: Returns a list of keys with status (Active/Expired/Revoked).
+    *   Rotation Test: Generate Key B; verify Key A still works for 5 minutes, then fails.

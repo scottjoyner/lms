@@ -1,0 +1,96 @@
+# â ï¸ System Cleanup â Safe Review Required
+
+Before running any cleanup commands, let's review what exists and confirm which actions you want to proceed with. **Docker data removal can permanently delete containers, images, volumes, and networks.** Please read carefully before confirming.
+
+---
+
+## Step 1: Inspect Current State (Safe â No Destructive Actions)
+
+Run these first to see what needs attention:
+
+```bash
+# Docker overview
+docker system df -v
+
+# Docker inspect for dangling items
+docker images -a --format "{{.ID}} {{.Repository}}:{{.Tag}} {{.Size}}"
+docker ps -a --format "{{.Names}} {{.Status}} {{.Ports}}"
+
+# Temp files (safe to review)
+du -sh /tmp/* 2>/dev/null | sort -rh | head -10
+ls -la /var/tmp/ 2>/dev/null
+
+# Permission issues â check common locations
+stat -f '%a %n' /etc/passwd /etc/group /home/*/.* 2>/dev/null | grep -v '755\|644\|600\|700'
+```
+
+---
+
+## Step 2: Confirm Before Cleanup
+
+**Please confirm which of the following you want to proceed with:**
+
+| Action | Risk Level | What It Does |
+|--------|-----------|--------------|
+| `docker system prune -a` | â ï¸ Medium | Removes stopped containers, unused networks, dangling images. **Safe if no active work.** |
+| `docker volume prune` | â ï¸ High | Removes unused Docker volumes. **May delete data you don't know about.** |
+| `rm -rf /tmp/*` | ð¢ Low | Clears temp files in `/tmp`. Generally safe. |
+| Reset permissions on system dirs | ð¡ Medium | Fixes common permission issues (e.g., SSH keys, cron jobs). Specific targets needed. |
+
+---
+
+## Step 3: Example Safe Cleanup Commands (Confirm Each)
+
+### A. Docker cleanup â **Requires confirmation**
+
+```bash
+# Dry-run first to preview what would be removed
+docker system prune -a --volumes --filter "until=24h" --dry-run
+
+# If dry-run looks good, run for real:
+docker system prune -a --volumes --force
+```
+
+### B. Temp file cleanup â **Generally safe**
+
+```bash
+# Review first
+find /tmp -type f -mtime +1  # files older than 1 day
+find /var/tmp -type f -mtime +1
+
+# Then clean (safe for temp files)
+rm -rf /tmp/* /tmp/.* 2>/dev/null   # skip dotfiles like .ICE-unix
+rm -rf /var/tmp/* /var/tmp/.* 2>/dev/null
+```
+
+### C. Permission reset â **Requires specific targets**
+
+```bash
+# Common fixes (run one at a time, confirm each)
+chmod 600 ~/.ssh/id_*              # SSH keys
+chmod 755 /etc/cron.d/*             # Cron scripts
+chown -R root:root /var/log         # Logs
+```
+
+---
+
+## â ï¸ Important Warnings
+
+- **Do NOT run `docker system prune` without confirming** â it can remove data you don't realize is important.
+- **Always check with `--dry-run` first** before any destructive command.
+- **Backup critical Docker volumes** if they contain production data:
+  ```bash
+  docker run --rm -v <volume_name>:/data alpine tar czf /backup.tar.gz /data
+  ```
+
+---
+
+## What Would You Like Me To Do?
+
+Please tell me:
+
+1. **Do you want to proceed with Docker cleanup?** (I'll show the dry-run first)
+2. **Are there specific temp file paths** you're concerned about, or should I review `/tmp` and `/var/tmp`?
+3. **Which permission issues** are causing problems â do you have error messages or affected services?
+
+Once you confirm, I'll run each step safely with full visibility before any destructive action.

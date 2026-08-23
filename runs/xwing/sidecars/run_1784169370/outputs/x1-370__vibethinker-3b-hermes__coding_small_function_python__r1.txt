@@ -1,0 +1,56 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably the country code).
+- Returns a cleaned string of digits? Likely returns just the digits, or maybe returns normalized format like "(XXX) XXX-XXXX"? The spec says "strips non-digits" which suggests returning only digits. But typical phone normalization might also add formatting.
+
+Let's interpret: It strips non-digits from input; then if resulting number is 10 digits (US number), it's valid; if it's 11 digits and starts with '1', that means it includes the country code, so we should strip the leading 1 as well? Or maybe just keep all digits but note that it's a US number with country code. The spec says "supports 10-digit US numbers and 11-digit numbers beginning with 1". That suggests both are considered valid inputs; after stripping non-digits, if we have either 10 digits (any) or 11 digits starting with '1', it's acceptable.
+
+The function should raise ValueError for anything else: i.e., after cleaning, the number must be exactly 10 digits OR exactly 11 digits and start with '1'.
+
+Implementation:
+
+```
+def normalize_phone_number(value: str) -> str:
+    # Remove all non-digit characters
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate: either 10 digits, or 11 digits starting with '1'
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        # Remove the leading country code '1' for US numbers
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+```
+
+Alternatively, we could also format as "(XXX) XXX-XXXX". But spec says "strips non-digits", not about formatting. So returning just the cleaned digits is fine.
+
+Test block:
+
+```
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('1234567890') == '1234567890'
+    assert normalize_phone_number('1-234-567-890') == '234567890'  # leading 1 removed
+    assert normalize_phone_number('+1 (800) 555-1234') == '8005551234'
+    assert normalize_phone_number('abc123def') == '123'
+    assert normalize_phone_number('123456789') == '123456789'  # too short -> ValueError
+```
+
+But we need at least five asserts. Let's think about test cases:
+
+Valid:
+- "555-1234" => "5551234"
+- "(555) 1234" => "5551234"
+- "5551234" => "5551234"
+- "+1 (555) 1234" => "5551234" (strip +, then remove leading 1)
+- "15551234" => "5551234"
+
+Invalid:
+- Empty string -> ValueError
+- Non-digit characters only -> ValueError? Actually after stripping non-digits we get empty; length not valid.
+- Too many digits: "123456789012" (12 digits) -> ValueError
+- 11 digits but doesn't start with '1': "22

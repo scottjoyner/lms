@@ -1,0 +1,43 @@
+# Root Cause
+
+The error occurs because the script attempts to access `payload['user']['id']` without first verifying that `payload` itself is not `None`. This could happen if:
+- The script was initialized with an empty payload or a different structure than expected
+- There's a mismatch between how data flows through the system and what's being accessed
+
+# Safe Fix
+
+```python
+try:
+    user_id = payload['user']['id']
+except KeyError as e:
+    print(f"KeyError: {e}")
+    raise
+```
+
+This ensures we handle missing keys gracefully before attempting to access them.
+
+# Regression Tests
+
+1. **Test 1 - Payload Exists but User ID is None**
+   ```python
+   def test_payload_none():
+       payload = {'user': {'id': 'test'}}
+       assert payload['user']['id'] == 'test'
+   
+   def test_payload_missing_user_id():
+       payload = {'user': {}}  # No user_id key
+       assert payload['user']['id'] is None
+   ```
+
+2. **Test 2 - Payload Structure Mismatch**
+   ```python
+   def test_payload_wrong_structure():
+       payload = {'user': 'test'}  # Missing 'id' key
+       assert payload['user']['id'] == 'test'
+   
+   def test_payload_missing_user_id_key():
+       payload = {'user': {}}  # No user_id key
+       assert payload['user']['id'] is None
+   ```
+
+These tests ensure the script handles both valid and invalid payloads correctly.

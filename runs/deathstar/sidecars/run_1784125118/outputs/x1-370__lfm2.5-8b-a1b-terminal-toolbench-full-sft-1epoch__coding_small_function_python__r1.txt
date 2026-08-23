@@ -1,0 +1,23 @@
+
+def normalize_phone_number(value: str) -> str:
+    # Remove all non-digit characters
+    digits = ''.join(filter(str.isdigit, value))
+    
+    # Validate the stripped number
+    if len(digits) == 10 or (len(digits) == 11 and digits.startswith('1')):
+        return digits
+    else:
+        raise ValueError(f"Invalid phone number: {value}")
+
+if __name__ == '__main__':
+    # Test cases
+    assert normalize_phone_number("(123) 456-7890") == "1234567890"
+    assert normalize_phone_number("12345678901") == "12345678901"
+    assert normalize_phone_number("1 234-567890") == "1234567890"
+    try:
+        normalize_phone_number("abc")
+        raise AssertionError
+    except ValueError as e:
+        print(e)
+    # A valid number with leading zero is not supported (must start with 1 for length 11)
+    assert normalize_phone_number("01234567890

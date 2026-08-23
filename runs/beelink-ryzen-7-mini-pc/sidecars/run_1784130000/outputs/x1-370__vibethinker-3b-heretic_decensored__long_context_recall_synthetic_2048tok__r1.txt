@@ -1,0 +1,22 @@
+<think>We need to read the synthetic context, find the "control code" (some code given). The prompt says:
+
+- There are many filler facts and one control code.
+
+- Return JSON only with keys "control_code" and "evidence_quote".
+
+The context includes repeated lines: "Project note: ... Segment X." At some point there is a line: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Thus the control code is "ORION-7429". The exact sentence that proves it is likely: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+We need to output JSON with two keys:
+
+- "control_code": string (the control code). Should we include the segment? Probably just "ORION-7429".
+
+- "evidence_quote": a quoted string from the context that proves it. The entire sentence: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+We need to ensure the JSON only includes those keys, no extra whitespace? Probably fine.
+
+Thus answer:
+
+{
+  "control_code": "ORION-

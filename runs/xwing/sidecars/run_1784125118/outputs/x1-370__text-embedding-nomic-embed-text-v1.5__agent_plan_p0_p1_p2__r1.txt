@@ -1,0 +1,120 @@
+# Implementation Plan: Authentication, API Key Rotation, Audit Logging & Admin Dashboards
+
+## Architecture Overview
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Auth | JWT + OAuth2 password flow | User authentication |
+| Keys | HMAC-signed tokens with TTL | API key rotation |
+| Audit | Structured JSON logs to storage backend | Compliance & traceability |
+| Admin | FastAPI sub-app with RBAC | Dashboard access control |
+
+---
+
+## P0 â Critical Path (Authentication + Audit Foundation)
+
+### P0-1: User Authentication System
+
+**Tasks:**
+- Implement `OAuth2PasswordBearer` scheme with JWT token generation/verification
+- Create `/auth/register`, `/auth/login`, `/auth/me` endpoints
+- Add password hashing via `bcrypt` or `argon2`
+- Build user model with email, hashed password, created_at, updated_at fields
+
+**Acceptance Criteria:**
+1. New users can register with unique email and strong password (min 8 chars)
+2. Login returns valid JWT with claims: sub, email, exp, iat, iss
+3. Tokens expire after configurable TTL (default 24h); refresh tokens rotate on use
+4. Failed login attempts are rate-limited per IP/user (max 5/minute)
+5. Password reset flow via email token works end-to-end
+
+**Test Expectations:**
+| Test Case | Expected Result |
+|-----------|-----------------|
+| Register with valid data | HTTP 201, user created in DB |
+| Login with correct creds | HTTP 200, JWT returned |
+| Login with wrong password | HTTP 401, no token |
+| Request with expired token | HTTP 401 |
+| Concurrent login from same account | New refresh token issued, old invalidated |
+
+---
+
+### P0-2: Audit Logging Infrastructure
+
+**Tasks:**
+- Create `AuditLog` model (event_type, actor_id, target_resource, payload, ip_address, user_agent, timestamp)
+- Build middleware that captures request/response metadata automatically
+- Implement structured JSON logging with correlation IDs per request
+- Add storage backend abstraction (file-based default; pluggable for S3/DB)
+
+**Acceptance Criteria:**
+1. Every API call generates an audit entry within 50ms of request completion
+2. Audit entries include: method, path, status_code, duration_ms, actor_id, ip_address
+3. Sensitive fields (passwords, tokens in body) are redacted before storage
+4. Logs are queryable by date range, user, event_type, and IP
+5. Log retention policy is configurable (default 90 days; archive older records)
+
+**Test Expectations:**
+| Test Case | Expected Result |
+|-----------|-----------------|
+| Authenticated request logged | Audit entry created with actor_id from JWT |
+| Unauthenticated request logged | Actor_id = "anonymous", ip_address captured |
+| Request with sensitive body field | Field redacted in stored log |
+| Query by date range | Returns matching entries only |
+| 10,000 requests under load | No audit entry loss; <5% latency overhead |
+
+---
+
+### P0-3: RBAC Role System (Foundation)
+
+**Tasks:**
+- Define role hierarchy: `viewer`, `editor`, `admin`
+- Add `roles` field to user model with default role assignment on registration
+- Implement middleware that checks scope before endpoint execution
+- Create `/auth/roles` endpoint for role listing and assignment (admin only)
+
+**Acceptance Criteria:**
+1. Each protected endpoint declares required roles via dependency injection
+2. Users without required role receive HTTP 403 with descriptive error
+3. Role assignments require admin approval workflow
+4. Role changes are logged in audit trail as `role_assignment` event
+
+**Test Expectations:**
+| Test Case | Expected Result |
+|-----------|-----------------|
+| Viewer tries admin endpoint | HTTP 403 Forbidden |
+| Admin accesses viewer-only endpoint | HTTP 200 OK |
+| Role change via non-admin user | HTTP 403, audit log entry created |
+
+---
+
+## P1 â Core Features (API Key Rotation + Dashboard Scaffolding)
+
+### P1-1: API Key Management & Rotation
+
+**Tasks:**
+- Create `ApiKey` model with key_hash, owner_id, name, permissions, expires_at, last_rotated_at
+- Implement `/api-keys/create`, `/api-keys/list`, `/api-keys/rotate`, `/api-keys/revoke` endpoints
+- Build HMAC-signed API key validation middleware (separate from JWT)
+- Add automatic rotation trigger when key age exceeds threshold
+
+**Acceptance Criteria:**
+1. API keys are generated with 256-bit entropy and stored only as SHA-256 hashes
+2. Key creation returns the plaintext key once; subsequent calls return masked version
+3. Rotation generates new key, invalidates old one atomically (no window for both valid)
+4. Keys expire after configurable TTL (default 90 days); expired keys return HTTP 401
+5. Revocation is immediate and logged as `api_key_revoked` audit event
+
+**Test Expectations:**
+| Test Case | Expected Result |
+|-----------|-----------------|
+| Create API key | Returns masked key, plaintext stored once in memory |
+| Use valid key | HTTP 200 with request-scoped token |
+| Use expired key | HTTP 401 Unauthorized |
+| Rotate active key | Old key immediately invalid; new key functional |
+| Concurrent rotation attempts | Only one successful; others get 409 Conflict |
+
+---
+
+### P1-2: Admin Dashboard Scaffolding
+

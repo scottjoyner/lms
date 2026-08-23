@@ -1,0 +1,49 @@
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+---
+
+## P0 â Critical Foundation Tasks
+
+### P0-1: User Authentication System
+
+**Objective:** Implement secure user authentication with JWT-based token management and role-based access control (RBAC).
+
+| Sub-task | Description | Acceptance Criteria | Test Expectations |
+|----------|-------------|---------------------|-------------------|
+| 1.1 | Design & implement database schema for users, roles, permissions | Schema supports: email uniqueness, hashed passwords (bcrypt/argon2), role assignment, soft-delete capability | Migration runs cleanly; duplicate email rejected with HTTP 409 |
+| 1.2 | Implement registration endpoint (`POST /auth/register`) | Returns 201 on success; rejects invalid input; rate-limited to prevent abuse | Valid payload â 201 + JWT token in response body; missing fields â 422 validation error; duplicate email â 409 Conflict |
+| 1.3 | Implement login endpoint (`POST /auth/login`) with refresh token support | Returns access token (short-lived) and refresh token (long-lived); supports password reset flow | Valid credentials â 200 + both tokens; invalid credentials â 401 Unauthorized; expired refresh token â 401 on re-login |
+| 1.4 | Implement middleware for JWT validation & RBAC enforcement | Middleware extracts claims from Authorization header; rejects unauthenticated/unauthorized requests before route handlers execute | Missing `Authorization` header â 401; insufficient role (e.g., user accessing admin endpoint) â 403 Forbidden |
+| 1.5 | Implement password reset flow (`POST /auth/forgot-password`, `POST /auth/reset-password`) | Reset token is single-use, time-limited (e.g., 15 min), and bound to specific email | Request with valid reset token â 200; expired token â 400; reused token â 400; invalid token â 400 |
+| 1.6 | Implement logout & token revocation | Revoked tokens are rejected on subsequent requests even if not expired | Token in revoked list â 401 regardless of expiry time |
+
+**Test Strategy:** Unit tests for middleware logic, integration tests with mocked DB/token store, security tests verifying bcrypt cost factor and JWT expiration.
+
+---
+
+### P0-2: Audit Logging Infrastructure
+
+**Objective:** Build a centralized audit logging system that captures all sensitive operations with tamper-evident storage.
+
+| Sub-task | Description | Acceptance Criteria | Test Expectations |
+|----------|-------------|---------------------|-------------------|
+| 2.1 | Design audit log schema (user_id, action, resource, timestamp, IP, user_agent, status) | Schema includes all required fields; supports indexing on user_id and timestamp for efficient querying | Migration creates table with proper indexes; query by user_id returns results in <50ms at scale |
+| 2.2 | Implement audit middleware that intercepts all HTTP requests/responses | Middleware captures request metadata (method, path, status code, duration) before response is sent | Every endpoint call generates an audit entry; entries include correct method/path/status_code |
+| 2.3 | Implement structured logging with correlation IDs | Each request receives a unique trace_id propagated through middleware and stored in audit logs | Correlation ID present in all log entries for same request chain; trace_id matches across services |
+| 2.4 | Implement tamper-evident storage (append-only with checksums) | Log writes are append-only; each entry includes HMAC of previous entry's hash | Attempted deletion/overwrite returns error; integrity check verifies full chain of hashes |
+| 2.5 | Implement audit log query API (`GET /admin/logs`) | Supports filtering by user_id, action_type, date range, status code; paginated results with cursor-based pagination | Filter by user_id â correct subset returned; invalid date range â 400; empty result set returns 200 with empty page |
+| 2.6 | Implement alerting on suspicious patterns (e.g., repeated auth failures) | Configurable threshold triggers webhook or log-level escalation | 5 failed login attempts from same IP within 10 min â alert triggered; below threshold â no alert |
+
+**Test Strategy:** Integration tests with real audit DB, performance tests verifying <10ms overhead per request, security tests verifying tamper detection.
+
+---
+
+### P0-3: API Key Management (Core)
+
+**Objective:** Implement secure API key generation, storage, and lifecycle management as foundation for rotation feature.
+
+| Sub-task | Description | Acceptance Criteria | Test Expectations |
+|----------|-------------|---------------------|-------------------|
+| 3.1 | Design API key schema with metadata (owner_id, service_name, created_at, expires_at, last_rotated_at) | Schema supports: owner reference, optional expiry, rotation tracking, revocation flag | Migration creates table; keys are generated with cryptographically secure randomness |
+| 3.2 | Implement API key generation endpoint (`POST /api-keys`) | Generates unique key (e.g., `sk_live_...`); returns key in response only once at creation time | Valid request â 201 + new key string in response; subsequent calls return existing keys without exposing them again |
+| 3.3 | Implement API key validation middleware | Middleware validates key format, checks revocation status, verifies expiry | Valid key â passes through; revoked key â 401; expired key â 401; invalid format â 4

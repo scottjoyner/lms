@@ -1,0 +1,3 @@
+{
+  "task_fit": ["Task alignment", "Goal achievement", "Output relevance"], "confidence": 0.87, "limitations": ["depends on dataset quality", "may struggle with edge cases", "requires sufficient context"], "recommended_max_context_tokens": 250
+}

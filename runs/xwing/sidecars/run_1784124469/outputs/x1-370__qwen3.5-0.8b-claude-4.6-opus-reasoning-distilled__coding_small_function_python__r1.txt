@@ -1,0 +1,27 @@
+def normalize_phone_number(value: str) -> str:
+    """Normalize a phone number by stripping non-digits and validating format."""
+    # Strip whitespace from the input string
+    value = value.strip()
+    
+    # Check if it's empty - raise ValueError
+    if not value:
+        raise ValueError("Phone number cannot be empty")
+    
+    # Convert to integer (to handle leading zeros automatically)
+    phone_num = int(value)
+    
+    # If it's 0, return "0"
+    if phone_num == 0:
+        return "0"
+    
+    # Check if it starts with '1' - raise ValueError for other cases
+    if value.startswith('1'):
+        raise ValueError("Phone number must not start with '1'")
+    
+    # Strip non-digit characters and return as string
+    normalized = ''.join(c for c in value if c.isdigit())
+    return normalized
+
+if __name__ == '__main__':
+    test_cases = [
+        ("+1-555-1234", "5

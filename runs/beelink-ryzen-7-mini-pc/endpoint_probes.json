@@ -1,0 +1,21 @@
+[
+  {
+    "base_url": "http://100.85.72.121:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.018,
+    "model_count": 9,
+    "models": [
+      "refinedtoolcallv5-3b",
+      "text-embedding-nomic-embed-text-v1.5",
+      "orinth-1.0-9b",
+      "liquid/lfm2.5-1.2b",
+      "qwen3.6-28b-reap20-a3b",
+      "vibethinker-3b-heretic_decensored",
+      "google/gemma-4-12b-qat",
+      "vibethinker-3b-hermes",
+      "qwen3.6-14b-a3b-vibeforged-v2"
+    ],
+    "error": null
+  }
+]

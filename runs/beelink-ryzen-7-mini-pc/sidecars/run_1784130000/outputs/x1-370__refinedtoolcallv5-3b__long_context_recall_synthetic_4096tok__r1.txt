@@ -1,0 +1,10 @@
+<think>
+The context provides information about a "LMS control code" which must be preserved exactly as ORION-7429. Let me search through the provided text to find the exact mention of this control code.
+
+Looking at the context, I can see:
+1. "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+2. Several other mentions of "Project note: the benchmark runner records endpoint latency..."
+
+Let me search more specifically for the exact phrase that states what the control code is.
+</think>
+{"control_code": "ORION-7429", "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."}

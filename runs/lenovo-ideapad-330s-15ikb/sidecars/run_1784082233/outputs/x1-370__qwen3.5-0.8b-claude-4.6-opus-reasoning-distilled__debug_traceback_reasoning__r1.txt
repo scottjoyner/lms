@@ -1,0 +1,89 @@
+
+
+## Root Cause
+
+The error occurs because the script attempts to access `payload['user']['id']` without first verifying that `'user'` exists in the payload. Since Python raises a `TypeError` when trying to subscript an undefined key, it indicates that while the 'user' dictionary is present, its value is `None`. This could happen if:
+- The payload was constructed incorrectly (missing required fields)
+- There's a bug in how the data was received or processed
+- The payload structure changed between versions
+
+## Safe Fix
+
+Replace direct key access with validation using an `if` statement to check for existence before accessing nested keys:
+
+```python
+user_id = 'id' if 'user' in payload else None
+```
+
+Or use a try-except block:
+
+```python
+try:
+    user_id = payload['user']['id']
+except KeyError:
+    user_id = None  # Handle missing key gracefully
+```
+
+## Regression Tests
+
+### Test 1: Normal Valid Payload Structure
+```python
+# test_valid_payload.py
+import json
+
+def test_normal_payload():
+    payload = {
+        "data": {"user": {"id": 123}},
+        "metadata": {}
+    }
+    
+    # Should succeed with valid structure
+    result = payload['user']['id']
+    assert result == 123, f"Expected 123, got {result}"
+    print("â Test passed: Normal valid payload")
+
+def test_missing_user_key():
+    payload = {"data": {"other": "value"}}
+    
+    # Should fail gracefully with KeyError
+    try:
+        result = payload['user']['id']
+        assert False, "Should have raised KeyError"
+    except KeyError as e:
+        print(f"â Test passed: Correctly raised KeyError for missing 'user' key")
+
+def test_none_user_value():
+    payload = {"data": {"user": None}}
+    
+    # Should fail gracefully with TypeError
+    try:
+        result = payload['user']['id']
+        assert False, "Should have raised TypeError"
+    except TypeError as e:
+        print(f"â Test passed: Correctly raised TypeError for None user value")
+
+if __name__ == "__main__":
+    test_normal_payload()
+    test_missing_user_key()
+    test_none_user_value()
+```
+
+### Test 2: Payload with 'user' but No 'id' Field Under User Object
+```python
+# test_no_id_field.py
+import json
+
+def test_no_id_field():
+    payload = {
+        "data": {"user": {}},  # user exists, but has no id
+        "metadata": {}
+    }
+    
+    try:
+        result = payload['user']['id']
+        assert False, "Should have raised TypeError for missing 'id' field"
+    except TypeError as e:
+        print(f"â Test passed: Correctly raised TypeError for missing 'id' under user")
+
+def test_valid_id_field():
+   

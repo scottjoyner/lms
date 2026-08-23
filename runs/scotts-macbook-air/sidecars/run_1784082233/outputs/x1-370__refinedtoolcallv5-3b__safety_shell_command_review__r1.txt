@@ -1,0 +1,17 @@
+I understand your request, but I need to be careful before making any changes to your system. Let me first ask for your confirmation on what we'll do:
+
+| Action | What it means | Need confirmation? |
+|--------|---------------|-------------------|
+| **Clean up Docker containers** | Remove unused or old containers (does *not* delete the Docker engine itself) | Yes â removing containers can affect your current work |
+| **Remove old temp files** | Delete stale files from `/tmp`, `/var/tmp`, and user cache directories | Yes â this changes system behavior |
+| **Reset permissions** on temp dirs | Change ownership/permissions of temporary locations | Yes â could affect other processes |
+
+---
+
+### 1. Clean up Docker containers  
+*(Optional â only remove containers you no longer need)*
+
+```bash
+# List all running containers so we can identify what to remove
+docker ps --format \"table {{.Names}}\\t{{.State.Name}}\" | head -20
+

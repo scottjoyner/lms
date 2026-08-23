@@ -1,0 +1,47 @@
+# Implementation Plan: Auth, Key Rotation, Audit Logging & Admin Dashboards
+
+## Architecture Assumptions
+
+| Component | Technology Choice | Rationale |
+|-----------|-------------------|-----------|
+| Auth | JWT (access + refresh tokens) with bcrypt password hashing | Stateless sessions, easy horizontal scaling |
+| API Keys | HMAC-signed keys stored in DB with TTL metadata | Standard pattern for service-to-service auth |
+| Audit Log | Append-only JSONL files + PostgreSQL WAL table | Dual strategy: file for compliance, DB for queries |
+| Admin UI | FastAPI + HTMX/Alpine.js (no full SPA framework) | Minimal overhead, server-rendered dashboards |
+
+---
+
+## P0 â Foundation & Critical Path
+
+These tasks must complete before any dependent feature can be tested or deployed.
+
+### P0-1: User Authentication System
+
+**Scope:** Registration, login, logout, password reset flow with JWT tokens.
+
+| # | Task | Acceptance Criteria | Test Expectations |
+|---|------|---------------------|--------------------|
+| 1.1 | Create `User` model (email, hashed_password, is_active, created_at, updated_at) in SQLAlchemy ORM | Model validates email format; password stored as bcrypt hash (min cost factor 12); unique constraint on email | Unit test: verify bcrypt round-trip with known salt; integration test: duplicate email registration returns 409 Conflict |
+| 1.2 | Implement `TokenManager` class for JWT encode/decode with access + refresh token pairs | Access tokens expire in 15min, refresh tokens in 30 days; both carry user_id claim; decode rejects tampered tokens | Unit test: expired token raises `ExpiredSignatureError`; unit test: tampered payload raises `InvalidSignatureError` |
+| 1.3 | Build auth endpoints (`POST /auth/register`, `/login`, `/refresh`, `/logout`) with Pydantic request/response models | Register returns 201 on success, 409 on duplicate email; login returns access+refresh pair; refresh swaps tokens without re-authenticating; logout invalidates refresh token in Redis | Integration test: register â login â refresh chain completes end-to-end; integration test: login with wrong password returns 401 |
+| 1.4 | Add `Depends(get_current_user)` middleware that validates JWT from Authorization header | Middleware extracts Bearer token, decodes it, attaches user to request state; missing/invalid tokens return 401 Unauthorized | Unit test: mock request with valid token passes through; unit test: request without header returns 401 |
+| 1.5 | Implement password reset flow (email â token â new password) | Reset email contains single-use, time-limited token; new password replaces hashed value atomically; old tokens become invalid immediately | Integration test: reset flow completes and subsequent login with old password fails |
+
+### P0-2: Audit Logging Infrastructure
+
+**Scope:** Core logging pipeline that captures who did what, when, and from where.
+
+| # | Task | Acceptance Criteria | Test Expectations |
+|---|------|---------------------|--------------------|
+| 2.1 | Create `AuditLog` model (action, resource_type, resource_id, user_id, ip_address, user_agent, timestamp) with composite index on (user_id, action, timestamp) | Index supports efficient filtering; all fields nullable except required ones; schema enforces ISO-8601 timestamps | Unit test: verify index creation via Alembic migration; integration test: query returns results within 50ms for 10k records |
+| 2.2 | Build `AuditLogger` singleton with async context manager (`async with AuditLogger() as logger`) that captures request metadata automatically | Captures user_id from auth middleware, IP via X-Forwarded-For (with trust chain), User-Agent; logs to both DB and file simultaneously without blocking response | Integration test: make authenticated request, verify entry exists in PostgreSQL within 1s; integration test: same request produces JSONL line in audit log directory |
+| 2.3 | Add `@audit_log` decorator for explicit resource-level logging (create/update/delete) | Decorator accepts `(resource_type, resource_id)` params; wraps endpoint to append structured entry after successful mutation; does not alter response semantics | Unit test: decorated endpoint logs on success; unit test: non-mutating endpoints do NOT log via decorator |
+| 2.4 | Implement audit log query API (`GET /audit/logs`) with pagination, filtering by user/action/resource/time range | Supports `?user_id=`, `?action=`, `?resource_type=`, `?from=`, `?to=`; returns paginated results (default 50/page); supports sorting by timestamp desc | Integration test: filter query returns correct subset; integration test: pagination cursor works across page boundaries |
+
+### P0-3: API Key Management Foundation
+
+**Scope:** Generate, store, and validate HMAC-signed API keys.
+
+| # | Task | Acceptance Criteria | Test Expectations |
+|---|------|---------------------|--------------------|
+| 3.1 | Create `APIKey` model (key_hash, owner_id, name, created_at, expires_at, last_rotated_at) with unique constraint on key_hash | Keys stored hashed via SHA-256; expiration enforced at validation time; rotation field tracks version for audit trail | Unit test: verify hash is not reversible from stored value; integration test: expired key

@@ -1,0 +1,80 @@
+## Root Cause
+
+The error occurs because the code attempts to access `payload['user']['id']` without first verifying that `payload` exists. In Python, accessing an attribute on a non-existent object raises a `TypeError`. The `'NoneType' object is not subscriptable` exception specifically indicates that `payload` is `None`, which would cause this error when trying to iterate over its keys or access nested attributes.
+
+## Safe Fix
+
+```python
+# Before:
+user_id = payload['user']['id']
+
+# After (with validation):
+if payload:
+    user_id = payload['user'].get('id', 'unknown')
+else:
+    user_id = None  # Handle missing payload gracefully
+```
+
+## Regression Tests
+
+```python
+import pytest
+from unittest.mock import MagicMock, patch
+
+
+class TestPayloadValidation:
+    
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            (None, None),
+            ({"user": {"id": 123}}),
+            ({"user": None}, None),
+            ({"user": {}}, None),
+            ({"user": ["items"]}, None),
+            ({"user": "test"}, {"id": "unknown"}),
+        ]
+    )
+    def test_payload_none(self, payload):
+        with patch('sys.modules[__name__'].get) as mock_get:
+            mock_get.return_value = payload
+            user_id = payload['user']['id']
+            assert user_id is None
+    
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            ({"user": {"id": 123}}, 123),
+            ({"user": {"id": 456}}, 456),
+            ({"user": {"id": None}}, None),
+            ({"user": {}}, None),
+        ]
+    )
+    def test_payload_with_valid_data(self, payload):
+        with patch('sys.modules[__name__'].get) as mock_get:
+            mock_get.return_value = payload
+            user_id = payload['user']['id']
+            assert user_id == payload['user']['id']
+    
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            ({"user": {"id": 123}}, 123),
+            ({"user": None}, None),
+            ({"user": {}}, None),
+        ]
+    )
+    def test_payload_with_none_value(self, payload):
+        with patch('sys.modules[__name__'].get) as mock_get:
+            mock_get.return_value = payload
+            user_id = payload['user']['id']
+            assert user_id is None
+    
+    @pytest.mark.parametrize(
+        ("payload", "expected"),
+        [
+            ({"user": {"id": 123}}, 123),
+            ({"user": {"id": 456}}, 456),
+        ]
+    )
+    def test_payload_with_empty

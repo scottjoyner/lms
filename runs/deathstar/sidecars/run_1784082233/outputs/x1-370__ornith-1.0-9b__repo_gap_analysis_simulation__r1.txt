@@ -1,0 +1,71 @@
+# Implementation Cycle Plan â FastAPI + React Monorepo
+
+## P0 â Critical (Immediate)
+
+| # | Item | Type | Details |
+|---|------|------|---------|
+| 1 | **Remove direct shell command endpoint** | Security | Exposes OS commands to unauthenticated users. Replace with a sandboxed service or remove entirely. |
+| 2 | **Add authentication (JWT/session)** | Security | No auth = full data exposure. Implement login/register, token refresh, role-based access control. |
+| 3 | **Fix error handling leaks** | Security/Logic | Stack traces and internal paths exposed to clients. Wrap all endpoints in `try/except` returning generic messages. |
+| 4 | **Add Docker healthcheck** | Reliability | Prevents deployment of broken containers. Use `curl http://localhost:8000/docs -w "%{http_code}"`. |
+
+---
+
+## P1.1 â High (This Sprint)
+
+| # | Item | Type | Details |
+|---|------|------|---------|
+| 5 | **Database migrations** | Logic | Replace ad-hoc SQLite schema with Alembic migrations. Define models, indexes, constraints. |
+| 6 | **API error standardization** | Logic | Return `{error: "code", message: "text"}` consistently across all endpoints. |
+| 7 | **CI/CD pipeline** | Process | GitHub Actions: lint â test â build â deploy on push to main. |
+| 8 | **Input validation** | Security/Logic | Add Pydantic validators on all request bodies. Reject malformed data before processing. |
+
+---
+
+## P1.2 â Medium (Next Sprint)
+
+| # | Item | Type | Details |
+|---|------|------|---------|
+| 9 | **Unit + integration tests** | Testing | Cover auth flows, CRUD operations, error paths. Target â¥70% coverage. |
+| 10 | **API documentation** | Process | Ensure OpenAPI docs are generated and accessible at `/docs`. Add example requests/responses. |
+| 11 | **Logging & monitoring** | Reliability | Structured logging (JSON), request duration tracking, error rate alerts. |
+| 12 | **Rate limiting** | Security | Prevent brute-force on auth endpoints. Use `slowapi` or similar middleware. |
+
+---
+
+## P2 â Future / Nice-to-Have
+
+| # | Item | Type | Details |
+|---|------|------|---------|
+| 13 | **Performance optimization** | Logic | Query indexing, connection pooling, pagination for large datasets. |
+| 14 | **React dashboard enhancements** | Feature | Loading states, error boundaries, dark mode, responsive layout. |
+| 15 | **Code refactoring** | Process | Extract shared utilities, reduce duplication between backend and frontend. |
+
+---
+
+## Security Issues Summary
+
+- ð´ **Unauthenticated shell execution** â highest risk; can lead to RCE
+- ð  **No auth system** â all data publicly accessible
+- ð¡ **Weak error handling** â information disclosure via stack traces
+- ð¢ **Missing rate limiting** â vulnerable to abuse on public endpoints
+
+## Logic Gaps Summary
+
+- No migration strategy for schema changes
+- No input validation on request bodies
+- Inconsistent error responses across endpoints
+- No monitoring or observability in production
+
+## Test Deliverables
+
+| Priority | Scope | Target |
+|----------|-------|--------|
+| P1.2 | Auth flow (login, register, token refresh) | 3 test suites |
+| P1.2 | CRUD operations + error paths | 5 test suites |
+| P0 | Shell endpoint removal verification | Manual check |
+| P1.1 | CI pipeline smoke tests | Automated on every PR |
+
+---
+
+**Next Action:** Start with P0 #1 (remove shell endpoint) and P0 #2 (implement auth). These two items address the most critical security risks and unblock further development.

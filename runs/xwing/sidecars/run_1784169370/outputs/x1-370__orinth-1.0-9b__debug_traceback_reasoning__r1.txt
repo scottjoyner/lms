@@ -1,0 +1,41 @@
+## Root Cause
+
+`payload` is `None` (likely because the HTTP request body was empty or deserialization failed), so indexing it with `['user']['id']` fails. This typically happens when:
+
+- The client sends an empty/missing JSON body
+- Authentication middleware returns a 401 response and the handler still processes the payload
+- An exception occurred during JSON parsing upstream
+
+## Safe Fix
+
+```python
+# Option A: Defensive check before subscripting
+if not isinstance(payload, dict) or 'user' not in payload:
+    raise ValueError("Missing user_id in request payload")
+user_id = payload['user']['id']
+
+# Option B: Use .get() with defaults (less strict but silent on errors)
+user_id = payload.get('user', {}).get('id') if isinstance(payload, dict) else None
+```
+
+## Regression Tests
+
+```python
+import json
+
+def test_payload_none_raises():
+    """Regression: empty body must not crash"""
+    from your_module import handler  # adjust import path
+    with patch("your_module.request.get_json", return_value=None):
+        with pytest.raises((ValueError, TypeError)):
+            handler()
+
+def test_missing_user_key_raises():
+    """Regression: missing user field must be caught"""
+    payload = {"token": "abc123"}  # no 'user' key
+    with patch("your_module.request.get_json", return_value=payload):
+        with pytest.raises(ValueError, match="Missing user_id"):
+            handler()
+```
+
+**Key points:** Always validate the structure before subscripting. Add a `pytest.raises` assertion so this regression is caught if defensive checks are later removed.

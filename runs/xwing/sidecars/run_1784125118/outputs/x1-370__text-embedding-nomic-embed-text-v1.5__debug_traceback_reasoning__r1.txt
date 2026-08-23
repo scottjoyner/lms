@@ -1,0 +1,50 @@
+## Root Cause
+
+The variable `payload` is `None`, so attempting `payload['user']['id']` fails because you cannot subscript a `NoneType`. This typically happens when:
+
+- The upstream API or function that populates `payload` returned `None` (e.g., no data, error response, or early return)
+- A conditional branch skipped the assignment before reaching line 42
+- An exception was caught silently and `payload` was never initialized
+
+## Safe Fix
+
+Guard against `None` with an explicit check before subscripting:
+
+```python
+if payload is None:
+    raise ValueError("payload is None; cannot extract user_id")
+
+user_id = payload['user']['id']
+```
+
+Or use a more defensive approach that also handles missing keys:
+
+```python
+try:
+    user_id = payload['user']['id'] if payload else None
+except (TypeError, KeyError):
+    raise ValueError("payload is invalid or missing 'user.id'") from None
+```
+
+## Regression Tests
+
+**Test 1 â `None` payload raises a clear error:**
+
+```python
+def test_user_id_with_none_payload():
+    payload = None
+    with pytest.raises(ValueError, match="payload is None"):
+        if payload is None:
+            raise ValueError("payload is None; cannot extract user_id")
+        _ = payload['user']['id']
+```
+
+**Test 2 â Valid payload extracts `user_id` correctly:**
+
+```python
+def test_user_id_with_valid_payload():
+    payload = {"user": {"id": "abc-123"}}
+    assert payload is not None
+    user_id = payload["user"]["id"]
+    assert user_id == "abc-123"
+```

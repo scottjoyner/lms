@@ -1,0 +1,7 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,0.512,3.124,63.243,1.00,0.40,0.6871,10
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,orinth-1.0-9b,1.817,16.107,9.770,1.00,0.40,0.7238,10
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,text-embedding-nomic-embed-text-v1.5,0.007,,,0.00,0.00,0.0000,10
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,vibethinker-3b-hermes,8.454,0.456,21.927,1.00,0.20,0.6217,10
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,ornith-1.0-35b,0.038,,,0.00,0.00,0.0000,10
+1784169370,xwing,192.168.1.241,http://xwing.tailcb8954.ts.net:1234/v1,qwen3.6-14b-a3b-vibeforged-v2,109.725,,,0.00,0.00,0.0000,10

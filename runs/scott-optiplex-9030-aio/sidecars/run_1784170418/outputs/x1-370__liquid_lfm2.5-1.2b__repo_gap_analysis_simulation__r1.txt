@@ -1,0 +1,50 @@
+### Implementation Cycle Plan for FastAPI Backend
+
+**P0 â Requirements Analysis & Planning**  
+- Confirm all dependencies (FastAPI, SQLite, React frontend, no auth, no migrations).  
+- Identify weak points: no CI/CD, no tests, no error handling, no Docker healthcheck.  
+- Document security gaps: direct shell commands, lack of authentication, SQL injection risk.  
+- Define test deliverables: unit tests, integration tests for API and database.
+
+**P1.1 â Security Assessment & Fixes**  
+- Implement input validation and parameterized queries to prevent SQL injection.  
+- Add authentication/authorization (e.g., JWT or API keys).  
+- Introduce error handling with meaningful messages and logging.  
+- Define security deliverables: secure endpoints, error logs, authentication layer.
+
+**P1.2 â Core Functionality & Integration**  
+- Develop core API endpoints and integrate with SQLite database.  
+- Build direct shell command endpoint for external access.  
+- Implement basic CRUD operations and test them.  
+- Define logic gaps: missing validation, inconsistent state handling.  
+- Define test deliverables: functional API tests, integration with React dashboard.
+
+**P2 â Testing & CI/CD Setup**  
+- Write unit and integration tests for all components.  
+- Set up CI pipeline (e.g., GitHub Actions) with basic checks.  
+- Add Docker healthcheck for containerized deployment.  
+- Define test deliverables: passing test suite, CI pass rate, Docker health status.
+
+**Next Steps:**  
+- Address all identified gaps in security and logic.  
+- Implement full test coverage and error handling.  
+- Schedule next delivery: deploy to staging, run final QA.  
+
+---
+
+### Security Issues Identified  
+- Direct shell access to backend â potential for abuse.  
+- No authentication â unauthorized data access.  
+- Weak error messages â risk of exposing stack traces.  
+- Missing input validation â SQL injection vulnerability.
+
+### Logic Gaps  
+- No transaction handling or rollback logic.  
+- Inconsistent state management between API and frontend.  
+- Lack of logging for critical operations.
+
+### Test Deliverables  
+- Unit & integration tests covering all core features.  
+- API contract tests with mocked database responses.  
+- CI pipeline verification reports.  
+- Docker healthcheck status documentation.

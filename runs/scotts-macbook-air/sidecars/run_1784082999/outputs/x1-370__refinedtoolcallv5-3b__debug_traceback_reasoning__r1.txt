@@ -1,0 +1,67 @@
+
+## Root Cause
+```python
+# The error means: payload['user'] is **None**, not a dict
+# so trying to subscript it (payload['user']['id']) raises:
+#   TypeError: 'NoneType' object is not subscriptable
+
+# Most common reasons this happens:
+# 1. `payload` does not have a key `'user'`
+# 2. The value for `'user'` is `None` instead of an object/dict
+# 3. The topâlevel payload dict is missing entirely or corrupted
+```
+
+## Safe Fix
+```python
+from typing import Any, Optional
+
+def get_user_id(payload: dict) -> Optional[str]:
+    """
+    Safely retrieve the 'id' field from a nested 'user' key.
+    Returns None if the path doesn't exist or the intermediate value is None.
+    """
+    user = payload.get('user')               # safe lookup with default
+    if not user:                            # covers both "no key" and "value is None"
+        return None
+    # Use .get() instead of [] to avoid the TypeError on missing 'id'
+    return user.get('id')
+```
+
+## Regression Tests
+```python
+import pytest
+
+def test_normal_case():
+    """Test that a valid payload returns the correct id."""
+    payload = {"user": {"id": "123", "name": "Alice"}}
+    assert get_user_id(payload) == "123"
+
+
+def test_missing_user_key():
+    """Test that when 'user' is missing we return None (no TypeError)."""
+    payload = {"items": [1, 2, 3]}          # no 'user' key
+    assert get_user_id(payload) is None
+
+
+def test_user_value_is_none():
+    """Test that when the intermediate value is None we return None."""
+    payload = {"user": None}
+    assert get_user_id(payload) is None
+
+
+def test_missing_inner_key():
+    """Test that when 'id' is missing inside user we return None."""
+    payload = {"user": {"name": "Bob", "email": "bob@example.com"}}
+    assert get_user_id(payload) is None
+
+
+def test_empty_payload():
+    """Test that with an empty dict we don't crash."""
+    assert get_user_id({}) is None
+
+
+def test_non_dict_top_level():
+    """Test that when the top-level isn't a dict we don't raise."""
+    # This should be caught by the caller before calling get_user_id
+    with pytest.raises(Exception):
+        get_user_id(None)         

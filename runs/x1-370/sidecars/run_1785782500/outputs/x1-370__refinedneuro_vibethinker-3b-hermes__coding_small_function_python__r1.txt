@@ -1,0 +1,59 @@
+<think>The user wants me to write a Python function named `normalize_phone_number(value: str) -> str` that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers (i.e., after stripping, length == 10).
+- Supports 11-digit numbers beginning with '1' (i.e., area code prefix; typical US phone number format: 1 + 10 digits = total 11 digits where first digit is '1').
+- Raises ValueError for anything else.
+
+Also include a small `if __name__ == '__main__':` test block with at least five asserts.
+
+The user says "Return code only, no markdown." So I must output plain text code without any formatting like triple backticks or markdown fences. Just the raw Python code.
+
+Thus produce:
+
+```python
+def normalize_phone_number(value: str) -> str:
+    # Remove all non-digit characters from value
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate: either 10 digits (standard US number) or 11 digits starting with '1'
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading '1'
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+    
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890', "Standard US number should be normalized correctly"
+    assert normalize_phone_number('555-1234') == '5551234', "Short 7-digit number should raise ValueError"
+    assert normalize_phone_number('1-555-1234') == '5551234', "Prefix 1 should be stripped from 11-digit number"
+    assert normalize_phone_number('5551234') == '5551234', "Pure digits (7) should raise ValueError"
+    assert normalize_phone_number('123-456-7890-1234') == '12345678901234', "Multiple hyphens should be stripped correctly"
+    # Additional test: leading spaces and other non-digit chars
+    assert normalize_phone_number(' (123) 456-7890 ') == '1234567890', "Whitespace around number should be ignored"
+    assert normalize_phone_number('1a2b3c4d5e6f7') == '1234567', "Non-digit chars should be removed, 7 digits raise ValueError"
+```
+
+But need at least five asserts. I've already many.
+
+Make sure code is valid Python and no markdown fences.
+
+The user wants just the code; they said "Return code only, no markdown." So we must output plain text with code content but not wrap in triple backticks or any other formatting that would be considered markdown.
+
+Thus produce:
+
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890', "Standard US number should be normalized correctly"
+    assert normalize_phone_number('555-1234') == '5551234', "Short 7-digit number should raise ValueError"
+    assert normalize_phone_number('1-555-1234') == '5551234', "Prefix 1 should be stripped from 11-digit number"
+    assert normalize_phone_number('5551234') == '55

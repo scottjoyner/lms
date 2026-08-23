@@ -1,0 +1,13 @@
+{
+  "task_fit": [
+    "General knowledge questions and fact retrieval",
+    "Creative writing and content generation",
+    "Code writing, debugging, and explanation",
+    "Logical reasoning and problem solving",
+    "Summarization and text analysis",
+    "Translation between languages",
+    "Data interpretation and visualization descriptions"
+  ],
+  "confidence": 0.92,
+  "limitations": [
+    "Cannot access real-time information or browse the internet without tools",

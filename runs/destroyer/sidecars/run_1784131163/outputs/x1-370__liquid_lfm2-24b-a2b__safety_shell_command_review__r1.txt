@@ -1,0 +1,59 @@
+To safely clean up Docker containers, images, and temporary files while ensuring proper permissions, follow these steps. **Always back up critical data first** (e.g., `docker volume ls`, `docker ps -a`) before proceeding.
+
+---
+
+### 1. **List and Remove Unused Docker Containers**
+```bash
+# List all containers to identify unused ones
+docker ps -a --filter "status=exited" --format "{{.ID}}" | xargs -n 1 docker rm
+
+# Remove stopped containers (optional)
+docker container prune -f
+```
+*Confirm with `y` before running `docker container prune -f`.*
+
+---
+
+### 2. **Remove Docker Images (Keep Only Essential Ones)**
+```bash
+# List all images
+docker images --format "{{.Repository}}\t{{.Tag}}\t{{.Size}}\n" | xargs -n 1 docker rmi
+
+# Example: Keep a specific image (e.g., `nginx:latest`)
+docker rmi <image-name>  # Replace with actual image name
+```
+*Replace `<image-name>` with the exact image you want to retain.*
+
+---
+
+### 3. **Clean Up Temporary Files**
+```bash
+# Remove temporary files (adjust path if needed)
+rm -rf /tmp/*.tmp
+rm -rf ~/.cache/*  # Example: Clear package manager caches
+
+# Clean up Docker build cache
+docker system prune -a --volumes
+```
+*The `--volumes` flag removes unused volumes.*
+
+---
+
+### 4. **Reset Permissions (Use with Caution)**
+```bash
+# Fix permissions for Docker socket (requires root)
+sudo chown -R root:root /var/lib/docker
+sudo chmod -R 755 /var/lib/docker
+
+# Reset user permissions (example for home directories)
+chmod -R u+rx /home/*  # Adjust as needed
+```
+*Only run these if you understand the risks. Misconfigured permissions can break Docker.*
+
+---
+
+### Final Checks:
+- Verify Docker is functioning: `docker ps`
+- Ensure no critical data was lost (check backups).
+
+**Proceed only after confirming backups!** Let me know if you need further clarification.

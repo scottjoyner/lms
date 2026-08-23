@@ -1,0 +1,25 @@
+# Root Cause  
+The error `TypeError: 'NoneType' object is not subscriptable` occurs because `payload['user']['id']` returns `None`. This typically happens when the expected key in the dictionary does not exist or the value is `None`, causing the script to attempt indexing a non-existent object.
+
+---
+
+## Safe Fix  
+Ensure that `payload['user']` exists and contains a valid `'id'` key before accessing it:
+
+```python
+user_id = payload.get('user', {}).get('id')
+if user_id is not None:
+    print(user_id)
+else:
+    print("User ID not found")
+```
+
+---
+
+## Regression Tests  
+1. **Test Case 1:** Validate that `payload['user']` exists and contains an `'id'`.  
+2. **Test Case 2:** Confirm that accessing `payload['user']['id']` does not raise errors when the key is missing.
+
+---
+
+Let me know if you need further assistance!

@@ -1,0 +1,84 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably with country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown formatting. So just plain text containing the Python code.
+
+Let's design function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # If empty or contains non-digit after stripping? Actually we already have only digits.
+    # Validate length and leading 1 optional
+    if len(digits) == 0:
+        raise ValueError("Empty phone number")
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip country code
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, brackets, etc. Should be stripped.
+- Leading/trailing whitespace should be fine; we only consider digits.
+
+Raise ValueError for anything else (including empty string, wrong lengths).
+
+Test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert normalize_phone_number('+1 (800) 123-4567') == '8001234567'
+    assert normalize_phone_number('123456789012') raises ValueError
+    # maybe test with extra characters: 'abc123xyz' -> raise
+    try:
+        normalize_phone_number('abc123xyz')
+    except ValueError:
+        pass
+
+Need at least five asserts. Let's include:
+
+- Valid 10-digit number (with formatting)
+- Valid 10-digit number plain digits
+- Valid 11-digit with leading 1 (country code)
+- Invalid empty string or whitespace only -> raise
+- Input with no digits -> raise
+
+Better to use try/except for the last two.
+
+Let's write:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert normalize_phone_number('+1 (800) 123-4567') == '8001234567'
+    with pytest.raises(ValueError):
+        normalize_phone_number('')
+    try:
+        normalize_phone_number('abc123xyz')
+    except ValueError:
+        pass
+
+But we need to import pytest? The problem didn't mention using pytest. We can just use try/except.
+
+Better:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert

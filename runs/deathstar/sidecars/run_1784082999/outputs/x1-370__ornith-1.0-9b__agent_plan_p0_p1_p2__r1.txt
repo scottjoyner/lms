@@ -1,0 +1,66 @@
+# Implementation Plan: Security & Observability Enhancements for FastAPI Service
+
+## Architecture Overview
+
+```
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â                  Existing FastAPI Service             â
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ¤
+â  P0: Auth Framework + Audit Logging Infrastructure   â
+â  P1: API Key Rotation + Admin Dashboard Scaffolding  â
+â  P2: Full Admin Dashboards + Monitoring Integration  â
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+```
+
+---
+
+## P0 â Foundational Infrastructure (Weeks 1â3)
+
+### P0-1: User Authentication System
+
+**Description:** Implement JWT-based authentication with role-based access control (RBAC).
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **JWT Token Issuance** | â¢ Tokens issued on successful login<br>â¢ Claims include `sub`, `roles`, `exp`<br>â¢ Refresh token rotation supported | â¢ Login returns 200 with access + refresh tokens<br>â¢ Expired token returns 401<br>â¢ Invalid signature returns 403 |
+| **RBAC Middleware** | â¢ Route-level role restrictions enforced<br>â¢ Admin, User, ReadOnly roles defined<br>â¢ Permission matrix documented in OpenAPI spec | â¢ Unauthorized role gets 403 on protected routes<br>â¢ Role claims verified in token payload<br>â¢ RBAC rules reflected in `/docs` |
+| **Password Security** | â¢ Minimum 8 chars, complexity enforced<br>â¢ bcrypt hashing with cost factor â¥12<br>â¢ Account lockout after 5 failed attempts | â¢ Weak passwords rejected at registration<br>â¢ Hash comparison takes <10ms (constant-time)<br>â¢ Lockout triggers after threshold exceeded |
+| **Session Management** | â¢ Token blacklist for revoked sessions<br>â¢ Graceful logout invalidates tokens<br>â¢ Concurrent session limits enforced | â¢ Revoked token returns 401 on next request<br>â¢ Logout endpoint clears all active sessions<br>â¢ Max concurrent sessions respected (e.g., 5) |
+
+---
+
+### P0-2: Audit Logging Framework
+
+**Description:** Centralized audit trail capturing security-relevant events.
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **Audit Event Schema** | â¢ Events include: timestamp, user_id, action, resource, IP, status<br>â¢ Immutable log entries (append-only)<br>â¢ Structured format for downstream processing | â¢ All events conform to schema validation<br>â¢ Log entries cannot be deleted or modified<br>â¢ Schema validated via Pydantic models |
+| **Audit Middleware** | â¢ Intercepts all HTTP requests/responses<br>â¢ Captures auth failures, privilege escalations, data mutations<br>â¢ Configurable log levels per endpoint | â¢ Every request generates audit entry<br>â¢ Auth failure events tagged with `auth_failure`<br>â¢ Sensitive endpoints (DELETE, PUT) always logged at INFO level |
+| **Storage Backend** | â¢ PostgreSQL or Redis-backed storage<br>â¢ Retention policy configurable (default 90 days)<br>â¢ Queryable via REST API (`/api/audit`) | â¢ Logs persist after service restart<br>â¢ Old logs archived/compressed per retention policy<br>â¢ Audit query returns paginated results with filters |
+| **Alerting Integration** | â¢ Critical events trigger alerts (e.g., brute force, privilege escalation)<br>â¢ Webhook delivery to monitoring systems | â¢ Brute force pattern triggers alert within 60s<br>â¢ Alert payload includes event context and severity level |
+
+---
+
+### P0-3: Database Migration & Schema Updates
+
+**Description:** Migrate existing service to support new security features.
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **Migration Script** | â¢ Existing users migrated with hashed passwords<br>â¢ New tables: `audit_logs`, `api_keys`, `user_roles`<br>â¢ Zero-downtime migration strategy | â¢ Migration runs without data loss<br>â¢ All existing records have valid hash values<br>â¢ Rollback script available and tested |
+| **API Key Generation** | â¢ Keys generated with unique prefixes (e.g., `sk_live_...`)<br>â¢ Metadata: owner_id, created_at, expires_at, last_rotated<br>â¢ Revocation support | â¢ Generated key is unique across all keys<br>â¢ Key metadata queryable via API<br>â¢ Revoked key returns 401 on use |
+
+---
+
+## P1 â Security Features (Weeks 3â5)
+
+### P1-1: API Key Rotation System
+
+**Description:** Automated and manual API key rotation with versioning.
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **Key Versioning** | â¢ Each key has a version number<br>â¢ Old versions remain valid until explicitly revoked<br>â¢ Rotation increments version atomically | â¢ Rotated key works while old key still active<br>â¢ After revocation, only new version accepted<br>â¢ Version conflict resolved via atomic update |
+| **Rotation Triggers** | â¢ Manual rotation via admin API<br>â¢ Automatic rotation on expiration (configurable)<br>â¢ Forced rotation after security incident | â¢ Admin triggers rotation and receives new key immediately<br>â¢ Auto-rotation fires 24h before expiry<br>â¢ Incident-triggered rotation bypasses normal checks |
+| **Key Lifecycle** | â¢ Provision â Active â Rotated â Revoked lifecycle<br>â¢ Audit trail for every state transition<br>â¢ Grace period after revocation (configurable) | â¢ State transitions logged in audit system<br>â¢ Rev

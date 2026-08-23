@@ -1,0 +1,113 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical), P1 (high), and P2 (medium/optional) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what these tasks would look like:
+
+- User Authentication: password hashing, JWT token generation and validation, user registration, login, role-based access control
+- API Key Rotation: mechanism for rotating API keys, revocation, audit logging of key changes
+- Audit Logging: structured logging of all auth-related actions, key rotations, user activity, system events
+- Admin Dashboards: UI components for admin to view metrics, user stats, key rotation status, audit logs
+
+Organize into P0 (must-have), P1 (should-have but not mandatory), and P2 (nice-to-have / optional). Each task should have acceptance criteria and test expectations.
+
+Let me think about the ordering:
+
+P0 tasks are those that are absolutely required for the service to function correctly. Typically:
+- P0: User authentication core (must work)
+- P0: API key rotation mechanism (must work)
+- P0: Audit logging integration (must be there)
+
+Admin dashboards might be P1 because it's nice-to-have but not strictly required; or could be P2 if the admin UI is optional. Let me think:
+
+User authentication is definitely critical - without it, service can't function.
+
+API key rotation is important for security; probably a must-have (P0).
+
+Audit logging is also essential for security and compliance - likely P0.
+
+Admin dashboards are more of an advanced feature that could be required depending on the business. I'd place admin dashboard as P1 or P2. Let me think: If this is a production service, having admin dashboards might be critical for operations; but if it's just a developer tool, maybe not. The user didn't specify. I'll assume admin dashboards are important but not strictly required for the core functionality to work - so they'd be P1.
+
+Thus:
+
+P0 tasks:
+- P0-1: User Authentication (registration, login, JWT)
+- P0-2: API Key Rotation (key generation, rotation, revocation)
+- P0-3: Audit Logging Integration
+
+P1 tasks:
+- P1-1: Admin Dashboard - Core UI components
+- P1-2: Security Enhancements for Auth (two-factor auth, password policy)
+
+P2 tasks (optional):
+- P2-1: Multi-tenancy support
+- P2-2: Advanced Audit Logging (log retention, alerting)
+- P2-3: API Key Expiration (longer rotation intervals)
+
+But the user asked specifically for "adding user authentication, API key rotation, audit logging, and admin dashboards". So I should focus on those four features. The plan can have multiple tasks under each feature across P0-P2.
+
+Let me propose:
+
+P0:
+- P0-1: User Authentication (registration, login, JWT tokens)
+- P0-2: API Key Rotation (key generation, rotation logic, revocation)
+- P0-3: Audit Logging Integration (logging of auth actions, key changes)
+
+P1:
+- P1-1: Admin Dashboard - Core UI components
+- P1-2: Admin Dashboard - User Statistics
+- P1-3: Admin Dashboard - API Key Management
+
+P2:
+- P2-1: Admin Dashboard - Audit Log Search & Filter
+- P2-2: Admin Dashboard - Real-time Notifications (webhooks)
+- P2-3: Security Hardening (rate limiting, IP blocking)
+
+But the user wants each task to include acceptance criteria and test expectations. So I need to write detailed tasks with those sections.
+
+Let me think about what acceptance criteria look like:
+
+For each task:
+1. Description/Task
+2. Acceptance Criteria (what must be verified)
+3. Test Expectations (what tests should pass)
+
+I'll organize as P0, P1, P2 headings and list tasks under them.
+
+Make sure to include all four features across the plan.
+
+Let me create a comprehensive plan:
+
+P0:
+- P0-1: User Authentication Core
+  - Acceptance Criteria: Users can register with email/password; login returns JWT token; token expiration works; protected routes require valid token.
+  - Test Expectations: unit tests for password hashing, integration tests for auth flow, edge cases (duplicate email, weak password).
+- P0-2: API Key Rotation
+  - Acceptance Criteria: API keys generated securely; rotation can be triggered; old key is revoked; new key works; rotation logs are recorded.
+  - Test Expectations: unit tests for key generation, integration tests for rotation flow, edge cases (invalid key, concurrent rotations).
+- P0-3: Audit Logging Integration
+  - Acceptance Criteria: All auth actions logged (login, logout, password change); API key changes logged; user activity logged; audit log queryable.
+  - Test Expectations: unit tests for logging functions, integration tests for audit log queries, edge cases (no logs returned empty list).
+
+P1:
+- P0 is done. Now P1 tasks:
+
+Admin Dashboard core features.
+
+- P1-1: Admin Dashboard - User Management UI
+  - Acceptance Criteria: Admin can see all users; view user details; delete users; update profile.
+  - Test Expectations: UI tests, integration tests for CRUD operations, edge cases (user not found).
+- P1-2: Admin Dashboard - API Key Management
+  - Acceptance Criteria: Admin can list keys, view rotation history, revoke keys, generate new keys.
+  - Test Expectations: UI tests, integration tests for key management flow, edge cases (key doesn't exist).
+- P1-3: Admin Dashboard - Audit Log Overview
+  - Acceptance Criteria: Admin can filter by date, user, action type; view recent logs; export to table.
+  - Test Expectations: UI tests, integration tests for filtering and query, edge cases (no matching logs).
+
+P2:
+- P2-1: Advanced Audit Logging Features
+  - Acceptance Criteria: Log retention policies; log aggregation; alerting on log volume thresholds.
+  - Test Expectations: Unit tests for retention logic, integration tests for alerting flow.
+- P2-2: Real-time Notifications (Webhooks)
+  - Acceptance Criteria: Admin can subscribe to audit events; receive real-time notifications via WebSocket/HTTP.
+  - Test Expectations: Integration tests with webhook providers, edge cases (unsubscribed subscriptions).
+- P2-3: API Key Expiration
+ 

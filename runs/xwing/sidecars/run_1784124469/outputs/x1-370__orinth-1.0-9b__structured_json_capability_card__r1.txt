@@ -1,0 +1,18 @@
+{
+  "task_fit": [
+    "Answering questions across diverse topics",
+    "Writing and editing text in multiple languages",
+    "Code generation, debugging, and explanation",
+    "Logical reasoning and problem solving",
+    "Summarizing and analyzing documents",
+    "Creative writing and brainstorming",
+    "Data analysis and interpretation",
+    "Educational content creation"
+  ],
+  "confidence": 0.95,
+  "limitations": [
+    "Cannot access real-time information or browse the internet without tools",
+    "Knowledge cutoff limits awareness of very recent events",
+    "May produce inaccurate results on highly specialized domains without verification",
+    "Cannot execute code directly in all environments",
+    "Context window constraints limit processing of extremely long inputs",

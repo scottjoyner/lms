@@ -1,0 +1,3 @@
+**Root Cause**  
+`payload['user']` returns **None** (the key âuserâ is either absent or its value is `None`).  
+Python tries to treat that `None` as if it were a dictionary and then calls `[

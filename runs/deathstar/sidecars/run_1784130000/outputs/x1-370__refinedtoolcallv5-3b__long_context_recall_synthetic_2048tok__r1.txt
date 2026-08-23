@@ -1,0 +1,23 @@
+<think> The user wants me to read the synthetic context below which contains many filler facts and one control code. Return JSON only with keys control_code and evidence_quote.
+
+The context shows:
+
+- Many "Project note:" lines repeating same statement about benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Each has a Segment number.
+- Then: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+So the control_code is "ORION-7429". The exact sentence proving it is that line.
+
+Thus I need to output JSON with keys:
+
+- control_code: "ORION-7429"
+- evidence_quote: something like "\"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.\""
+
+But the user says return JSON only with keys control_code and evidence_quote. So I need to output a JSON object.
+
+Make sure no extra text, just JSON.
+
+Thus:
+
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "\"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.\"

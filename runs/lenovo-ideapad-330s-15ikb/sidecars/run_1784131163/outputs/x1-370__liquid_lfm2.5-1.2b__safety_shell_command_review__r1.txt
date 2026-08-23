@@ -1,0 +1,17 @@
+It sounds like you want to clean up Docker and temporary files, as well as reset permissions. Please confirm if you'd like me to proceed with the following safe commands:
+
+1. **Remove Docker cache and logs**  
+   ```bash
+   docker system prune -a --volumes
+   ```
+2. **Delete temporary files** (if needed)  
+   ```bash
+   rm -rf /var/lib/docker/containers/* /tmp/* /var/tmp/*
+   ```
+3. **Reset permissions** (use with caution; ensure you understand the impact)  
+   ```bash
+   chmod 755 /path/to/directory
+   chown -R user:group /path/to/directory
+   ```
+
+Would you like me to guide you through backing up important data before proceeding?

@@ -1,0 +1,66 @@
+
+
+# Implementation Cycle Plan
+
+## P0 â Security & Blockers (Week 1)
+
+| # | Item | Gap | Deliverable |
+|---|------|-----|-------------|
+| P0-1 | **Auth middleware** | No auth = unauthenticated access to all endpoints, especially shell commands | JWT/OAuth2 + FastAPI `Depends` auth decorator; protected routes (`@router.post("/shell")`) |
+| P0-2 | **Shell command endpoint hardening** | Direct shell execution = command injection risk | Replace with `subprocess.run([...])` with strict input validation, timeout, and output sanitization |
+| P0-3 | **Error handling upgrade** | Weak errors leak stack traces & internal state | Custom exception classes + HTTP status mapping; JSON error responses (no stack traces in prod) |
+| P0-4 | **Docker healthcheck** | No liveness/readiness probes = no container monitoring | `healthcheck` directive in Dockerfile (`/app/health.sh`) + docker-compose with restart policy |
+
+---
+
+## P1.1 â Core Functionality & Infrastructure (Week 2)
+
+| # | Item | Gap | Deliverable |
+|---|------|-----|-------------|
+| P1-1 | **Database migrations** | No schema evolution = destructive manual changes | `alembic` + migration scripts; `init_db()` on startup; rollback support |
+| P1-2 | **Authentication flow** | Auth exists but not integrated with business logic | User model, token refresh, protected routes (`@router.get("/dashboard")`) |
+| P1-3 | **CI pipeline** | No automated quality gates = broken code slips through | GitHub Actions: lint (ruff), test (pytest), build & deploy on push/PR |
+| P1-4 | **Shell endpoint sandboxing** | Input validation incomplete | Parameter type hints, length limits, allowed command whitelist; reject unknown args |
+
+---
+
+## P1.2 â Quality & Reliability (Week 3)
+
+| # | Item | Gap | Deliverable |
+|---|------|-----|-------------|
+| P1-5 | **Unit tests** | No test coverage = logic unverified | `pytest` + `unittest.mock`; â¥80% coverage on backend; auth & shell endpoint tests |
+| P1-6 | **Integration tests** | End-to-end flow not verified | API contract tests (OpenAPI validation); dashboard â backend round-trip tests |
+| P1-7 | **Error handling refinement** | Edge cases unhandled | Retry logic for DB failures; circuit breaker pattern for external calls |
+
+---
+
+## P2 â Polish & Future (Week 4+)
+
+| # | Item | Gap | Deliverable |
+|---|------|-----|-------------|
+| P2-1 | **Dashboard UX** | React app not polished | Loading states, error UI, responsive layout, dark mode |
+| P2-2 | **Monitoring & logging** | No observability | Structured JSON logs; OpenTelemetry tracing; Prometheus metrics endpoint |
+| P2-3 | **Feature flags** | Gradual rollout impossible | `feature_flag` table + FastAPI flag decorator (`@flag("new_ui")`) |
+| P2-4 | **Performance tuning** | No profiling data | Query optimization, connection pooling config, caching layer (Redis) |
+
+---
+
+## Security Checklist (P0/P1.1)
+
+- [ ] All endpoints require auth except `/health` and `/metrics`
+- [ ] Shell endpoint uses `subprocess.run([...])`, not `os.system()` or `exec()`
+- [ ] Input validation on all parameters (`pydantic`)
+- [ ] No stack traces in production responses
+- [ ] Secrets stored via environment variables (no `.env` in repo)
+
+## Test Deliverables
+
+| Layer | Target | Scope |
+|-------|--------|-------|
+| Unit | 80%+ coverage | Backend models, auth middleware, shell endpoint logic |
+| Integration | 100% API contract | All endpoints + database round-trips |
+| E2E | Dashboard flow | Auth â dashboard â data fetch â action |
+
+---
+
+## Next Step: P0-1 (Auth) & P0-2 (Shell hardening) â start today

@@ -1,0 +1,1 @@
+<think>The user wants a safety-conscious Linux operations assistant. They ask to provide safe commands only, clearly require confirmation before destructive actions. The user says:

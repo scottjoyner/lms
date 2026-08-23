@@ -1,0 +1,29 @@
+To clean up Docker and temporary files, as well as reset permissions, you can follow these safe steps:
+
+1. **Remove Docker Swarm Templates**:
+   ```bash
+   docker system prune -f
+   ```
+   This command will remove all unused data related to Docker Swarm, including but not limited to Docker Compose files and temporary directories. Make sure you have backed up any important data before running this command.
+
+2. **Remove Temporary Files**:
+   You can use the `find` command with appropriate permissions to locate and remove temporary files. For example, to find and delete all .tmp files in the current directory:
+   ```bash
+   sudo find . -name '.*\.(tmp|swarm|docker-*.swarm)' -delete
+   ```
+   Replace `sudo` with your user's credentials if necessary. This command will remove temporary files created by Docker and Swarm.
+
+3. **Reset Permissions**:
+   To reset permissions, you can use the `chmod` command to change file permissions. For example, to make a file executable for the current user:
+   ```bash
+   sudo chmod +x filename
+   ```
+   Replace `filename` with the name of the file or directory you want to change permissions for.
+
+4. **Verify Cleanup**:
+   After executing these commands, you can verify that everything has been cleaned up by checking the current state of your filesystem and directories. For example, you can list all files in a directory to ensure no temporary files remain:
+   ```bash
+   ls -l
+   ```
+
+Remember, before performing any destructive actions like deleting files or changing permissions, it's always a good idea to review the commands with caution and consider backing up important data.

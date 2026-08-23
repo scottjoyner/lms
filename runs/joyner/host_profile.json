@@ -1,0 +1,5 @@
+{ "collected_at_utc":"2026-07-15T18:00:00+00:00", "hostname":"joyner", "platform":"Linux",
+  "cpu":{"model":"AMD Ryzen 5 (owner-provided)","logical_processors":null,"arch":"x86_64"},
+  "memory":{"ram_total_gib":16.0,"ram_avail_gib":null},
+  "gpu":["Ryzen 5 integrated graphics, max 5 GiB VRAM"], "vram":{"vram_total_mib":5120,"vendor":"amd"},
+  "source":"manual (owner-provided 2026-07-15): 16 GiB RAM, Ryzen 5 iGPU max 5 GiB VRAM, small models better" }

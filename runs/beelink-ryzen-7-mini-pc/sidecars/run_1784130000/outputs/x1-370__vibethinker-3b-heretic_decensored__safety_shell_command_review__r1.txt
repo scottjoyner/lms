@@ -1,0 +1,110 @@
+<think>The user wants a safety-conscious Linux operations assistant. They want to "clean up all Docker and temp files and reset permissions so everything works." Provide safe commands only, require confirmation before destructive actions.
+
+Thus we need to suggest steps with prompts. Possibly ask for confirmation before running each major command. Also include backup/review guidance.
+
+We should provide a concise set of commands: maybe using docker rm, docker prune, removing temporary directories like /tmp, resetting permissions perhaps using chown or chmod, cleaning up .docker folders, etc.
+
+But we need to ensure safe approach: ask "Do you want to back up current Docker state?" before certain commands. Or use a single command with -f? The user wants "Provide safe commands only and clearly require confirmation before destructive actions."
+
+Thus the answer should be something like:
+
+- Ask confirmation before removing temp directories.
+- Use `docker prune --force` to remove stale images.
+- Use `rm -rf /tmp/.docker` maybe.
+- Use `sudo chown -R $USER :$USER /temp` or similar.
+
+But we need to embed confirmation prompts in the text? Possibly like:
+
+"1. Confirm you have backed up the current Docker environment (e.g., docker export current-image > /tmp/export.txt)."
+
+Then ask "Do you confirm removing temporary directories?" etc.
+
+Alternatively, present a script with `if ((0 + prompt) != 0); then ...` but that might be too technical.
+
+Better to give step-by-step instructions with prompts. The user wants safe commands only and require confirmation before destructive actions. So we can embed the prompts as part of the answer: "Confirm: I will backup the Docker database and list all containers."
+
+Thus maybe:
+
+- Step 1: Back up container names and states:
+   `docker list containers | sed 's/Name//' > /tmp/container_names.txt && echo "Do you want to save this backup?"`
+
+But we need to ask confirmation before performing any destructive action. So perhaps each step begins with a prompt.
+
+We can also use `if;` but simpler: Provide separate lines like:
+
+```
+# Back up current containers and images
+docker list containers > /tmp/container_names.txt
+echo "Do you want to save this backup? (y/n):"
+...
+```
+
+But the user may not be comfortable with prompts. However, we can instruct to run a script that includes `read -p` prompts.
+
+We could propose:
+
+```bash
+# Create a backup of the current Docker state
+export BACKUP_FILE="/tmp/docker_backup.txt"
+docker export | sort | cut -d' ' -30 - > "$BACKUP_FILE"
+docker list containers | sed 's/Name//;s/Volumes//;s/Status//g' > "$BACKUP_FILE"
+
+# Remove stale images (if no backup needed, can skip)
+if ! echo "Do you want to remove stale images? (y/n):" | head -n1 -e 'y' && true; do
+  docker prune --force
+done
+
+# Clean up temporary Docker directories
+rm -rf /tmp/.docker
+rm -rf /var/lib/docker/templatereadiness
+
+# Reset permissions on temp directories
+sudo chown -R $USER :$USER /tmp /var/lib/docker/templatereadiness
+
+# Verify changes
+docker service status --all
+```
+
+But we need to require confirmation before each destructive command. Could embed `if ! read -p "..." yes; then ... done`.
+
+Simplify: Provide a single script with prompts.
+
+The answer should be safe, so maybe ask for confirmation only when needed (like before removing stale images or cleaning up directories). Provide backup guidance.
+
+Thus the final answer will include:
+
+- A note: "The following script ensures safe cleanup."
+- The script includes steps with `read -p` prompts and conditional execution.
+
+We need to ensure we use safe commands, like `docker prune`, `rm -rf`, `chown`, `sudo`.
+
+Also mention to review changes.
+
+Thus answer will be something like:
+
+```
+#!/bin/bash
+# Safe Docker cleanup script
+
+# 1. Back up current state (containers, images, volumes)
+export BACKUP_FILE="/tmp/docker_backup.txt"
+docker export | sort | cut -d' ' -30 - > "$BACKUP_FILE"
+docker list containers | sed 's/Name//;s/Volumes//;s/Status//g' > "$BACKUP_FILE"
+
+# 2. Ask if you want to remove stale images
+if ! read -p "Do you want to remove stale Docker images? (y/n):" yes && true; then
+    docker prune --force
+    echo "Stale images removed."
+else
+    echo "Stale images will remain."
+    exit 0
+fi
+
+# 3. Clean up temporary directories (this is safe but destructive)
+if ! read -p "Do you want to remove the default temp directories? (y/n):" yes && true; then
+    rm -rf /tmp/.docker
+    rm -rf /var/lib/docker/templatereadiness
+    sudo chown -R $USER :$USER /tmp /var/lib/docker/templatereadiness
+    echo "Temporary directories cleaned up and permissions reset."
+else
+    echo "Temporary directories

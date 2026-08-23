@@ -1,0 +1,145 @@
+
+
+# Implementation Plan: FastAPI Authentication System
+
+## Overview
+This comprehensive implementation adds secure authentication, API key rotation, audit logging, and admin dashboards to an existing FastAPI service. The system follows best practices for security, scalability, and maintainability.
+
+---
+
+## P0: Core Security Foundation & Authentication
+
+### Task 1: JWT-Based Authentication Implementation
+
+#### Acceptance Criteria:
+- User authentication endpoint returns valid tokens on successful login
+- Token expiration is configurable (default: 7 days)
+- Email/password fallback works for users without JWT support
+- Invalid token returns appropriate error response
+- Protected routes return 401 with proper header
+
+#### Test Expectations:
+```python
+# Expected behavior - should work in both cases
+POST /api/auth/login
+    Body: {"username": "testuser", "password": "pass"}
+    Response: {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+        "expires_in": 7200,
+        "user_id": 1
+    }
+
+POST /api/auth/login (email/password)
+    Body: {"username": "testuser", "password": "pass"}
+    Response: {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+        "expires_in": 7200,
+        "user_id": 1
+    }
+
+POST /api/auth/login (invalid credentials)
+    Response: {"error": "Invalid credentials"}
+```
+
+#### Implementation Details:
+- Use `httpx` for HTTP client with proper token validation
+- Implement JWT verification in middleware
+- Add email/password fallback using bcrypt hashing
+- Create separate auth endpoints if JWT not supported
+
+---
+
+### Task 2: Email Password Fallback System
+
+#### Acceptance Criteria:
+- Users without JWT support can still login via email/password
+- Password reset functionality works for users with email
+- Reset link expires after 7 days
+- Failed password attempts are logged and rate-limited
+- Admin dashboard allows resetting passwords for all users
+
+#### Test Expectations:
+```python
+# Email password fallback should work
+POST /api/auth/login
+    Body: {"username": "user@example.com", "password": "pass"}
+    Response: {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+        "expires_in": 7200,
+        "user_id": 1
+    }
+
+# Password reset should work
+POST /api/auth/reset-password
+    Body: {"email": "user@example.com", "password": "newpass"}
+    Response: {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+        "expires_in": 7200,
+        "reset_token": "abc-123"
+    }
+
+# Email not found should return appropriate error
+POST /api/auth/login
+    Body: {"username": "", "password": "pass"}
+    Response: {"error": "User not found"}
+```
+
+#### Implementation Details:
+- Use `pydantic` for strict validation
+- Implement email/password verification with bcrypt
+- Add rate limiting to prevent brute force attacks
+- Create admin endpoint for password reset functionality
+
+---
+
+### Task 3: Rate Limiting Middleware
+
+#### Acceptance Criteria:
+- Request rate limit of 100 requests per minute per IP
+- Token bucket algorithm for fair distribution
+- Rate limit violations return appropriate error responses
+- Rate limit headers are sent to all clients
+
+#### Test Expectations:
+```python
+# Should return 429 with proper headers
+GET /api/auth/login
+    Headers: {
+        "X-RateLimit-Limit": "100",
+        "X-RateLimit-Remaining": "85",
+        "X-RateLimit-Timed-Out": "true"
+    }
+
+# Should return 429 with proper error message
+POST /api/auth/login
+    Response: {
+        "error": "Rate limit exceeded, please try again later",
+        "retry_after": 10
+    }
+```
+
+#### Implementation Details:
+- Use `httpx` for HTTP client with token bucket algorithm
+- Implement rate limiting in middleware layer
+- Add proper error responses with retry logic
+- Track rate limit statistics for monitoring
+
+---
+
+### Task 4: Authentication Middleware
+
+#### Acceptance Criteria:
+- Authentication middleware validates JWT tokens
+- Token validation returns appropriate status codes (200, 401, 403)
+- Invalid token returns detailed error response
+- Protected routes return 401 with proper authorization header
+- Auth middleware is reusable across all endpoints
+
+#### Test Expectations:
+```python
+# Token validation should work correctly
+POST /api/auth/login
+    Body: {"username": "testuser", "password": "pass"}
+    Response: {
+        "token": "eyJhbGciOiJIUzI1NiIs...",
+       

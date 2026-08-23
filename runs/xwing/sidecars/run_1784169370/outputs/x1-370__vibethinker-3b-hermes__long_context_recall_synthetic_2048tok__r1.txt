@@ -1,0 +1,11 @@
+<think>
+The user wants me to read the synthetic context provided and answer only with JSON containing:
+- `control_code`: the control code (ORION-7429)
+- `evidence_quote`: a quote from the text that proves it
+
+Let me search for the exact sentence that contains the control code.
+</think>
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+}

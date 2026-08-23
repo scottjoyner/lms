@@ -1,0 +1,8 @@
+```json
+{
+  "task_fit": ["JSON object generation", "Structured data output", "Constraint-based formatting"],
+  "confidence": 0.95,
+  "limitations": ["Cannot access external APIs", "No real-time information retrieval", "Limited to text-based responses"],
+  "recommended_max_context_tokens": 8192
+}
+```

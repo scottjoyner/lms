@@ -1,0 +1,82 @@
+<think>The user wants me to write a Python function named `normalize_phone_number(value: str) -> str` that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers (i.e., after stripping, length == 10).
+- Supports 11-digit numbers beginning with '1' (presumably area code prefix for international numbers; i.e., after stripping, length == 11 and first digit is '1').
+- Raises ValueError for anything else.
+
+Also include a small `if __name__ == '__main__':` test block with at least five asserts.
+
+The user says "Return code only, no markdown." So I must output plain text code without any markdown formatting. That means just the Python file content as raw text.
+
+Let me think about what to write:
+
+```
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate lengths
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading 1
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+```
+
+But we need to be careful about raising ValueError for anything else. The error message can be generic or descriptive.
+
+The test block:
+
+```
+if __name__ == '__main__':
+    assert normalize_phone_number('555-1234') == '5551234'
+    assert normalize_phone_number('5551234') == '5551234'
+    assert normalize_phone_number('1-555-1234') == '5551234'
+    assert normalize_phone_number('15551234') == '5551234'
+    # 11-digit starting with 1
+    assert normalize_phone_number('1-555-1234-567') == '5551234567'
+    # Invalid: too few digits
+    assert normalize_phone_number('555') == None  # actually should raise, so better use:
+```
+
+Better to test raising:
+
+```
+    with pytest.raises(ValueError):
+        normalize_phone_number('not a number')
+    with pytest.raises(ValueError):
+        normalize_phone_number('123456789012')
+    with pytest.raises(ValueError):
+        normalize_phone_number('abc')
+```
+
+But the user didn't mention using pytest; they said "at least five asserts". So we can use plain assert statements. For error cases, we need to catch ValueError and check that it was raised.
+
+Better:
+
+```
+if __name__ == '__main__':
+    # Valid 10-digit numbers
+    assert normalize_phone_number('555-1234') == '5551234'
+    assert normalize_phone_number('5551234') == '5551234'
+    assert normalize_phone_number('55a55b1234c') == '5551234'
+    
+    # Valid 11-digit numbers starting with 1
+    assert normalize_phone_number('1-555-1234') == '5551234'
+    assert normalize_phone_number('15551234') == '5551234'
+    
+    # Invalid: too few digits (should raise)
+    with pytest.raises(ValueError):
+        normalize_phone_number('555')
+    
+    # Invalid: 10-digit starting with 1 (should be valid as 10-digit, but it's actually 10-digit; let me think)
+```
+
+Actually, if we have a string that after stripping is exactly '1234567890', length=10, it should be accepted. So the invalid case must be something else.
+
+Invalid cases:
+- Empty string
+- Non-digit only (e.g., '1234567890' is valid)
+- 11 digits not starting with 

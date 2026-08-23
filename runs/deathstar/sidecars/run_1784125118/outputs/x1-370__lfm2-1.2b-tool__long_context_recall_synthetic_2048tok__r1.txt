@@ -1,0 +1,1 @@
+The control code is ORION-7429 and the exact sentence that proves it is: "the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows."

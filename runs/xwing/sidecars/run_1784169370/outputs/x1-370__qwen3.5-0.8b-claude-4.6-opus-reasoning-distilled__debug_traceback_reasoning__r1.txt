@@ -1,0 +1,73 @@
+## Root Cause
+
+The `TypeError` occurs because `'payload'` is `None`. When Python tries to access `payload['user']`, it attempts to call the dictionary method on a `None` object, which raises this error since dictionaries are subscriptable but `None` is not.
+
+---
+
+## Safe Fix
+
+```python
+# Option 1: Use .get() with default value (recommended)
+if 'user' in payload:
+    user_id = payload['user']['id']
+else:
+    user_id = None  # Handle missing user field gracefully
+    
+payload['user']['id'] = user_id  # Reassign to ensure it exists
+
+# Option 2: Wrap in try-except for broader error handling
+try:
+    user_id = payload['user']['id']
+except (KeyError, TypeError) as e:
+    print(f"Payload missing or invalid: {e}")
+```
+
+---
+
+## Regression Tests
+
+```python
+import pytest
+from unittest.mock import patch
+
+# Test 1: Original behavior should fail when payload is None
+@patch('requests.get', return_value={'payload': None})
+def test_original_behavior_fails_when_payload_none(requests_mock):
+    with requests_mock.Mocker() as m:
+        m.get('/test', return_value={'payload': None})
+    
+    # This should raise TypeError
+    try:
+        payload = {'user': {'id': 123}}
+        user_id = payload['user']['id']
+        assert False, "Expected TypeError when payload is None"
+    except TypeError as e:
+        assert str(e) == "'NoneType' object is not subscriptable"
+
+# Test 2: Safe fix should work correctly with valid payload
+@patch('requests.get', return_value={'payload': {'user': {'id': 456}}})
+def test_safe_fix_with_valid_payload(requests_mock):
+    with requests_mock.Mocker() as m:
+        m.get('/test', return_value={'payload': {'user': {'id': 789}}}
+        
+        payload = {'user': {'id': 123}}
+        user_id = payload['user']['id']
+        assert user_id == 456
+
+# Test 3: Safe fix should handle missing user field gracefully
+@patch('requests.get', return_value={'payload': {'user': None}})
+def test_safe_fix_with_missing_user_field(requests_mock):
+    with requests_mock.Mocker() as m:
+        m.get('/test', return_value={'payload': {'user': None}})
+        
+        payload = {'user': {'id': 123}}
+        user_id = payload['user']['id']
+        assert user_id is None
+
+# Test 4: Safe fix should handle invalid payload structure
+@patch('requests.get', return_value={'payload': {'invalid_field': 'value'}})
+def test_safe_fix_with_invalid_payload(requests_mock):
+    with requests_mock.Mocker() as m:
+        m.get('/test', return_value={'payload': {'user': {'id': 123}}}
+        
+        payload = {'user

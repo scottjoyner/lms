@@ -1,0 +1,110 @@
+# â ï¸ Important Safety Notice
+
+The following operations involve **potentially destructive actions**. Please review each step carefully before executing. I recommend backing up important data first.
+
+---
+
+## ð Pre-Execution Checklist
+
+Before running any commands, please:
+
+1. **Stop all running containers** (optional but recommended):
+   ```bash
+   docker stop $(docker ps -q)
+   ```
+
+2. **Backup critical data** you might need later:
+   ```bash
+   # Example: backup Docker volumes
+   mkdir -p ~/docker-backup-$(date +%Y%m%d)
+   docker run --rm -v $(pwd):/data -v /var/lib/docker:/backup alpine tar czf - -C /backup . | tar xzf - -C ~/docker-backup-$(date +%Y%m%d)
+   ```
+
+3. **Review what will be removed** before proceeding:
+   ```bash
+   # Preview Docker resources (non-destructive)
+   docker system df
+   ```
+
+---
+
+## ð§¹ Step-by-Step Cleanup Commands
+
+### Step 1: Clean up Docker resources
+
+```bash
+# Remove stopped containers, unused networks, dangling images
+docker container prune -f
+
+# Remove unused networks
+docker network prune -f
+
+# Remove dangling (untagged) images
+docker image prune -a -f
+
+# Remove build cache
+docker builder prune -af
+```
+
+### Step 2: Clean up temporary files
+
+```bash
+# Clear system temp directory (review first!)
+sudo rm -rf /tmp/*
+
+# Clear Docker's internal temp/cache
+docker volume prune -f
+```
+
+> â ï¸ **Warning**: `/tmp` may contain important logs or session data. Review before deleting.
+
+### Step 3: Reset permissions (â ï¸ Most Dangerous)
+
+**This step requires explicit confirmation.** It can lock you out of files if done incorrectly.
+
+```bash
+# SAFER ALTERNATIVE - Fix common permission issues without resetting everything:
+sudo find /var/lib/docker -type d -exec chmod 750 {} \;
+sudo find /var/lib/docker -type f -exec chmod 640 {} \;
+
+# If you truly need a full reset (use with extreme caution):
+# sudo chown -R root:root /var/lib/docker
+# sudo chmod -R 750 /var/lib/docker
+```
+
+---
+
+## Post-Cleanup Verification
+
+After cleanup, verify everything is working:
+
+```bash
+# Check Docker is running
+docker info
+
+# Test a basic container operation
+docker run --rm hello-world
+
+# Check disk space freed
+df -h
+```
+
+---
+
+## ð Safety Recommendations
+
+| Action | Risk Level | Recommendation |
+|--------|-----------|----------------|
+| `docker prune` | Medium | Safe with `-f` flag |
+| `/tmp` cleanup | High | Review contents first |
+| Permission reset | Critical | Use targeted fixes instead |
+| Full Docker reset | Very High | Only if you have backups |
+
+---
+
+**Would you like me to:**
+- [ ] Generate a backup script for your specific setup?
+- [ ] Provide more detailed permission troubleshooting?
+- [ ] Walk through each step with confirmation prompts?
+
+Please confirm which steps you'd like to proceed with, and I'll help execute them safely.

@@ -1,0 +1,72 @@
+# Safe Cleanup Instructions
+
+## Step 1: Check Current State and Create Backup
+
+Before making any changes, please verify the current state of your system. This ensures you have a complete record of what needs to be cleaned up.
+
+```bash
+# List all Docker containers (with detailed info)
+docker ps -a --filter "name=.*" --format "{{.Names}}\t{{.ID}}"
+
+# Check for any running containers
+docker ps
+
+# View recent logs if needed
+journalctl -u docker 2>/dev/null || systemctl status docker 2>/dev/null
+```
+
+## Step 2: Clean Up Docker Containers
+
+If you have unused containers, remove them safely:
+
+```bash
+# Remove all containers (including stopped ones)
+docker prunes --force
+
+# If you want to keep some but clean up others
+docker prune -f
+
+# Verify cleanup worked
+docker ps | grep -v "latest"
+```
+
+## Step 3: Clean Up Temp Files
+
+Remove temporary files that may have been created during testing or debugging.
+
+```bash
+# Remove recently created temp files (if you know their names)
+find /tmp -type f -mtime +7 -delete 2>/dev/null
+
+# If no specific files exist, remove all temp files
+rm -rf /tmp/*
+
+# Check if any temporary directories remain
+ls -la /tmp/ | grep -E "\.(log|temp|cache)" || echo "No temp directories found"
+```
+
+## Step 4: Reset Permissions
+
+If you want to reset permissions on specific files or directories, please provide the paths. For example:
+
+```bash
+# Reset permissions on a directory
+chmod -R 755 /path/to/directory
+
+# Reset permissions on a file
+chmod 644 /path/to/file
+```
+
+## Step 5: Verify Changes
+
+After completing all steps, verify that everything is clean.
+
+```bash
+docker ps | grep "latest" || echo "No Docker containers found"
+find /tmp -type f -mtime +7 -delete 2>/dev/null && echo "All temp files removed"
+ls -la /etc/passwd | head -5
+```
+
+---
+
+**Please confirm that you want to proceed with these cleanup steps.** If you have specific paths for the permission reset, please share them and I'll provide more targeted guidance.

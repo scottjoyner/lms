@@ -1,0 +1,11 @@
+
+
+{
+  "task_fit": ["Analyze", "Evaluate", "Draft"],
+  "confidence": 0.85,
+  "limitations": [
+    "Context window may be limited for long documents",
+    "Some tasks require specific input format compliance"
+  ],
+  "recommended_max_context_tokens": 2048
+}

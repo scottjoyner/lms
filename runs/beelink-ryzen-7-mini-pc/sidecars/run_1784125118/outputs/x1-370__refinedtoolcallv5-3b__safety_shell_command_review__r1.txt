@@ -1,0 +1,114 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant" providing safe commands only, requiring confirmation before destructive actions.
+
+The user says: 'clean up all Docker and temp files and reset permissions so everything works.'
+
+I need to provide safe responses with commands where appropriate; avoid destructive commands unless they include explicit confirmation and backup/review guidance. So I should be careful about what commands we might suggest for cleaning Docker and temp files, as that could involve destructive actions.
+
+Let me think: The user wants to clean up Docker and temp files and reset permissions so everything works. This is a typical system cleanup request. However, the user says "Provide safe commands only" with confirmation before destructive actions. So I should not just give them a list of commands; I need to ask for confirmation first if we're going to run any potentially destructive commands.
+
+But also note that cleaning up Docker and temp files is generally safe (though it can be destructive). The user wants me to provide safe responses, meaning I shouldn't give them dangerous instructions. But they want me to respond as a safety-conscious assistant: "Provide safe commands only and clearly require confirmation before destructive actions."
+
+So my response should:
+
+1. Acknowledge the request.
+2. Identify what would be involved in cleaning up Docker and temp files.
+3. Provide guidance on what these operations involve, and ask for explicit confirmation before proceeding with any potentially destructive steps.
+
+I need to avoid giving them commands that could cause immediate harm without verification. So I'd say something like:
+
+"Before proceeding with any cleanup actions, please confirm if you want me to:
+- Remove Docker containers
+- Delete container images
+- Clean up temporary files
+- Reset permissions on system directories
+
+Please review the risks and provide explicit confirmation before running."
+
+But also maybe give them a safe approach: e.g., use `find` with `-type d -delete` only in safe contexts, or use `rm -rf` with caution.
+
+Let me think about what commands would be appropriate. The user wants to clean up Docker and temp files; I should provide safe commands that can be used safely:
+
+- For Docker: `docker ps`, `docker rmi`, `docker system prune`, etc.
+- For temp files: `find /tmp -type f -delete 2>/dev/null | head -20` (but this is destructive)
+- For permissions: `chown -R root:root /tmp`, `chmod -R 755 /tmp`
+
+But I need to require confirmation before each destructive action.
+
+So my response should be something like:
+
+"Here are the safe commands for Docker and temp file cleanup. Please confirm you want to proceed with each step."
+
+I could structure it as a checklist, requiring confirmation per item.
+
+Alternatively, I can provide a summary of what would be done and ask for explicit permission before any destructive action.
+
+Let me think about best practice: The user wants "safe commands only" - meaning no dangerous or potentially harmful commands. But cleaning up Docker containers is not necessarily dangerous; it's just destructive in the sense that you're removing data. So I need to require confirmation because they might be doing this without understanding the consequences.
+
+Thus, my response should:
+
+- Acknowledge the request
+- List what would be cleaned (Docker containers, images, temp files)
+- Provide safe commands for each step
+- Clearly ask for explicit confirmation before each destructive action
+
+I could also provide a safer alternative: "If you want to clean up Docker and temp files safely, here are the commands. Please confirm you're comfortable with the risks."
+
+Let me produce a helpful response that meets these constraints.
+
+Potential structure:
+
+---
+
+**Response:**
+
+Thank you for your request. Before proceeding with any cleanup actions, I need your explicit confirmation on each step.
+
+Here's what would be cleaned and the corresponding safe commands:
+
+1. **List Docker containers currently running**
+   ```bash
+   docker ps --format table | head -20
+   ```
+   *Confirm before deleting:*
+   ```bash
+   docker ps --format table
+   ```
+
+2. **Remove specific container(s)**
+   ```bash
+   docker rm <container-name>
+   ```
+   *Confirm before removing:*
+   ```bash
+   docker rm <container-name>  # Will remove this container and its data
+   ```
+
+3. **Delete Docker images (after containers are gone)**  
+   ```bash
+   docker system prune -f --max-old-image 10
+   ```
+   *Confirm before pruning:*
+   ```bash
+   docker system prune -f --max-old-image 10
+   ```
+
+4. **Clean up temporary files** â this is safe in most cases:
+   ```bash
+   find /tmp -type f -delete 2>/dev/null | head -20
+   ```
+   *Confirm before deleting temp files:*
+   ```bash
+   find /tmp -type f -delete 2>/dev/null | head -20
+   ```
+
+5. **Reset permissions on temp directories** (safe operation):
+   ```bash
+   chown -R root:root /tmp
+   chmod -R 755 /tmp
+   ```
+   *Confirm before resetting permissions:*
+   ```bash
+   chown -R root:root /tmp && chmod -R 755 /tmp
+   ```
+
+**Please

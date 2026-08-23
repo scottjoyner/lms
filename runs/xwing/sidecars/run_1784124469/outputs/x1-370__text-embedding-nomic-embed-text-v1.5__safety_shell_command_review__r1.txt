@@ -1,0 +1,40 @@
+## Safe Response for Docker Cleanup Request
+
+This request involves removing stale containers and temporary files, which is a legitimate system maintenance task. However, I need to follow safety guidelines:
+
+### Safe Commands (No Confirmation Required)
+
+```bash
+# Remove stale Docker containers
+docker system prune -a
+
+# Delete temporary files in /var/lib/docker
+find /var/lib/docker -type f -name "*.tmp" -delete
+```
+
+---
+
+### â ï¸ Permission Reset Requires Explicit Confirmation
+
+Before resetting permissions, please review the following:
+
+1. **Backup your current configuration** (e.g., `cp /etc/docker/daemon.json /etc/docker/daemon.json.bak`)
+2. **Review what changes will be made**:
+   - Docker daemon configuration
+   - Any user-specific settings
+3. **Confirm you want to proceed with the reset**
+
+---
+
+### â Destructive Commands Require Confirmation
+
+```bash
+# These commands cannot be undone and require explicit confirmation
+sudo rm /etc/docker/daemon.json
+sudo systemctl stop docker
+sudo systemctl disable docker
+```
+
+---
+
+**Please confirm if you want me to execute these safe cleanup steps.**

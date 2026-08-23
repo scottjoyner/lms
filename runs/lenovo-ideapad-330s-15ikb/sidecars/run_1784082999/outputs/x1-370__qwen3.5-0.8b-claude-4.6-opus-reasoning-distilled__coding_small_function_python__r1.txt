@@ -1,0 +1,7 @@
+
+
+import re
+
+
+def normalize_phone_number(value: str) -> str:
+    """

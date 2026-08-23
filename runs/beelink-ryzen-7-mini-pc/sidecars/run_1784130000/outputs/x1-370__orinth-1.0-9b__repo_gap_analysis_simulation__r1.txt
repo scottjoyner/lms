@@ -1,0 +1,87 @@
+# Implementation Cycle Plan â FastAPI + SQLite + React Dashboard
+
+---
+
+## P0 â Critical Blockers (Fix Before Anything Else)
+
+| # | Item | Category | Risk |
+|---|------|----------|------|
+| 1 | **Remove or harden the direct shell command endpoint** â either delete it, require auth, or sandbox via subprocess with timeout + restricted paths. | Security | Remote code execution / arbitrary file access |
+| 2 | **Add authentication** (JWT or session-based) on all mutating endpoints and admin routes. | Security | Unauthenticated data modification/deletion |
+| 3 | **Implement input validation & sanitization** â Pydantic models with strict types, reject unknown fields (`extra='forbid'`). | Logic / Security | Injection attacks, unexpected payloads |
+| 4 | **Add Dockerfile + docker-compose.yml** with proper `HEALTHCHECK` directive. | DevOps | No way to verify container liveness in production |
+
+---
+
+## P1.1 â High Priority (Security & Stability)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 5 | **SQLite migration system** â use `alembic` or a lightweight alternative (`sqlalchemy-migrate`). Track schema changes without manual edits. | Logic / DevOps | Prevents data loss on schema evolution |
+| 6 | **Centralized error handling middleware** â return typed `HTTPException`, never expose stack traces to clients. Log full details server-side only. | Security | Information leakage via 500 responses |
+| 7 | **Rate limiting** â simple token-bucket or fixed-window per IP/user on public endpoints. | Security | Brute-force / DoS mitigation |
+| 8 | **SQL injection protection audit** â verify all queries use parameterized statements; no string concatenation in SQL. | Security | Direct data breach vector |
+
+---
+
+## P1.2 â Medium Priority (Reliability & Observability)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 9 | **CI pipeline** â GitHub Actions or GitLab CI: lint, type-check, run tests, build Docker image, push to registry. | DevOps | Automated quality gate |
+| 10 | **Structured logging** â replace `print()`/`logging.info` with structured logs (JSON format), log levels, correlation IDs. | Observability | Debugging in production |
+| 11 | **Database connection pooling & graceful shutdown** â handle SIGTERM/SIGINT properly; close connections on exit. | Stability | Prevents orphaned processes / leaks |
+| 12 | **API documentation enforcement** â ensure OpenAPI spec is generated and validated on CI. | DevOps | Developer experience, contract testing |
+
+---
+
+## P2 â Future Work (Nice to Have)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 13 | **React dashboard auth integration** â token storage, refresh logic, protected routes. | Frontend | Depends on P0 #2 |
+| 14 | **End-to-end tests** (Playwright/Cypress) for critical user flows. | Testing | Requires stable API first |
+| 15 | **Performance profiling & caching layer** â Redis or in-memory cache for read-heavy queries. | Performance | Premature without baseline metrics |
+| 16 | **Multi-DB migration path** â abstract SQLite behind an interface to swap PostgreSQL later. | Architecture | Plan, don't implement yet |
+
+---
+
+## Test Deliverables (Tied to Priority Levels)
+
+| Priority | Test Scope | Approach |
+|----------|-----------|----------|
+| P0 | Shell endpoint access control, auth bypass attempts, input injection vectors | Unit + security fuzzing |
+| P1.1 | Error response format, SQL parameterization, rate limiter behavior under load | Unit + integration |
+| P1.2 | CI pipeline runs green on every commit; Docker build succeeds end-to-end | Pipeline validation |
+
+---
+
+## Security Issues Summary
+
+```
+âââââââââââââââââââââââââââââââââââââââââââââââ
+â  CRITICAL                                  â
+â  â¢ Direct shell command endpoint (RCE risk) â
+â  â¢ No authentication on any endpoint        â
+â  â¢ Stack traces exposed to clients          â
+â  â¢ No input validation / sanitization       â
+âââââââââââââââââââââââââââââââââââââââââââââââ¤
+â  HIGH                                      â
+â  â¢ Potential SQL injection (manual audit)   â
+â  â¢ No rate limiting                         â
+â  â¢ No CSRF protection on state-changing reqsâ
+âââââââââââââââââââââââââââââââââââââââââââââââ
+```
+
+---
+
+## Recommended Execution Order
+
+1. **P0** â Ship within 2â3 days; blocks all other work
+2. **P1.1** â Complete before any public deployment (1 week)
+3. **P1.2** â Parallelize with P1.1 where possible (2 weeks)
+4. **P2** â Queue behind stable release
+
+---
+
+*Next step: define acceptance criteria for each item and assign owners.*

@@ -1,0 +1,59 @@
+# Safe Cleanup Guide
+
+Here are safe approaches to clean up Docker, temp files, and reset permissions. **I'll show you what would be removed before actually removing anything.**
+
+## 1. Review What Would Be Removed (Safe First)
+
+```bash
+# Show unused Docker resources without deleting them
+docker system df -v
+
+# List temp files in /tmp
+ls -lh /tmp | head -20
+
+# Check current permissions on a sample directory
+ls -la /var/log/  # or your target directory
+```
+
+## 2. Clean Up Temp Files (Safe)
+
+```bash
+# Remove files older than 7 days from /tmp (review first!)
+find /tmp -type f -mtime +7 -print | head -20
+
+# Then actually remove them (requires confirmation):
+# find /tmp -type f -mtime +7 -delete
+```
+
+## 3. Clean Up Docker Resources (Safe)
+
+```bash
+# Show what would be removed:
+docker system prune --dry-run
+
+# Remove unused containers, images, networks (interactive confirmation):
+docker system prune
+
+# To also remove unused volumes (more aggressive):
+# docker system prune -v
+```
+
+## 4. Reset Permissions (Safe)
+
+```bash
+# Show current permissions on a directory:
+ls -la /path/to/directory
+
+# Common permission fixes (review before running):
+# sudo chown -R $USER:$USER /path/to/directory
+# chmod 755 /path/to/directory
+```
+
+## â ï¸ Important Notes
+
+- **Always review first** using `-print` or `head` commands before deleting
+- Use `--dry-run` options when available to preview changes
+- Back up important data before mass deletions
+- For Docker, consider which containers/images you actually need before pruning
+
+Would you like me to help you execute any of these safely with confirmation steps?

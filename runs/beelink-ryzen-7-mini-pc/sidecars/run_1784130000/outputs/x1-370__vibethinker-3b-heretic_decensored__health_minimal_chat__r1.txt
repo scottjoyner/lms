@@ -1,0 +1,2 @@
+<think>The user says: "Reply with exactly: LMS_health_OK". They want the reply to be exactly that string. Likely they want just that phrase.
+

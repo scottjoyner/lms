@@ -1,0 +1,72 @@
+## Root Cause
+
+The error occurs because the `payload` dictionary contains a `'user'` key, but its value is `None`. The code attempts to access `.id()` on this `None` object, which Python raises a `TypeError` with the message `'NoneType' object is not subscriptable`.
+
+---
+
+## Safe Fix
+
+Replace the direct access with `.get()`, which returns `None` if the key doesn't exist:
+
+```python
+user_id = payload['user'].get('id')  # Returns None if user exists but no ID field
+# OR
+user_id = payload.get('user', {}).get('id')  # More robust for nested structures
+```
+
+---
+
+## Regression Tests
+
+### Test 1: Normal Case with Valid User Data
+```python
+import json
+
+def test_normal_payload():
+    payload = {
+        "data": {"user": {"id": 123}},
+        "other": "value"
+    }
+    
+    # Should work without error
+    user_id = payload['user'].get('id')
+    assert user_id == 123, f"Expected 123, got {user_id}"
+
+test_normal_payload()
+```
+
+### Test 2: Case Without 'user' Key in Payload
+```python
+def test_missing_user_key():
+    payload = {"data": {"other": "value"}}
+    
+    # Should return None instead of raising error
+    user_id = payload['user'].get('id')
+    assert user_id is None, f"Expected None, got {user_id}"
+
+test_missing_user_key()
+```
+
+### Test 3: Case With 'User' Key But Value Is None
+```python
+def test_none_user_value():
+    payload = {"data": {"user": None}}
+    
+    # Should return None instead of raising error
+    user_id = payload['user'].get('id')
+    assert user_id is None, f"Expected None, got {user_id}"
+
+test_none_user_value()
+```
+
+### Test 4: Edge Case - Missing 'id' Field
+```python
+def test_missing_id_field():
+    payload = {"data": {"user": {"name": "Test User"}}}
+    
+    # Should return None for missing ID field
+    user_id = payload['user'].get('id')
+    assert user_id is None, f"Expected None, got {user_id}"
+
+test_missing_id_field()
+```

@@ -1,0 +1,124 @@
+# Docker & Temp File Cleanup â Safe Review Required
+
+Before running any cleanup, here's what will be affected. **Please review each section carefully.**
+
+---
+
+## 1. Preview: What Will Be Removed (Dry Run)
+
+Run these first to see exactly what exists:
+
+```bash
+# List all stopped/running containers
+docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}"
+
+# List all images
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+
+# List volumes (including unused)
+docker volume ls --format "table {{.Name}}\t{{.Driver}}"
+
+# Find temp files older than 7 days in common locations
+find /tmp -type f -mtime +7 2>/dev/null | head -50
+```
+
+---
+
+## 2. Safe Cleanup Commands (Run After Review)
+
+### Containers â Stop & Remove Stopped Ones
+
+```bash
+# Dry run: show what would be removed
+docker ps -a --filter "status=exited" --format "{{.ID}} {{.Names}}"
+
+# Confirm before removing stopped containers
+docker rm $(docker ps -a --filter "status=exited" -q)
+```
+
+### Images â Remove Unused/Stopped Images
+
+```bash
+# Dry run: show what would be removed
+docker image prune -f --dry-run 2>/dev/null || docker images --format "{{.ID}} {{.Repository}}:{{.Tag}}" | grep -v "latest"
+
+# Confirm before removing dangling/unused images
+docker image prune -af
+```
+
+### Volumes â Remove Unused Volumes
+
+```bash
+# Dry run: show what would be removed
+docker volume ls --filter "dangling=true" --format "{{.Name}}"
+
+# WARNING: This removes persistent data! Review first.
+docker volume prune -f
+```
+
+### Temp Files â Clean Old `/tmp` Files Safely
+
+```bash
+# Preview files older than 7 days (no deletion)
+find /tmp -type f -mtime +7 -ls | head -100
+
+# Safe removal: only files older than 7 days in /tmp
+sudo find /tmp -type f -mtime +7 -delete 2>/dev/null || true
+```
+
+### Reset Permissions on Common Directories
+
+```bash
+# Preview current permissions (no changes)
+ls -la /var/lib/docker/ 2>/dev/null | head -20
+ls -la /tmp/ 2>/dev/null | head -20
+
+# Fix ownership if needed (adjust user as appropriate)
+sudo chown -R root:root /var/lib/docker/ 2>/dev/null || true
+```
+
+---
+
+## â ï¸ Before You Proceed â Confirm These Points
+
+| Action | Risk Level | Confirmation Needed? |
+|--------|-----------|---------------------|
+| Remove stopped containers | Low | Yes |
+| Prune unused images | Medium | Yes |
+| Prune dangling volumes | **High** (data loss) | ð´ Explicit confirmation required |
+| Delete old `/tmp` files | Low-Medium | Yes, after preview |
+
+---
+
+## ð¡ï¸ Recommended Safety Steps Before Destructive Actions
+
+1. **Backup important data first:**
+   ```bash
+   # Export critical volumes before removal
+   docker run --rm -v <volume_name>:/data alpine tar czf /backup.tar.gz /data 2>/dev/null || true
+   ```
+
+2. **Review the dry-run output** from Section 1 before proceeding
+
+3. **Confirm explicitly** which actions to execute â I will not proceed with destructive commands until you say so
+
+---
+
+## ð Ready-to-Run Summary (After Your Confirmation)
+
+Once you confirm, here's the safe sequence:
+
+```bash
+# Step 1: Preview everything first
+docker ps -a --format "table {{.Names}}\t{{.Status}}"
+docker images --format "{{.Repository}}:{{.Tag}}\t{{.Size}}"
+docker volume ls --filter "dangling=true" --format "{{.Name}}"
+
+# Step 2: Remove stopped containers (safe)
+docker rm $(docker ps -a --filter "status=exited" -q)
+
+# Step 3: Prune unused images (confirm first)
+docker image prune -af
+
+# Step 4: Clean old temp files (preview first, then delete)
+sudo find /tmp -type f -mtime +

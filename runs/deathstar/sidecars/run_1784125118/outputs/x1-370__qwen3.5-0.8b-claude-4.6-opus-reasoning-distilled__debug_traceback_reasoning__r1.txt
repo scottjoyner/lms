@@ -1,0 +1,92 @@
+## Root Cause
+
+The `TypeError: 'NoneType' object is not subscriptable` indicates that the code attempted to access an attribute on a value that is None. Based on the traceback referencing `payload['user']['id']`, the most likely causes are:
+
+1. **Missing payload parameter** - The function received no data
+2. **Data structure modification** - The original payload was cleared or removed from the response
+3. **Incorrect data format** - The expected nested structure doesn't exist in the actual response
+
+---
+
+## Safe Fix
+
+```python
+# Original problematic line (line 42)
+user_id = payload['user']['id']
+
+# Fixed version with validation:
+try:
+    user_id = payload.get('user', {}).get('id')
+except (KeyError, TypeError):
+    # Handle cases where 'user' doesn't exist or is None
+    user_id = None  # Or raise a more descriptive error
+```
+
+---
+
+## Regression Tests
+
+### Test 1: When payload is None
+```python
+# test_payload_none.py
+import pytest
+from my_module import process_data
+
+def test_process_with_none_payload():
+    """Should raise TypeError when payload is None"""
+    with pytest.raises(TypeError) as exc_info:
+        process_data(None, {"user": "test"})
+    
+    assert str(exc_info.value).startswith('TypeError')
+```
+
+### Test 2: When 'user' key doesn't exist in payload
+```python
+# test_payload_missing_user.py
+import pytest
+from my_module import process_data
+
+def test_process_with_missing_user():
+    """Should raise TypeError when user is not present"""
+    with pytest.raises(TypeError) as exc_info:
+        process_data({}, {"user": "test"})
+    
+    assert str(exc_info.value).startswith('TypeError')
+```
+
+### Test 3: Normal operation (regression test)
+```python
+# test_normal_operation.py
+import pytest
+from my_module import process_data
+
+def test_process_valid_payload():
+    """Should work correctly with valid payload"""
+    result = process_data(
+        {"user": "12345", "email": "test@example.com"},
+        {"status": "success"}
+    )
+    
+    assert result["id"] == 12345
+    assert result["status"] == "success"
+
+def test_process_with_empty_payload():
+    """Should handle empty payload gracefully"""
+    result = process_data({}, {"user": "test"})
+    # Empty payload should be handled without crashing
+```
+
+### Test 4: Verify the fix works with proper data
+```python
+# test_fix_verification.py
+import pytest
+from my_module import process_data
+
+def test_process_with_proper_payload():
+    """Verify the safe fix produces correct results"""
+    result = process_data(
+        {"user": "98765", "name": "John Doe"},
+        {"status": "success"}
+    )
+    
+    assert result

@@ -1,0 +1,43 @@
+## Implementation Plan â FastAPI Service (Authâ¯+â¯APIâKey Rotationâ¯+â¯Auditâ¯+â¯Admin Dashboard)
+
+| Priority | Task | Description |
+|----------|------|-------------|
+| **P0** | P0â1, P0â2 | Foundation & security baseline |
+| **P1** | P1â1, P1â2, P1â3, P1â4 | Core authentication, key rotation, audit logging, admin dashboard |
+| **P2** | P2â1, P2â2, P2â3, P2â4 | Advanced features & verification |
+
+---  
+
+## P0 â Critical Path (Foundation & Security Baseline)
+
+### P0â1. Project Setup & Dependency Injection Framework
+- **Task:** Create a clean project structure; set up `uvicorn` + `fastapi` + `pydantic`; configure dependency injection framework (`Depends`, `Context`, `Request`).  
+- **Acceptance Criteria:**  
+  - FastAPI app is productionâready with `app.run()` configured.  
+  - `Depends`, `Context`, and `Request` dependencies are available at every route entry point.  
+  - Environment variables (DB URL, secret key, JWT secret) are all validated before app starts.  
+- **Test Expectations:**  
+  - Unit tests for dependency injection flow (`@app.get`, `@app.post`).  
+  - Integration test: request â dependency injection â next_app() completes without exception.  
+
+### P0â2. Security Model & Audit Logging Infrastructure
+- **Task:** Define the security model (JWT, encryption, token storage) and design audit logging pipeline; create database schemas for `users`, `audit_logs`, and `api_keys`.  
+- **Acceptance Criteria:**  
+  - JWT algorithm (HS256/HS384/HS512) and secret are defined in `.env`.  
+  - Encryption key generation is deterministic and stored securely.  
+  - AuditLog model includes: `id`, `action_type`, `user_id`, `method`, `path`, `timestamp`, `metadata` (autoâpopulated).  
+  - Database models (`User`, `AuditLog`, `ApiKey`) are correctly defined with primary keys and foreign keys.  
+- **Test Expectations:**  
+  - Unit tests: schema validation, encryption key generation, secret rotation logic.  
+  - Integration test: create audit log entry â store â fetch â verify fields present.  
+
+---  
+
+## P1 â High Priority (Core Features)
+
+### P1â1. User Authentication System
+- **Task:** Implement full auth flow (register â login â protected routes). Use `Pydantic` models; integrate with `python-jose[cryptography]`.  
+- **Acceptance Criteria:**  
+  - `/api/v1/users/register` validates email, password strength; hashes password; returns `{id, email}`.  
+  - `/api/v1/users/login` accepts `(email, password)`, verifies against DB, returns `{access_token, refresh_token, token_type}`.  
+  - `@app.get` / `@app.post` routes call `get_current_user()` dependency that validates JWT and extracts user ID.

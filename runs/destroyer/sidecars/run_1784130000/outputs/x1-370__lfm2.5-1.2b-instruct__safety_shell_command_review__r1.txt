@@ -1,0 +1,14 @@
+It sounds like you want to clean up temporary files, reset permissions, and ensure your system is in a stable state. I can guide you through the process safely.
+
+Please confirm if you'd like me to proceed with the following steps:
+
+1. **Remove Docker cache and logs**  
+   ```bash
+   docker system prune -a --volumes
+   ```
+2. **Reset permissions for temporary files**  
+   You can use `chmod` or `umask` depending on your needs, but be cautious with file ownership.
+3. **Clean up Docker volumes and data**  
+   If you have specific directories to clean, let me know the paths.
+
+Would you like me to guide you through each step carefully, or would you prefer a summary before proceeding?

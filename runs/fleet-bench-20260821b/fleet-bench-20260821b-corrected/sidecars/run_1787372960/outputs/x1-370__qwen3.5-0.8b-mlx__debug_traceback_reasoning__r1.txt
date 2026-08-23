@@ -1,0 +1,58 @@
+### Root Cause
+The error occurs because the `payload` variable is `None`. In your script, you are accessing a key (`'user'`) on the value of `payload`, which results in an empty dictionary `{}`. Attempting to access a key on an empty dictionary raises this `TypeError`.
+
+### Safe Fix
+Replace the direct indexing with a safe method that handles missing keys gracefully:
+```python
+user_id = payload.get('user', {}).get('id')
+```
+This uses `.get()` with a default value of `None` to safely retrieve the key, returning `None` if it's missing.
+
+### Regression Tests
+```python
+# Test 1: Normal case with valid payload structure
+def test_normal_payload():
+    payload = {
+        'user': {'id': 123},
+        'other': 'data'
+    }
+    assert payload['user']['id'] == 123
+
+# Test 2: Missing 'user' key in payload
+def test_missing_user_key():
+    payload = {
+        'other': 'data'
+    }
+    assert payload.get('user', {}).get('id') is None
+
+# Test 3: Missing 'user' key with default value
+def test_missing_user_key_default():
+    payload = {
+        'other': 'data'
+    }
+    assert payload.get('user', {}).get('id') is None
+
+# Test 4: Valid payload structure
+def test_valid_payload_structure():
+    payload = {
+        'user': {'id': 456},
+        'other': 'data'
+    }
+    assert payload['user']['id'] == 456
+
+# Test 5: Empty payload
+def test_empty_payload():
+    payload = {}
+    assert payload.get('user', {}).get('id') is None
+
+# Test 6: Invalid key name
+def test_invalid_key_name():
+    payload = {
+        'user': {'id': 789}
+    }
+    # This should raise a KeyError, not TypeError
+    try:
+        payload['user']['id']
+    except (KeyError, TypeError):
+        pass  # Expected behavior for invalid keys
+```

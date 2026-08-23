@@ -1,0 +1,16 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1 (e.g., 0.8)
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular task; they just want me to produce a JSON object with those fields. Usually, I'd interpret this as providing generic information about best practices for producing JSON responses or something like that. But it's ambiguous: maybe they're testing if I can follow the format.
+
+Given typical patterns in these tasks, they might be expecting some content about what kind of task fits this output (like "JSON formatting", "Data structure creation", etc.). Or perhaps they want me to produce a generic response describing best practices for JSON responses. Let's think: The user says "Return a JSON object with keys: task_fit, confidence, limitations, recommended_max_context_tokens." So I need to fill those fields.
+
+- task_fit should be an array of strings describing what the task is (like "Format output as strict JSON", "Ensure

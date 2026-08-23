@@ -1,0 +1,62 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably area code prefix).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown formatting. So plain text code.
+
+Let's think about the function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate: either 10 digits or 11 digits starting with '1'
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading 1
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+    
+But we need to be careful about raising ValueError for anything else, including empty strings.
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, brackets, etc. Should strip them.
+- Input like "(555) 123-4567" -> "5551234567"
+- Input like "+1 (555) 123-4567" -> digits = '15551234567', length=11, starts with '1' => return '5551234567'
+- Input like "5551234567" -> returns same
+- Input like "555-123-4567" -> returns digits = 10-digit number, ok.
+- Input like "12345678901" (starts with '1', length=11) => should return '2345678901'? Actually typical US phone numbers: if it's 11 digits starting with 1, that means it includes country code. So we strip the leading 1 and return remaining 10-digit number.
+- Input like "123" -> raise ValueError
+- Input like "" or None? The function expects str; passing None would cause TypeError at type hint check but not necessarily in runtime if they pass None. But it's okay.
+
+We need to include a test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('5551234567') == '5551234567'
+    assert normalize_phone_number('(555) 123-4567') == '5551234567'
+    assert normalize_phone_number('+1 (555) 123-4567') == '5551234567'
+    assert normalize_phone_number('15551234567') == '5551234567'   # country code
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    # raise error cases:
+    with pytestException(ValueError) as e:
+        normalize_phone_number('')
+    with pytestException(ValueError):
+        normalize_phone_number('123')
+    with pytestException(ValueError):
+        normalize_phone_number('123456789012')
+    
+But we need to import pytest? The test block can just use assert and ValueError. For raising ValueError, the assert will compare exception messages.
+
+Better:
+
+if __name__ == '__main__':
+    # Valid US numbers
+    assert normalize_phone_number('5551234567') == '5551234567'
+    assert normalize_phone_number('555-123-4567') == '5551234567'
+    assert normalize_phone_number('(555) 123.4

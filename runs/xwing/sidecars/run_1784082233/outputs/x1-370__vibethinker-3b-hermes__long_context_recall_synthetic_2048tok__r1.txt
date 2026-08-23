@@ -1,0 +1,27 @@
+<think>The user wants me to read the synthetic context below which contains many filler facts and one control code. Return JSON only with keys control_code and evidence_quote.
+
+Context:
+
+```
+ (<some tags>)
+Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 0.
+...
+The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.
+...
+```
+
+So I need to extract:
+- control_code: "ORION-7429"
+- evidence_quote: the exact sentence that proves it, i.e., "The LMS control code for this benchmark is ORION-7429"
+
+Thus output JSON:
+
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+}
+
+Make sure to match the exact wording. The context says: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly." That's the evidence.
+
+Thus answer with JSON only, no extra text.</think>{
+  \"control_code\": \"OR

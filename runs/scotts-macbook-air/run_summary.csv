@@ -1,0 +1,5 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1784130000,scotts-macbook-air,192.168.1.241,http://scotts-macbook-air.tailcb8954.ts.net:1234/v1,liquid/lfm2.5-1.2b,0.221,0.319,56.651,1.00,0.70,0.8904,10
+1784130000,scotts-macbook-air,192.168.1.241,http://scotts-macbook-air.tailcb8954.ts.net:1234/v1,refinedtoolcallv5-3b,32.071,37.754,1.685,1.00,0.30,0.4537,10
+1784130000,scotts-macbook-air,192.168.1.241,http://scotts-macbook-air.tailcb8954.ts.net:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,13.173,6.431,29.047,1.00,0.30,0.5671,10
+1784130000,scotts-macbook-air,192.168.1.241,http://scotts-macbook-air.tailcb8954.ts.net:1234/v1,text-embedding-nomic-embed-text-v1.5,4.829,0.391,56.236,1.00,0.70,0.8904,10

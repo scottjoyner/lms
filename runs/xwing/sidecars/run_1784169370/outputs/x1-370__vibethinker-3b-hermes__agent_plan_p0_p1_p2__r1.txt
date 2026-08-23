@@ -1,0 +1,107 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical), P1 (high), and P2 (medium/low) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what would be appropriate for each priority level:
+
+- P0: Critical path items that are essential, must-complete before anything else works; likely user authentication and API key rotation because they're core functionality.
+- P1: High priority but not critical; audit logging and admin dashboards.
+- P2: Maybe some supporting tasks or documentation.
+
+But I need to think about the order. Typically:
+1. P0: Set up database schema for auth users, api_keys, audit logs
+   - Integrate JWT or OAuth2 for authentication
+   - Implement API key management (registration, rotation)
+2. P1: Audit logging integration and admin dashboard
+3. P2: Testing, documentation, deployment.
+
+But the user wants a plan that organizes tasks into P0, P1, and P2 categories; each task includes acceptance criteria and test expectations.
+
+Let me think about what tasks are needed:
+
+**User Authentication**: 
+- Choose auth provider (JWT or OAuth2)
+- Create database models for users, tokens
+- Implement registration & login endpoints
+- Implement protected routes
+- Implement password hashing
+- Implement refresh token flow
+
+**API Key Rotation**:
+- Store API keys per client
+- Allow creation of new API keys
+- Rotate old API keys to new ones
+- Validate API key on each request
+- Handle expiration
+
+**Audit Logging**:
+- Log all auth-related actions (login, logout, password change)
+- Log API key usage events
+- Log admin dashboard activity
+- Ensure audit logs are persisted and searchable
+
+**Admin Dashboards**:
+- UI for admin to view user stats
+- View API key usage statistics
+- View audit log summaries
+- Manage users
+- Manage API keys
+
+Now, let me categorize:
+
+P0 tasks (critical - must be done before other features work):
+1. P0-01: Set up database schema and models for auth, api_keys, audit_logs
+2. P0-02: Implement JWT-based user authentication with registration/login/refresh
+3. P0-03: Implement API key validation middleware and basic rotation logic
+4. P0-04: Create audit logging infrastructure (database table, log format)
+
+P1 tasks (high priority):
+5. P1-01: Build admin dashboard UI for user stats, api_keys, audit logs
+6. P1-02: Implement detailed audit logging for all auth actions and API key usage
+7. P1-03: Add API key rotation workflow with error handling and notifications
+
+P2 tasks (medium/low):
+8. P2-01: Write comprehensive unit tests for auth, api_key, audit modules
+9. P2-02: Write integration tests for dashboard endpoints
+10. P2-03: Set up monitoring and alerting for audit log growth
+11. P2-04: Documentation and runbooks
+
+But I need to think about the order more carefully; maybe some tasks can be done in parallel, but they still belong to priority categories.
+
+Let me propose a plan:
+
+**P0 - Critical (Must Complete Before Other Features Work):**
+- Database schema for auth, api_keys, audit_logs
+- JWT authentication system with registration/login/refresh
+- API key validation middleware and basic rotation
+
+**P1 - High Priority (Implementation After P0):**
+- Audit logging infrastructure with action tracking
+- Admin dashboard UI endpoints
+- Complete API key rotation workflow
+
+**P2 - Medium/Low (Post-Implementation):**
+- Test suite for all new features
+- Monitoring and alerting
+- Documentation
+
+Now, each task needs acceptance criteria and test expectations.
+
+Let me write out a detailed plan. I'll organize it clearly with headings for P0, P1, P2 sections.
+
+I need to be thorough: For each task, define what should be done, acceptance criteria (what the system must deliver), and test expectations (what tests should pass).
+
+Also note that this is an existing FastAPI service; we assume it already has some structure but not these features. I'll mention dependencies like database models, existing API routes.
+
+Let me start writing.
+</think>
+# Implementation Plan: User Authentication, API Key Rotation, Audit Logging & Admin Dashboards  
+**FastAPI Service â Priority Levels:** P0 (Critical) â P1 (High) â P2 (Medium/Low)
+
+---
+
+## ð P0 â Critical Path (Must Complete Before Other Features Work)
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+| **P0-01** | **Database Schema & Models** | Create PostgreSQL tables for `users`, `api_keys`, and `audit_logs` with proper indexes. Define Pydantic models for request/response validation. | - `users` table: id, email, password_hash, hashed_password, created_at, updated_at, is_active, role (user/admin) | Unit tests for schema migrations; integration test that all new models are recognized by the ORM. |
+| **P0-02** | **JWT Authentication Layer** | Implement a secure JWT auth module with: <br>â¢ Password hashing via `bcrypt`/`argon2`. <br>â¢ Registration endpoint (`POST /auth/register`). <br>â¢ Login endpoint (`POST /auth/login`) returning access + refresh tokens. <br>â¢ Protected route decorator. | - Users can register and log in correctly. <br>- Access token expires (30 min default). <br>- Refresh token is valid for 1 hour. <br>- Token validation works on every protected request. | Unit tests: registration, login, token expiration; integration test: protected endpoint requires valid JWT. |
+| **P0-03** | **API Key Validation Middleware** | Integrate `fastapi.security.Security` with API key header verification. Implement a rotation service that: <br>â¢ Stores current keys per client (ID + secret). <br>â¢ Allows creating new API keys. <br>â¢ Rotates old â new keys on request (or via `/api/rotate`). <br>â¢ Returns `401 Unauthorized` if key invalid or expired. | - `GET /api/keys` returns list of active keys per client. <br>- `POST /api/rotate` rotates a specific client's key. <br>- `GET /api/

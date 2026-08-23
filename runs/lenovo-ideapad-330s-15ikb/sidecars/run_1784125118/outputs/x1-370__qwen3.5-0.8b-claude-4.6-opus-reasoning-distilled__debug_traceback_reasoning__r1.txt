@@ -1,0 +1,77 @@
+
+
+## Root Cause
+
+The error occurs because the code attempts to access `payload['user']['id']` without first verifying that `payload` exists. In Python, accessing a dictionary with a missing key raises a `KeyError`, but if `payload` itself is `None`, this triggers a deeper `TypeError: 'NoneType' object is not subscriptable`.
+
+This could happen when:
+- The payload was never received from the API
+- An exception was caught before line 42 (e.g., in a try-except block)
+- There's a bug in how data is being parsed or sent to the server
+
+---
+
+## Safe Fix
+
+Use `.get()` with a default value to safely access nested keys:
+
+```python
+user_id = payload.get('user', {}).get('id') if payload else None
+```
+
+Or wrap in try-except for broader error handling:
+
+```python
+try:
+    user_id = payload['user']['id']
+except (KeyError, TypeError) as e:
+    print(f"Failed to get user ID: {e}")
+    user_id = None  # Or raise an appropriate exception
+```
+
+---
+
+## Regression Tests
+
+### Test 1: When payload is None
+```python
+# test_payload_none.py
+def test_payload_is_none():
+    payload = None
+    assert payload is None, f"Expected None, got {payload}"
+    user_id = payload.get('user', {}).get('id') if payload else None
+    assert user_id is None, f"Expected None, got {user_id}"
+
+# test_payload_missing_user_key.py
+def test_payload_missing_user():
+    payload = {'other': 'data'}
+    assert payload['user'] is None, f"Expected empty dict, got {payload}"
+    user_id = payload.get('user', {}).get('id') if payload else None
+    assert user_id is None
+
+# test_payload_none_with_nested_key.py
+def test_payload_none_with_user():
+    payload = {'other': 'data'}
+    assert payload['user'] is None, f"Expected empty dict, got {payload}"
+    # This should fail gracefully with KeyError
+    try:
+        user_id = payload.get('user', {}).get('id')
+        assert user_id is None, f"Expected None, got {user_id}"
+    except KeyError as e:
+        assert "User ID not found" in str(e)
+
+# test_payload_none_with_user_object.py
+def test_payload_none_with_user():
+    payload = {'other': 'data'}
+    # This should fail gracefully with TypeError
+    try:
+        user_id = payload['user']['id']
+        assert user_id is None, f"Expected None, got {user_id}"
+    except TypeError as e:
+        assert "NoneType" in str(e)
+
+# test_normal_operation.py
+def test_normal_payload():
+    payload = {'user': {'id': 123}}
+    assert payload['user']['id'] == 123, f"Expected 123, got {payload['user']['id']}"
+```

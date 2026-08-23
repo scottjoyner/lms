@@ -1,0 +1,37 @@
+
+
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+---
+
+## P0 â Critical Foundation (Blocking Deployment)
+
+### Task 01: Secure Password Storage & Hashing
+**Description:** Implement bcrypt password hashing with secure storage in the database, including salt generation and verification logic.
+
+| Acceptance Criteria | Test Expectations |
+|---------------------|-------------------|
+| - All user passwords are hashed using bcrypt (cost factor â¥ 12)<br>- Passwords are never stored in plain text<br>- Hash verification returns `True` for correct password, `False` otherwise<br>- Password hashing is idempotent across restarts | - Unit test: `hash_password()` produces different hashes on each call<br>- Unit test: `verify_password()` correctly validates known passwords<br>- Unit test: `verify_password()` rejects incorrect passwords<br>- Integration test: User registration stores hashed password, login verifies it successfully<br>- Security scan: No plaintext passwords in codebase or logs |
+
+---
+
+### Task 02: JWT Authentication with Refresh Tokens
+**Description:** Implement JWT-based authentication using access tokens (15 min TTL) and refresh tokens (7 day TTL), with secure storage of token claims.
+
+| Acceptance Criteria | Test Expectations |
+|---------------------|-------------------|
+| - Access tokens are signed with HS256/RS256 algorithm<br>- Refresh tokens are stored in database with expiration tracking<br>- Token validation rejects expired, revoked, or invalid tokens<br>- JWT payload includes `sub`, `iat`, `exp`, and custom claims<br>- Tokens are validated on every protected route | - Unit test: Valid token returns 200 OK from `/protected`<br>- Unit test: Expired token returns 401 Unauthorized<br>- Unit test: Revoked token returns 401 Unauthorized<br>- Integration test: User login generates access + refresh tokens<br>- Integration test: Refresh token rotation works (old revoked, new issued)<br>- Security scan: Tokens are not logged or exposed in responses |
+
+---
+
+### Task 03: API Key Generation & Storage
+**Description:** Implement secure API key generation with UUID v7 format, HMAC-based signing, and database-backed storage.
+
+| Acceptance Criteria | Test Expectations |
+|---------------------|-------------------|
+| - API keys are generated using cryptographically secure random bytes<br>- Keys are stored in database with `created_at`, `expires_at` timestamps<br>- Key validation uses HMAC-SHA256 signature verification<br>- Invalid/missing key returns 401 Unauthorized | - Unit test: Key generation produces unique, non-repeating keys<br>- Integration test: Valid API key returns 200 OK from `/api/data`<br>- Integration test: Missing or invalid key returns 401 Unauthorized<br>- Security scan: Keys are not logged in plaintext<br>- Performance test: Key validation completes < 5ms |
+
+---
+
+### Task 04: API Key Rotation Mechanism
+**Description

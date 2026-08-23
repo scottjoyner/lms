@@ -1,0 +1,66 @@
+# Repository Review â Implementation Cycle Plan
+
+## ð´ P0 â Critical (Blockers / Immediate Risk)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 1 | **Remove direct shell command endpoint** | Security | Direct OS access is a critical vulnerability. Replace with sandboxed subprocess execution or remove entirely. |
+| 2 | **Implement authentication & authorization** | Security | No auth means unrestricted API access. Add JWT/session-based auth + role-based permissions. |
+| 3 | **Fix weak error handling** | Logic / Security | Generic exceptions leak stack traces, DB credentials, and internal paths. Use structured error responses with appropriate HTTP status codes. |
+| 4 | **Add database migrations** | Logic | SQLite without migrations leads to schema drift across environments. Adopt Alembic or a migration tool. |
+
+## ð  P1.1 â High Priority (Stability & Security)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 5 | **Add Docker healthcheck** | Infrastructure | `HEALTHCHECK` in docker-compose prevents orchestrating unhealthy containers. |
+| 6 | **Implement input validation & sanitization** | Security | Validate all request bodies, query params, and file uploads. Use Pydantic models with strict typing. |
+| 7 | **Add rate limiting** | Security | Prevent brute-force on auth endpoints and abuse of shell commands. |
+| 8 | **Secure SQLite connection handling** | Logic | Ensure connections are properly closed in `finally` blocks; use context managers throughout. |
+
+## ð¡ P1.2 â High Priority (Quality & Reliability)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 9 | **Set up CI/CD pipeline** | Infrastructure | GitHub Actions or GitLab CI with lint, test, build, and deploy stages. |
+| 10 | **Write unit & integration tests** | Testing | Target â¥70% coverage on backend logic; add API contract tests for frontend. |
+| 11 | **Add logging & monitoring** | Observability | Structured logging (e.g., `structlog`), error tracking, and basic metrics endpoint. |
+
+## ð¢ P2 â Medium Priority (Enhancement)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 12 | **React dashboard enhancements** | Frontend | Add loading states, error boundaries, and responsive layout improvements. |
+| 13 | **API documentation** | Documentation | Generate OpenAPI/Swagger docs with examples and auth flow diagrams. |
+| 14 | **Environment configuration** | Infrastructure | Move secrets to `.env` / vault; remove hardcoded credentials from codebase. |
+
+---
+
+## ð¡ï¸ Security Issues Summary
+
+- **Critical**: Direct shell command endpoint â allows arbitrary OS commands if not properly sandboxed and authenticated.
+- **High**: No authentication â anyone can read/write/delete data via API.
+- **High**: Weak error handling â exposes internal details (stack traces, DB paths) to attackers.
+- **Medium**: No input validation â vulnerable to injection attacks (SQL, command injection).
+- **Medium**: No rate limiting â enables brute-force and DoS on auth endpoints.
+
+## ð§© Logic Gaps Summary
+
+- **Schema drift** without migrations causes deployment failures across environments.
+- **Connection leaks** in SQLite can exhaust resources under load.
+- **No error boundaries** in React dashboard means one failing component breaks the whole UI.
+- **No CI/CD** means no automated quality gate â bugs reach production unchecked.
+
+## ð§ª Test Deliverables
+
+| Priority | Deliverable | Scope |
+|----------|-------------|-------|
+| P0 | Shell command endpoint tests (negative cases) | Verify unauthorized access is blocked; verify sandboxing prevents escape. |
+| P1.1 | Auth flow tests | Login, token refresh, role-based permission checks. |
+| P1.2 | API integration tests | End-to-end request/response validation for all major endpoints. |
+| P1.2 | Backend unit tests | Business logic, error handling paths, input validation edge cases. |
+| P2 | Frontend component tests | Dashboard critical UI flows (login, data display, error states). |
+
+---
+
+**Recommended execution order**: P0 items first (security risk), then P1.1 â P1.2 in parallel, followed by P2 during stabilization phase.

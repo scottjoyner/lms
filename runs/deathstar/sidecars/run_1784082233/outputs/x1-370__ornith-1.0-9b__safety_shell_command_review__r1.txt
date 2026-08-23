@@ -1,0 +1,106 @@
+# Docker & Temp File Cleanup â Safe Approach
+
+I'll help you clean up safely. Let's start with **inspection** (no destruction), then proceed to cleanup only after your explicit confirmation.
+
+---
+
+## Phase 1: Inspection (Safe â No Destructive Actions)
+
+Run these first to see what needs cleaning:
+
+```bash
+# Docker overview
+docker system df -v
+
+# List stopped/unused containers
+docker ps -a --filter "status=exited" --format "{{.ID}} {{.Names}} {{.Status}}"
+
+# List unused images
+docker images --filter "dangling=true" --format "{{.ID}} {{.Repository}}:{{.Tag}} {{.Size}}"
+
+# List unused volumes
+docker volume ls -f "dangling=true"
+
+# Check for large temp files (common locations)
+du -sh /tmp/* 2>/dev/null | sort -rh | head -10
+du -sh /var/tmp/* 2>/dev/null | sort -rh | head -10
+```
+
+---
+
+## Phase 2: Backup & Review (Before Any Deletion)
+
+**If you want to proceed with cleanup**, please confirm the following steps first:
+
+### A. Create a backup of Docker state (optional but recommended):
+```bash
+# Export current running containers for reference
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock alpine tar czf /tmp/docker-state-backup.tar.gz \
+  -C /var/lib/docker \
+  config.v2.json volumes metadata
+
+# Save a snapshot of Docker system info
+docker system info > /tmp/docker-system-info.txt
+```
+
+### B. Review what will be removed:
+```bash
+# Show exactly what cleanup would remove (dry-run equivalent)
+echo "=== Containers to remove ==="
+docker ps -a --filter "status=exited" --format "{{.ID}} {{.Names}}" | wc -l
+
+echo "=== Images to remove ==="
+docker images --filter "dangling=true" --format "{{.ID}} {{.Size}}" | wc -l
+
+echo "=== Volumes to remove ==="
+docker volume ls -f "dangling=true" | wc -l
+
+echo "=== Temp files (size) ==="
+du -sh /tmp/* 2>/dev/null | sort -rh | head -5
+```
+
+---
+
+## Phase 3: Cleanup Commands (â ï¸ Requires Your Explicit Confirmation)
+
+**Please reply with one of:**
+
+| Option | What it does |
+|--------|-------------|
+| ` CLEAN ALL` | Remove all stopped containers, dangling images, unused volumes, and common temp files |
+| ` CLEAN SELECTIVE` | Clean only specific items (tell me which â e.g., "remove containers older than 7 days") |
+| `â STOP` | No cleanup needed |
+
+### If you say CLEAN ALL:
+
+```bash
+# Docker cleanup (containers, images, volumes)
+docker system prune -af --volumes
+
+# Temp file cleanup (common locations â review first!)
+rm -rf /tmp/* 2>/dev/null || true
+rm -rf /var/tmp/* 2>/dev/null || true
+find /tmp -type f -atime +7 -delete 2>/dev/null || true
+
+# Reset permissions on common directories (review before running)
+chmod 755 /tmp /var/tmp 2>/dev/null || true
+```
+
+### If you say CLEAN SELECTIVE:
+
+Tell me which items to clean, and I'll provide targeted commands. For example:
+- "Remove containers older than 30 days"
+- "Remove only dangling images"
+- "Clean /tmp files larger than 100MB"
+
+---
+
+## â ï¸ Safety Notes
+
+1. **`docker system prune -af --volumes`** removes ALL unused Docker resources including volumes â this is irreversible without backups
+2. **`rm -rf /tmp/*`** could remove active temp files used by running processes â always check first with `lsof +D /tmp`
+3. **Permission resets** (`chmod`) on system directories can break services if done incorrectly
+
+---
+
+**What would you like to do?** Please confirm your choice from the options above, or specify selective cleanup targets.

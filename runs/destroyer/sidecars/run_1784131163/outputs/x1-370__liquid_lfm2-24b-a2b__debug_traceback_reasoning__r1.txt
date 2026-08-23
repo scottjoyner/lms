@@ -1,0 +1,22 @@
+# Root Cause
+The error occurs because `payload` is `None` when the code attempts to access `payload['user']['id']`. This typically happens if the payload is not properly parsed or if an API call fails to return valid data.
+
+# Safe Fix
+Add a check for `None` and handle it gracefully:
+
+```python
+if payload is None:
+    # Handle error, e.g., log, raise exception, or set default values
+    user_id = None  # or some default value
+else:
+    user_id = payload['user']['id']
+```
+
+# Regression Tests
+1. **Test with valid payload**:  
+   Input: `payload = {'user': {'id': 123}}`  
+   Expected output: `user_id = 123`
+
+2. **Test with None payload**:  
+   Input: `payload = None`  
+   Expected output: `user_id = None` (or appropriate error handling)

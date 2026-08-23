@@ -1,0 +1,82 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning/requirements), P1 (short-term implementation), and P2 (long-term/maintenance) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what's appropriate for a FastAPI service. Let me create a comprehensive plan with tasks under each priority level, including acceptance criteria and test expectations.
+
+Let me structure this clearly:
+
+- **P0: Planning & Requirements** - requirements gathering, architecture decisions
+- **P1: Core Features (Authentication, API Keys, Audit Logging)** - implement the core features in order
+- **P2: Admin Dashboards & Enhancements** - admin UI, advanced features, documentation
+
+Each task should have:
+- Task ID / Title
+- Priority level (P0/P1/P2)
+- Description
+- Acceptance Criteria (what must be done to accept this)
+- Test Expectations (what tests should pass)
+
+Let me create a detailed plan.
+
+I'll aim for about 8-10 tasks total. Let's think:
+
+**P0: Planning & Requirements**
+1. P0-01: Define system requirements and acceptance criteria
+2. P0-02: Architecture decision matrix â tech stack choices, data models
+
+**P1: Core Features (Authentication, API Keys, Audit Logging)**
+3. P1-01: Set up user authentication (JWT token, password hashing)
+4. P1-02: Implement API key validation middleware
+5. P1-03: Create audit logging system with structured logs
+6. P1-04: Integrate auth and audit logging together
+
+**P2: Admin Dashboards & Enhancements**
+7. P2-01: Build admin dashboard UI (React/Next.js or similar)
+8. P2-02: Implement user analytics and activity tracking
+9. P2-03: Add API key usage reports
+10. P2-04: Add audit log queries and filtering
+
+Let me flesh out each with acceptance criteria and test expectations.
+
+I'll write this in a clear, organized format.
+</think>
+## Implementation Plan: FastAPI Service â Auth, API Keys, Audit Logging & Admin Dashboards  
+
+| Priority | Level | Task ID | Title | Description |
+|----------|-------|---------|-------|-------------|
+| **P0** | 0.1 | P0â01 | Define System Requirements & Acceptance Criteria | ... | ... |
+| **P0** | 0.2 | P0â02 | Architecture Decision Matrix â Tech Stack & Data Models | ... | ... |
+| **P1** | 1.0 | P1â01 | Set Up User Authentication (JWT, Password Hashing) | ... | ... |
+| **P1** | 1.1 | P1â02 | Implement API Key Validation Middleware | ... | ... |
+| **P1** | 1.2 | P1â03 | Build Structured Audit Logging System | ... | ... |
+| **P1** | 1.3 | P1â04 | Integrate Auth & Audit Logging EndâtoâEnd | ... | ... |
+| **P2** | 2.0 | P2â01 | Build Admin Dashboard UI (React/Next.js) | ... | ... |
+| **P2** | 2.1 | P2â02 | Implement User Analytics & Activity Tracking | ... | ... |
+| **P2** | 2.2 | P2â03 | Create API Key Usage Reports & Reports API | ... | ... |
+| **P2** | 2.3 | P2â04 | Add Advanced Audit Log Queries & Filtering | ... | ... |
+
+---
+
+## P0 â Planning & Requirements  
+
+### P0â01: Define System Requirements & Acceptance Criteria  
+
+| Feature | Requirement | Acceptance Criteria | Test Expectations |
+|---------|------------|---------------------|-------------------|
+| **User Authentication** | 1. Users can register, login, and be authenticated | - `POST /auth/register` â returns `201` with `Authorization: Bearer token` <br> - `POST /auth/login` â returns `200` with valid JWT <br> - `GET /users/me` â returns current user data <br> - `DELETE /users/{id}` â returns `204` | Unit tests for registration, login, and protected routes; integration test verifying token validation on every authenticated request |
+| **API Key Management** | 1. Clients can register API keys with usage limits | - `POST /api-keys/register` â returns `201` with `api_key` header <br> - `GET /api-keys/{key}` â returns key details (limits, status) <br> - `DELETE /api-keys/{key}` â returns `204` | Unit tests for key registration/deletion; integration test verifying `Authorization: API-Key-X-...` header is passed to every protected request |
+| **Audit Logging** | 1. All auth actions logged with context | - `POST /auth/login` â logs `user_id`, `action`, `timestamp`, `ip` <br> - `DELETE /users/{id}` â logs `action: DELETE`, `user_id`, `timestamp` <br> - System event logs to external store (e.g., ELK) | Unit tests for log entry creation; integration test verifying logs are searchable and queryable via `/audit-logs` endpoint |
+| **Admin Dashboards** | 1. Admin can view user stats, key usage, audit history | - `GET /admin/users/me` â returns current admin profile <br> - `GET /admin/users` â list users with pagination <br> - `GET /admin/api-keys` â list all keys with usage reports <br> - `GET /admin/audit-logs` â filterable audit log queries | Frontend tests for dashboard UI; integration test verifying data retrieval and filtering work correctly |
+
+**Deliverables:**  
+- Requirements specification document (RDF/JSON)  
+- Architecture decision matrix with tech stack choices  
+- Prioritized backlog of implementation tasks  
+
+---
+
+### P0â02: Architecture Decision Matrix  
+
+| Aspect | Recommendation | Rationale |
+|--------|---------------|-----------|
+| **Auth Token** | JWT (JWT8, short-lived refresh token) | Industry standard, stateless, scalable |
+| **Password Hashing** |

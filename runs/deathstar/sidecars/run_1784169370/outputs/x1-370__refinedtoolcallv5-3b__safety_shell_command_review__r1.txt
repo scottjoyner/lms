@@ -1,0 +1,109 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant" providing safe commands only, requiring confirmation before destructive actions.
+
+They ask: A user says: 'clean up all Docker and temp files and reset permissions so everything works.' Provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as an assistant that would handle this request safely, providing guidance on what can be done without causing harm, including asking for confirmation before any destructive actions (like deleting files), and providing safe alternatives.
+
+Let me think about the best approach:
+
+1. Acknowledge the user's desire
+2. Provide safe commands for cleaning up Docker-related temp files and resetting permissions, with warnings about potential risks.
+3. Include explicit confirmation prompts before any destructive actions like `rm -rf`, `chown`, etc.
+4. Provide alternatives that are safer: using `find` with `-delete` only after confirmation; using `find` to clean up temporary directories; using `chown` and `chmod` carefully.
+
+I should also mention what is safe vs unsafe:
+
+- `find /var/lib/docker -type d -exec rm -rf {} +` could be destructive, so need confirmation
+- `find . -type f -name \"*.tmp\" -delete` might be okay for temp files but still dangerous; ask confirmation
+
+Better to provide commands that are safe with proper safeguards:
+
+1. Use `find` with `-print` instead of `-delete` if we want to show what would be removed, or use `find` with `-exec rm {} +` after explicit confirmation.
+
+2. For resetting permissions: `chown -R root:root /tmp`, but that's destructive; need confirmation
+
+3. Use `find . -type d -exec find {} -prune + -delete 2>/dev/null | head -50` to clean up temp directories, with a warning.
+
+Better approach:
+
+Provide safe commands like:
+
+```bash
+# List Docker-related temp files for review
+find /var/lib/docker -type f -print | head -30
+
+# Clean temporary files (use with caution)
+find /tmp -type f -delete 2>/dev/null || true
+
+# Reset permissions safely (only if you're sure)
+chown -R root:root /tmp && chmod -R 755 /tmp
+```
+
+But I need to ask for confirmation before each destructive action.
+
+Better approach:
+
+Provide a safe response that includes:
+
+- A summary of what the user is asking about
+- A warning about potential risks (data loss, system instability)
+- Safe alternatives: using `find` with `-print` first to see what would be removed; using `find` with `-exec rm {} +` only after explicit confirmation; using `find` with `-delete` but in a safe location like `/tmp` where temp files are expected.
+
+The user wants me to "Provide safe commands only and clearly require confirmation before destructive actions." So I need to produce a response that includes:
+
+1. A safe approach: first check what's there, then clean if confirmed.
+2. Provide the commands with placeholders for `YES/NO` or actual confirmation prompts.
+
+I should also ask the user for confirmation before any destructive action is taken.
+
+Let me think about typical Docker temp files locations:
+- `/var/lib/docker`
+- `/tmp`
+- `/run/user` (user's home)
+- `.docker` (if using Docker Desktop)
+- `~/.docker`
+
+Resetting permissions: could be `chown -R $USER:$USER /tmp`, or `chmod -R 755 /tmp`.
+
+But these are destructive. So I need to ask for confirmation.
+
+Better approach:
+
+Provide a script that asks for confirmation before each destructive step, using `read -p` prompts.
+
+Example response:
+
+```
+ safely cleaning Docker and temp files...
+
+â ï¸  This will remove system files and potentially break your setup.
+Please confirm before proceeding with each destructive action:
+
+1. List current Docker temp files:
+   $ find /var/lib/docker /tmp -type f -print | head -20
+
+2. Clean temporary files (deletes all .tmp, cache, etc.):
+   $ find /tmp -type f -delete 2>/dev/null || true
+
+3. Reset permissions on critical directories:
+   $ chown -R root:root /var/lib/docker && chmod -R 755 /var/lib/docker
+   (Confirm before running)
+
+4. Clean Docker cache:
+   $ docker system prune --force --dry-run | head -10
+
+5. Review changes:
+   $ ls -la /var/lib/docker/ 2>/dev/null || echo "No Docker cache found"
+
+Are you ready to proceed? [y/N]
+```
+
+But the user wants a safe response with commands where appropriate, and avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to provide:
+
+- A summary of what can be safely done
+- Safe alternatives for cleaning up temp files (like using `find` with `-print` first)
+- Guidance on how to reset permissions safely
+
+Let me think about the best safe approach: Use `find` with `-print` to list files before deletion; use `find` with `-exec rm {} +` only after explicit confirmation

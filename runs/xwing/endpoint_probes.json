@@ -1,0 +1,18 @@
+[
+  {
+    "base_url": "http://xwing.tailcb8954.ts.net:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0295,
+    "model_count": 6,
+    "models": [
+      "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "orinth-1.0-9b",
+      "text-embedding-nomic-embed-text-v1.5",
+      "vibethinker-3b-hermes",
+      "ornith-1.0-35b",
+      "qwen3.6-14b-a3b-vibeforged-v2"
+    ],
+    "error": null
+  }
+]

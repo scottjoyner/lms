@@ -1,0 +1,67 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably the country code).
+- Returns a normalized string presumably of digits only? Or maybe returns just the cleaned number.
+
+- Raises ValueError for anything else: i.e., after stripping non-digits, if the resulting digit string is not length 10 or 11 starting with '1', raise ValueError.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output code only (no markdown). So just plain text. Let's write:
+
+```
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # allow 10-digit numbers (e.g., '5551234') or 11-digit starting with '1' (e.g., '15551234')
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip country code
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+```
+
+Test block:
+
+```
+if __name__ == '__main__':
+    assert normalize_phone_number('555-1234') == '5551234'
+    assert normalize_phone_number('555 1234') == '5551234'
+    assert normalize_phone_number('1555-1234') == '5551234'
+    assert normalize_phone_number('1 (800) 555-1234') == '5551234'
+    assert normalize_phone_number('1234567890') == '1234567890'
+    assert normalize_phone_number('12345678901') == '2345678901'  # country code stripped
+    assert normalize_phone_number('123') == ValueError
+    assert normalize_phone_number('555-123a') == ValueError
+```
+
+That's six asserts. Ensure we have at least five.
+
+Make sure the function signature is exactly `def normalize_phone_number(value: str) -> str:`
+
+Potential edge cases:
+
+- Input may be empty string => digits '' length 0, raise ValueError.
+- Input with only non-digits => same.
+- Input that after stripping yields '1' + 10 digits (i.e., 11-digit starting with 1). That's allowed; we return the last 10 digits.
+
+The spec says "supports 10-digit US numbers and 11-digit numbers beginning with 1". So both are valid. The function returns a normalized string: presumably just the digits, optionally stripped of country code. It doesn't specify whether to keep the leading '1' or not; but typical normalization would strip it.
+
+Better to be explicit in docstring maybe? Not required.
+
+We need to ensure we raise ValueError for anything else after stripping non-digits (including wrong lengths). The test block should use assert statements that catch both correct and invalid cases. Use `assert normalize_phone_number('123') is ValueError` or `assert isinstance(normalize_phone_number('123'), ValueError)`. In Python, calling a function that raises ValueError will raise it; so we need to call the function in the assertion.
+
+Better:
+
+```
+assert normalize_phone_number('123') == ValueError
+```
+
+Works because comparing a value error object with itself works. Actually `==` compares values; for exception objects, they compare by identity? Let's check: In Python, `error1 == error2` returns True if both errors are the same type and have same message? I think it checks equality of attributes. But better to use `is`:
+
+```
+assert normalize_phone_number('123') is ValueError
+```
+
+But many people also do `assert normalize_phone_number('

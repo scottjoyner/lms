@@ -1,0 +1,8 @@
+## Answer
+
+**Control Code:** ORION-7429
+
+**Exact Sentence Proving It:**
+> "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+This sentence directly identifies ORION-7429 as the control code of the local agent

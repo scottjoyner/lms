@@ -1,0 +1,109 @@
+<think>We need to create an implementation plan for adding features to an existing FastAPI service: user authentication, API key rotation, audit logging, admin dashboards. Organized as P0, P1, P2 tasks. Each task must include acceptance criteria and test expectations.
+
+Interpretation: P0 is high-level or planning; P1 is mid-level tasks; P2 are detailed tasks. Or could be categories: P0 (Overall), P1 (Subtasks), P2 (Detailed). The user wants a plan with tasks categorized into P0, P1, and P2. Each task must include acceptance criteria and test expectations.
+
+We need to produce an implementation plan. No clarifying questions. So we should just output the plan.
+
+Probably something like:
+
+P0: Define requirements and overall scope.
+
+- Task: Identify features (authentication, API key rotation, audit logging, admin dashboard). Acceptance criteria: etc. Test expectation: etc.
+
+But they want tasks organized as P0, P1, and P2. So maybe each level has multiple tasks.
+
+We need to produce a structured output: perhaps using bullet points or numbered lists.
+
+The plan should be clear and comprehensive.
+
+Let's think about the features:
+
+- User authentication: could use JWT (JSON Web Tokens) or OAuth2. Add endpoint for registering users, login, token issues, protected routes.
+
+- API key rotation: allow generating a new API key, current key storage, rotating after expiration, updating clients.
+
+- Audit logging: log all auth events, API key usage, admin dashboard actions.
+
+- Admin dashboards: UI for admins to view user stats, API keys, audit logs, settings.
+
+Implementation plan tasks:
+
+P0: High-level planning and requirement definition.
+
+- Task 1: Define feature boundaries and dependencies. Acceptance criteria: list of features defined; dependencies (e.g., existing auth module). Test expectation: verify that definitions are captured in spec.
+
+- Task 2: Choose technology stack for new features (e.g., use python-muxify for JWT, python-dotenv for config). Acceptance criteria: configuration file used; libraries documented. Test expectation: test that environment variable handling works.
+
+P1: Design and initial implementation of each feature.
+
+- Task 1: Set up database tables for users, api_keys, audit_log entries. Acceptance criteria: tables created with proper columns; audit_log records timestamps and events. Test expectation: query tests for each table.
+
+- Task 2: Implement user authentication module (register, login, protect routes). Acceptance criteria: POST /register, POST /login returns token; protected routes return correct status. Test expectation: unit tests for register/login, integration test for protected route.
+
+- Task 3: Build API key rotation service (store current key, expiration, rotate function). Acceptance criteria: endpoint GET /api-keys returns current key; POST /api-keys/rotate triggers rotation. Test expectation: unit tests for get and rotate, integration test with client.
+
+- Task 4: Create audit logging service (write events to a log backend, support query). Acceptance criteria: log events from auth and key rotations; query /audit-logs returns list. Test expectation: unit tests for log write, integration test for query.
+
+- Task 5: Design admin dashboard (REST endpoints for managing users, api keys, audit logs). Acceptance criteria: endpoints like POST /admin/users, PUT /admin/api-keys/<id>, GET /admin/audit_logs. Test expectation: unit tests for each endpoint.
+
+P2: Detailed implementation and integration.
+
+- Task 1: Code the authentication token generation and validation using python-jose. Acceptance criteria: tokens valid across services; validation works for expired tokens. Test expectation: integration test of token flow.
+
+- Task 2: Implement user registration and login with error handling (e.g., duplicate email). Acceptance criteria: proper error messages for duplicates, missing fields. Test expectation: test case for duplicate email.
+
+- Task 3: Add API key rotation with configuration for max rotations per user. Acceptance criteria: rotating after 3 uses, new key generated securely. Test expectation: test rotation sequence.
+
+- Task 4: Build audit logging with a simple log backend (e.g., list in file). Acceptance criteria: logs include event type, timestamp, details. Test expectation: verify logs contain expected entries.
+
+- Task 5: Create admin dashboard endpoints; integrate with authentication token for auth route. Acceptance criteria: admin can view user stats, manage keys, view logs. Test expectation: end-to-end flow from admin login to dashboard data retrieval.
+
+- Task 6: Write unit tests for each new feature using pytest. Acceptance criteria: test coverage >80% for new code. Test expectation: all tests pass.
+
+- Task 7: Perform integration tests with a test client (Postman or curl) covering full flow: user registers, logs in, gets token, calls /api-keys/rotate, checks audit log. Acceptance criteria: full workflow passes; test cases recorded. Test expectation: integration tests succeed.
+
+- Task 8: Provide documentation (API docs via OpenAPI) for new endpoints. Acceptance criteria: docs generated and accessible; reference in UI. Test expectation: external tooling can query docs.
+
+- Task 9: Perform performance testing (load, latency) to ensure endpoints >100ms. Acceptance criteria: throughput >1k requests per sec. Test expectation: test passes.
+
+- Task 10: Deploy new features to production environment with proper CI/CD steps. Acceptance criteria: service up, no errors in production logs. Test expectation: integration test in production environment.
+
+We need each task includes acceptance criteria and test expectations. So we must list them for each task.
+
+The plan should be organized as P0 tasks, then P1 tasks, then P2 tasks.
+
+Make sure each task has "Acceptance Criteria:" and "Test Expectations:" headings.
+
+Potential formatting: Use bullet points with subheadings.
+
+We need to avoid clarifying questions. So just present the plan.
+
+Let's produce a clear answer.
+
+Maybe structure:
+
+**P0 â HighâLevel Planning**
+
+- **Task 1: Define requirements & scope**  
+  *Acceptance Criteria:* ...  
+  *Test Expectations:* ...
+
+... etc.
+
+**P1 â Design & Initial Implementation**
+
+...
+
+**P2 â Detailed Implementation & Integration**
+
+...
+
+Make sure each task includes both sections. Use concise but clear language.
+
+We need to ensure we meet the requirement: "Each task must include acceptance criteria and test expectations." So for every task, list both.
+
+Potential number of tasks: maybe 5 per level? Or can be fewer but each must have AC and TE.
+
+Let's aim for about 3-4 tasks per level. But better to have enough detail.
+
+Maybe P0:

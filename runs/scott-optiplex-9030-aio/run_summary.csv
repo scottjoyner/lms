@@ -1,0 +1,12 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,4.464,24.345,8.803,1.00,0.20,0.6121,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,refinedtoolcallv5-3b,85.831,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,vibethinker-3b-i1,0.008,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,qwen3.5-2b-claude-4.6-opus-reasoning-distilled,0.004,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,lfm2.5-8b-a1b,0.006,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,qwen3.5-4b,0.005,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,qwen3.5-2b,0.014,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,ibm/granite-4-h-tiny,0.006,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,liquid/lfm2.5-1.2b,0.005,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,google/gemma-3-1b,0.012,,,0.00,0.00,0.0000,10
+1784125118,scott-optiplex-9030-aio,192.168.1.241,http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1,text-embedding-nomic-embed-text-v1.5,0.015,,,0.00,0.00,0.0000,10

@@ -1,0 +1,18 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1 (e.g., 0.8)
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular task; they just want me to produce a JSON object with those fields. Usually, in such cases we might provide generic content or ask for clarification? But the instruction says "Return a JSON object..." So I should produce something.
+
+Given no context of a specific task, perhaps I can create reasonable default values: e.g., task_fit could be ["understanding user intent", "generating relevant responses", "contextual awareness"], confidence 0.9, limitations ["model may have biases", "context window limits", "requires training data"], recommended_max_context_tokens maybe 4096 or 8192.
+
+But the user didn't specify any particular domain or constraints; they just want a JSON object with those keys. So I'll produce something plausible.
+
+Make sure it's valid JSON, no extra

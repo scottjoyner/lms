@@ -1,0 +1,52 @@
+# Implementation Plan: Authentication, Key Rotation, Audit Logging & Admin Dashboards
+
+## Architecture Overview
+
+```
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â                     FastAPI Service                          â
+ââââââââââââ¬âââââââââââ¬âââââââââââ¬âââââââââââââââââââââââââââââ¤
+â  Auth    â  API Key â  Audit   â     Admin Dashboard         â
+â Module   â Rotation â Logger   â       (Protected Routes)   â
+ââââââââââââ´âââââââââââ´âââââââââââ´âââââââââââââââââââââââââââââ
+```
+
+---
+
+## P0 â Critical Path (Blocks All Other Work)
+
+### P0-1: User Authentication System
+
+**Objective:** Implement secure user registration, login, and session management.
+
+| Task | Description | Acceptance Criteria | Test Expectations |
+|------|-------------|---------------------|-------------------|
+| **P0-1a** | Password hashing with `bcrypt`/`argon2` | - Passwords stored as hashed values only<br>- Minimum 8-character policy enforced<br>- No plaintext passwords in DB or logs | - Hash differs from input for same password<br>- Same input always produces identical hash (deterministic salt) |
+| **P0-1b** | JWT-based auth with refresh tokens | - Access token expires after configurable TTL (default: 15min)<br>- Refresh token valid for 7 days<br>- Token claims include `sub`, `iat`, `exp` | - Expired access token returns 401<br>- Valid refresh token issues new pair<br>- Stolen refresh token cannot be reused after rotation |
+| **P0-1c** | Login/Logout endpoints (`POST /auth/login`, `DELETE /auth/logout`) | - Returns JWT pair on success<br>- Invalid credentials return 401 with generic message<br>- Rate limit: 5 attempts per minute per IP | - Successful login returns valid tokens in response body<br>- Brute force attempt after 5 failures triggers lockout (24h)<br>- Response headers include `X-RateLimit-Remaining` |
+| **P0-1d** | Dependency injection for auth context | - All routes can access current user via `get_current_user()`<br>- Missing/invalid token returns 401 automatically<br>- User object includes id, email, role, created_at | - Unauthenticated request to protected route returns 401<br>- Authenticated request passes through with user context available in dependency |
+| **P0-1e** | Security headers & CORS configuration | - `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options` set<br>- CORS configured for production domains only | - Response includes all security headers<br>- Cross-origin request from untrusted domain returns 403 |
+
+---
+
+### P0-2: Audit Logging Infrastructure
+
+**Objective:** Build tamper-evident audit trail capturing all state-changing operations.
+
+| Task | Description | Acceptance Criteria | Test Expectations |
+|------|-------------|---------------------|-------------------|
+| **P0-2a** | Audit event schema & storage layer | - Events stored in `audit_events` table with: `event_id`, `timestamp`, `actor_id`, `action`, `resource_type`, `resource_id`, `ip_address`, `user_agent`, `metadata` (JSON)<br>- Append-only; no UPDATE/DELETE on audit tables<br>- Indexed by `timestamp` and `actor_id` | - Insert operation succeeds for all event types<br>- Attempted UPDATE returns error or is silently ignored<br>- Query by actor_id returns chronological events |
+| **P0-2b** | Middleware-based automatic capture | - All state-changing endpoints auto-capture audit events via middleware<br>- No manual decorators needed on existing routes<br>- Events captured before response sent (not in background) | - POST to any protected endpoint generates audit event automatically<br>- GET-only endpoints do NOT generate audit events<br>- Audit log entry contains correct actor_id, action, and resource details |
+| **P0-2c** | Audit log query API (`GET /audit/events`) | - Supports filtering by: `actor_id`, `action`, `resource_type`, date range<br>- Pagination with cursor-based pagination (offset not required)<br>- Returns paginated response with total count | - Filtered queries return correct subset of events<br>- Cursor-based pagination returns next page without duplicates<br>- Empty result set returns 200 with empty list and zero count |
+| **P0-2d** | Audit log integrity verification | - Events are cryptographically signed (HMAC-SHA256) by service key<br>- Client can verify event authenticity via `X-Audit-Key` header<br>- Tampered events fail signature verification | - Valid event passes HMAC verification<br>- Modified event fails verification and returns 403<br>- Missing audit key in response is flagged as error |
+
+---
+
+### P0-3: Database Schema Migration & Backward Compatibility
+
+**Objective:** Ensure existing service continues functioning during migration.
+
+| Task | Description | Acceptance Criteria | Test Expectations |
+|------|-------------|---------------------|-------------------|
+| **P0-3a** | Migration scripts for new tables | - `users`, `api_keys`, `audit_events` tables created via Alembic<br>- Existing data remains intact and queryable<br>- Foreign keys enforced (e.g., audit.actor_id â users.id) | - Migrations run without errors on test DB<br>- Pre-existing records still accessible after migration<br>- FK violations return 400 with clear error message |
+| **

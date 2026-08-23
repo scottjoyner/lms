@@ -1,0 +1,11 @@
+<think>
+The context contains many "Project note" entries that all say: "the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows." These are filler facts.
+
+Then there's a line: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+So the control code is "ORION-7429". I need to find an exact sentence that proves this. The only statement containing the control code is that line itself.
+
+Let me search for that.
+</think>
+{
+  \"control_code\": \"ORION-7429\",\n  \"evidence_quote\": \"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.\"\n}

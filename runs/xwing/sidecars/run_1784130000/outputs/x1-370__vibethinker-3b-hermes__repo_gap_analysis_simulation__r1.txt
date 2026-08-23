@@ -1,0 +1,38 @@
+**Implementation Cycle Plan â FastAPI + React Dashboard**
+
+---
+
+### P0 (Critical) â MustâDo
+
+| # | Item | Priority |
+|---|------|----------|
+| **1.1** | Introduce JWT/OAuth2 authentication layer with middleware & session management | |
+| **1.2** | Set up Alembic for SQLite migrations; define initial schema & migration history | |
+
+---
+
+### P1.1 (High) â Security & Validation
+
+| # | Item | Priority |
+|---|------|----------|
+| **2.1** | Add Pydantic models + input validation on every request | |
+| **2.2** | Implement rate limiting on API endpoints to prevent abuse | |
+| **2.3** | Sanitize and validate shellâcommand inputs before execution; reject dangerous commands | |
+
+---
+
+### P1.2 (High) â Shell Endpoint Hardening
+
+| # | Item | Priority |
+|---|------|----------|
+| **2.4** | Implement sandboxed shell execution with output logging; reject `eval`, `shlex`, etc. | |
+| **2.5** | Add structured error handling: uniform HTTP status codes, JSON responses, detailed messages | |
+
+---
+
+### P2 (Medium/LongâTerm)
+
+| # | Item | Priority |
+|---|------|----------|
+| **3.1** | CI/CD pipeline (GitHub Actions) â automated testing & security scanning | |
+| **3.2** | Docker setup: multiâstage builds, persistent SQLite volumes; remove

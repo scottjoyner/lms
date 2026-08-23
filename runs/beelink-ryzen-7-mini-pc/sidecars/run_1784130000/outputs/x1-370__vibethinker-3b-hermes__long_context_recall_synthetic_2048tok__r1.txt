@@ -1,0 +1,16 @@
+<think>
+The user wants me to read a synthetic context that contains many filler facts and one control code. They want me to return JSON with keys "control_code" and "evidence_quote", containing:
+
+1. The control code value (ORION-7429)
+2. An exact sentence from the context that proves it
+
+Let me search through the provided context for the control code.
+
+I can see in the text: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+That's a direct statement of the control code. Let me extract that sentence.
+</think>
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+}

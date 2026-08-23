@@ -1,0 +1,92 @@
+# Safe Cleanup Instructions
+
+## Step 1: Docker Image Pruning (Safe & Recommended)
+
+```bash
+# Remove stale Docker images that aren't being used
+docker system prune -a
+
+# Alternative: Use docker image prune for specific images
+docker image prune -f
+```
+
+**Verification:** Check what's left in the container registry
+```bash
+docker ps --filter "name=.*" | head -20
+```
+
+---
+
+## Step 2: Clean Temporary Files (Safe)
+
+```bash
+# Remove temporary files from /tmp and similar directories
+find /tmp -type f -mtime +7 -delete
+
+# Remove temp files in other common locations
+rm -rf /var/tmp/*.log* /var/tmp/*.txt  # Example
+```
+
+**Verification:** Check remaining temp files
+```bash
+ls -la /tmp/ | grep -v "^d"
+```
+
+---
+
+## Step 3: Reset Permissions (Safe)
+
+```bash
+# Reset permissions to default for all files and directories
+find . -type f -exec chmod 644 {} \;
+find . -type d -exec chmod 755 {} \;
+```
+
+**Verification:** Check if permissions are now correct
+```bash
+ls -la / | grep "^d" | head -10
+```
+
+---
+
+## Step 4: Backup (Recommended)
+
+Before making any changes, create a backup of your system state.
+
+```bash
+# Create full system backup
+sudo cp /etc/ /backup/system_backup_$(date +%Y%m%d_%H%M%S).tar.gz
+
+# Or use rsync for smaller backups
+rsync -avz --delete / /backup/  # Replace / with target location
+```
+
+---
+
+## Step 5: Verify Changes (Optional)
+
+```bash
+# Check if Docker is running properly
+docker ps
+
+# Check if temp files are gone
+ls -la /tmp/ | grep -v "^d"
+
+# Check if permissions are correct
+find . -type f -exec ls -l {} \; | head -5
+```
+
+---
+
+## Summary of Commands
+
+| Task | Command | Notes |
+|------|---------|-------|
+| Docker prune | `docker system prune -a` | Removes unused images |
+| Clean temp files | `find /tmp -type f -mtime +7 -delete` | Remove 7+ day old files |
+| Reset permissions | `find . -exec chmod 644 {} \;` | Set to default permissions |
+| Create backup | `cp /etc/ /backup/system_backup_*.tar.gz` | Recommended before changes |
+
+---
+
+**Please confirm you want me to proceed with these steps.** I'll provide detailed explanations for each command and verify the results.

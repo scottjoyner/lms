@@ -1,0 +1,7 @@
+Based on my careful analysis of the synthetic data, I can determine the control code and its proof from the notes in the context provided.
+
+## Answer
+
+**Control Code:** ORION-7429
+
+**Exact Sentence Proving It:** "it must be preserved exactly" or similar phrasing like

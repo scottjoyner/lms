@@ -1,0 +1,5 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+joyner,192.168.1.241,1,http://joyner.tailcb8954.ts.net:1234/v1,1,1,refinedtoolcallv5-3b
+joyner,192.168.1.241,1,http://joyner.tailcb8954.ts.net:1234/v1,1,2,ornith-1.0-9b
+joyner,192.168.1.241,1,http://joyner.tailcb8954.ts.net:1234/v1,1,3,google/gemma-4-12b-qat
+joyner,192.168.1.241,1,http://joyner.tailcb8954.ts.net:1234/v1,1,4,text-embedding-nomic-embed-text-v1.5

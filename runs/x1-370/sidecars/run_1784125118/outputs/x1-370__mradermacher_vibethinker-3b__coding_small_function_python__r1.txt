@@ -1,0 +1,5 @@
+<think>The user asks: "Write a Python function named normalize_phone_number(value: str) -> str that strips non-digits, supports 10-digit US numbers and 11-digit numbers beginning with 1, and raises ValueError for anything else. Include a small if __name__ == '__main__' test block with at least five asserts."
+
+We need to output code only, no markdown. So we must produce plain text code.
+
+The function should take a string value,

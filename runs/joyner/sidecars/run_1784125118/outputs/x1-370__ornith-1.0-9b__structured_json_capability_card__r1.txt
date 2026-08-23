@@ -1,0 +1,14 @@
+{
+  "task_fit": [
+    "General knowledge questions",
+    "Creative writing and content generation",
+    "Code writing and debugging assistance",
+    "Data analysis and summarization",
+    "Logical reasoning and problem solving",
+    "Translation between languages",
+    "Educational explanations and tutoring"
+  ],
+  "confidence": 0.92,
+  "limitations": [
+    "Cannot access real-time information or browse the internet without tools",
+    "May produce inaccurate information on

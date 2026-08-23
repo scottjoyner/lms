@@ -1,0 +1,13 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+x1-370,192.168.1.237,1,http://100.108.99.47:1234/v1,1,1,ternary-bonsai-27b@?
+x1-370,192.168.1.237,1,http://100.108.99.47:1234/v1,1,2,text-embedding-nomic-embed-text-v1.5
+x1-370,192.168.1.237,1,http://100.108.99.47:1234/v1,1,3,liquid/lfm2-24b-a2b
+x1-370,192.168.1.237,2,http://100.81.57.77:1234/v1,1,4,liquid/lfm2-24b-a2b
+x1-370,192.168.1.237,2,http://100.81.57.77:1234/v1,1,5,ternary-bonsai-27b@?
+x1-370,192.168.1.237,2,http://100.81.57.77:1234/v1,1,6,text-embedding-nomic-embed-text-v1.5
+x1-370,192.168.1.237,3,http://192.168.1.178:1234/v1,1,7,qwen3.5-0.8b-mlx
+x1-370,192.168.1.237,3,http://192.168.1.178:1234/v1,1,8,prism-ml/bonsai-27b
+x1-370,192.168.1.237,4,http://100.69.158.114:1234/v1,1,9,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled
+x1-370,192.168.1.237,4,http://100.69.158.114:1234/v1,1,10,prism-ml/bonsai-27b
+x1-370,192.168.1.237,4,http://100.69.158.114:1234/v1,1,11,refinedtoolcallv5-3b
+x1-370,192.168.1.237,5,http://192.168.1.81:1234/v1,1,12,liquid/lfm2.5-1.2b

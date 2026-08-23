@@ -1,0 +1,99 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical/must have), P1 (should have), and P2 (nice-to-have) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to produce a comprehensive implementation plan with tasks categorized into those priority levels.
+
+The user says: "Do not ask clarifying questions unless absolutely blocked." So I should just deliver the plan now, without asking for clarification.
+
+Let me think about what tasks would be appropriate:
+
+User authentication:
+- P0: Set up JWT-based authentication system (user model, password hashing, login endpoint, protect routes)
+- P1: Add refresh tokens, password reset flow
+- P2: Social login integration
+
+API key rotation:
+- P0: Integrate API key validation middleware
+- P1: Implement key rotation mechanism with secure storage
+- P2: Support for rotating per-endpoint or globally
+
+Audit logging:
+- P0: Set up audit log endpoint and tracking of auth events, API calls, etc.
+- P1: Implement detailed audit fields (user, action, timestamp)
+- P2: Add alerting rules and custom log formatting
+
+Admin dashboards:
+- P0: Create admin dashboard UI with authentication
+- P1: Build user management, API key management, audit logs view
+- P2: Add analytics and reporting features
+
+I need to organize these into P0, P1, P2 categories. Let me think about logical grouping:
+
+P0 (Critical - must have before anything else works):
+1. User Authentication (core)
+2. API Key Validation (critical for any API key rotation to work)
+3. Audit Logging (required for logging auth actions)
+4. Admin Dashboard (needs auth to be working)
+
+P1 (High priority, important but not critical):
+5. API Key Rotation (after validation is in place)
+6. Password Reset Flow
+7. Multi-factor Authentication (optional)
+8. Endpoint-level API key rotation
+
+P2 (Nice-to-have, optional):
+9. Social Login
+10. Custom Log Formatting
+11. Alerting Rules
+12. API Key Per-Endpoint Configuration
+13. API Key Rotation History
+14. Role-Based Access Control
+15. API Key revocation
+
+Let me structure each task with:
+- Task ID / Title
+- Priority (P0/P1/P2)
+- Description
+- Acceptance Criteria (checklist style)
+- Test Expectations
+
+I should also include a high-level timeline estimate perhaps.
+
+The plan needs to be clear and actionable. Let's produce it now.</think>## Implementation Plan â FastAPI Service: Auth, API Key Rotation, Audit Logging & Admin Dashboards  
+
+| Priority | Task ID | Task Title | Description |
+|----------|---------|------------|-------------|
+| **P0** | P0â01 | **User Authentication (Core)** | Set up JWT-based auth with user model, password hashing, login, and protected routes. | â |
+| | P0â02 | **API Key Validation Middleware** | Integrate API key validation middleware that blocks unauthenticated/invalid keys. | â |
+| | P0â03 | **Audit Logging** | Implement structured audit log endpoint and tracking of auth actions, API calls, and user activity. | â |
+| | P0â04 | **Admin Dashboard â Basic Auth UI** | Build a simple admin dashboard that requires authentication to display auth-related info. | â |
+| | P1â01 | **API Key Rotation** | Implement secure key rotation (perâclient or global) with storage, verification, and revocation. | â |
+| | P1â02 | **Password Reset Flow** | Add password reset email/phone flow with expiration tracking. | â |
+| | P1â03 | **MultiâFactor Authentication (MFA)** | Integrate MFA for admin accounts; store only OTP tokens, verify on login. | â |
+| | P1â04 | **API Key PerâEndpoint Configuration** | Allow rotating different keys per API endpoint (e.g., /api/v1 vs /api/v2). | â |
+| | P2â01 | **Social Login Integration** | Add OAuth2/OIDC login flows for Google, GitHub, and Facebook. | â |
+| | P2â02 | **Custom Log Formatting & Alerting** | Support custom log formats; add alerting rules (e.g., >5 failed auth attempts). | â |
+| | P2â03 | **Audit Log Export** | Provide CSV/JSON export of audit logs for reporting. | â |
+| | P2â04 | **RoleâBased Access Control (RBAC)** | Add RBAC so admins can grant/revoke view rights on user data and audit logs. | â |
+| | P2â05 | **API Key Revocation** | Implement per-client revocation of rotated keys; clear stale tokens. | â |
+
+---  
+
+### Detailed Task Descriptions
+
+#### P0 â Critical Tasks (must be completed before any other feature is functional)
+
+##### P0â01: User Authentication (Core)
+- **User Model**: `User` (id, email, hashed_password, created_at, updated_at) + `UserSession` (id, user_id, access_token, refresh_token, expires_at).
+- **Password Hashing**: Use `bcrypt`/`argon2id`; store salted hashes; compare with `argon2id()` on login.
+- **JWT Tokens**:
+  - `access_token`: shortâlived (~15â¯min), signed with a secret.
+  - `refresh_token`: longâlived (~7â¯days), stored in cookie, refresh flow via `GET /auth/refresh`.
+  - `id_token`: includes user ID for verification.
+- **Login Endpoint**: POST `/auth/login` â returns `{access_token, refresh_token, token_type}`.
+- **Protected Routes**: Middleware that extracts `Authorization: Bearer <token>`, verifies with `jose/jwt-py`, validates `refresh_token` on each request (or uses a short-lived access token).
+- **Register Endpoint**: POST `/auth/register` â creates user; returns `201` with clientâside redirect to login.
+
+**Acceptance Criteria**
+- `POST /auth/login` accepts `{email, password}` and returns valid JWT tokens.
+- `GET /protected` returns 401 when no token is present or invalid.
+- `GET /protected` returns 200 with `Authorization: Bearer

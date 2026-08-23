@@ -1,0 +1,16 @@
+[
+  {
+    "base_url": "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.045,
+    "model_count": 4,
+    "models": [
+      "refinedtoolcallv5-3b",
+      "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "liquid/lfm2.5-1.2b",
+      "text-embedding-nomic-embed-text-v1.5"
+    ],
+    "error": null
+  }
+]

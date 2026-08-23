@@ -1,0 +1,12 @@
+{
+  "task_fit": [
+    "string",
+    "string"
+  ],
+  "confidence": 0.5,
+  "limitations": [
+    "string",
+    "string"
+  ],
+  "recommended_max_context_tokens": 10
+}

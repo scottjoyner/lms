@@ -1,0 +1,67 @@
+# Implementation Cycle Plan â Codebase Review
+
+## P0 â Critical (Block Release)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 1 | **Remove direct shell command endpoint** | Security | Arbitrary code execution risk; must be deleted or gated behind strict allowlist + input sanitization |
+| 2 | **Implement authentication & authorization** | Security | No auth means any user can read/write all data. Add JWT/session-based auth with role checks on every mutation endpoint |
+| 3 | **Fix weak error handling** | Logic/Security | FastAPI should return structured `HTTPException` responses; prevent stack traces, DB errors, or internal paths from leaking to clients |
+
+## P1.1 â High (Pre-Release)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 4 | **Add Alembic migrations** | Logic | SQLite schema changes must be versioned; no manual `ALTER TABLE` in production |
+| 5 | **Dockerfile with healthcheck** | DevOps | Add `HEALTHCHECK CMD curl -f http://localhost:8000/docs || exit 1` to detect unresponsive containers |
+| 6 | **Input validation on all endpoints** | Security/Logic | Pydantic models must validate every request body; reject malformed data before DB touches it |
+
+## P1.2 â Medium (Stabilize)
+
+| # | Item | Category | Detail |
+|---|------|----------|--------|
+| 7 | **CI pipeline** | DevOps | GitHub Actions: lint â type check â test â build Docker image on push to main |
+| 8 | **Test suite** | Quality | Unit tests for services, integration tests against SQLite in-memory DB; target â¥80% coverage |
+| 9 | **React dashboard hardening** | Security/Logic | CSRF protection (if using cookies), CSP headers, secure React state management |
+
+## P2 â Future Work
+
+- Performance profiling & caching layer
+- Structured logging (JSON logs â ELK/Sentry)
+- API documentation audit (`/docs` access control behind auth)
+- Rate limiting on public endpoints
+
+---
+
+## Security Issues Summary
+
+| Severity | Issue | Fix |
+|----------|-------|-----|
+| ð´ Critical | Direct shell command endpoint exposed | Remove or restrict to admin-only with allowlist + input sanitization |
+| ð´ Critical | No authentication | Implement JWT/session auth on all endpoints |
+| ð  High | Weak error handling leaks internals | Use `HTTPException`, sanitize responses, never expose stack traces |
+| ð  High | No input validation | Enforce Pydantic models on every endpoint |
+| ð¡ Medium | No CSRF protection (React + cookie auth) | Add CSRF token or switch to stateless JWT |
+
+## Logic Gaps Summary
+
+- **No migration strategy** â schema changes risk data loss
+- **No error boundaries** â crashes propagate unhandled to client
+- **No input sanitization** â SQL injection, XSS, and command injection risks remain
+- **No rate limiting** â endpoints vulnerable to abuse/DoS
+- **No logging** â incidents cannot be diagnosed post-mortem
+
+## Test Deliverables
+
+| Scope | Target | Notes |
+|-------|--------|-------|
+| Unit tests (services) | â¥80% coverage | Mock DB, test business logic in isolation |
+| Integration tests | All CRUD endpoints | Use SQLite in-memory fixture |
+| Auth flow tests | Login/logout/token refresh | Verify token validation on protected routes |
+| Security tests | Shell endpoint, input injection | Negative cases: malformed JSON, SQLi payloads, command injection strings |
+| Docker build test | CI stage | Ensure image builds and healthcheck passes |
+
+---
+
+**Recommended execution order:** P0 â P1.1 â P1.2 â P2  
+**Estimated effort:** P0 (2â3 days), P1.1 (3â4 days), P1.2 (5â7 days)

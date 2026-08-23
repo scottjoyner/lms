@@ -1,0 +1,82 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably area code prefix "1").
+- Returns a cleaned string of digits? Likely returns just the digits, or maybe returns normalized format like "(XXX) XXX-XXXX"? The spec says "strips non-digits" which suggests returning only digits. But typical normalization might also reformat.
+
+Let's interpret: It strips non-digits from input; then if resulting number is 10-digit US number (any digits), accept it; or if 11-digit starting with '1', treat as area code prefix and strip the leading 1, leaving 10 digits. Then return cleaned string of digits.
+
+Raise ValueError for anything else: i.e., after stripping non-digits, if length is not 10 (or 11 starting with 1), raise.
+
+We need a small if __name__ == '__main__' test block with at least five asserts.
+
+Write code only. No markdown formatting.
+
+Let's produce:
+
+```python
+def normalize_phone_number(value: str) -> str:
+    # Strip all non-digit characters from the input
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Check for valid US phone number formats
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip the leading '1'
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+```
+
+Test block:
+
+```python
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('1234567890') == '1234567890'
+    assert normalize_phone_number('1-234-567-890') == '234567890'  # leading 1 stripped
+    assert normalize_phone_number('5551234') == ValueError
+    assert normalize_phone_number('123456789012') == ValueError
+    assert normalize_phone_number('abc') == ValueError
+```
+
+That's six asserts. Good.
+
+Make sure code is valid Python: need to handle the ValueError correctly; calling `assert normalize_phone_number('123456789012') == ValueError` works because `ValueError` is a type, not an instance. Actually we should call the function and catch the exception:
+
+```
+try:
+    normalize_phone_number('123456789012')
+except ValueError as e:
+    assert 'Invalid phone number' in str(e)
+```
+
+Better to use `assert isinstance(normalize_phone_number('123456789012'), ValueError)`.
+
+But the simplest is:
+
+```
+assert isinstance(normalize_phone_number('123456789012'), ValueError)
+```
+
+Let's produce final code accordingly. Ensure no markdown formatting, just plain text with code lines.
+
+We'll write everything in one file.
+
+Potential improvements: Use regex for stripping non-digits; but simple comprehension is fine.
+
+Edge cases:
+
+- Input may be None? Should raise ValueError because not a string or after stripping digits length doesn't match.
+- Input empty -> '' => len=0, raises ValueError
+- Input with spaces and hyphens etc. -> stripped to digits
+
+Test block: at least five asserts; we have 6.
+
+Let's produce final answer.</think>def normalize_phone_number(value: str) -> str:
+    # Strip all non-digit characters from the input
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Check for valid US phone number formats
+    if len(digits) == 1

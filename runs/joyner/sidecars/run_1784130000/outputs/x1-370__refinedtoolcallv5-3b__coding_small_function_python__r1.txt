@@ -1,0 +1,70 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably with country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown. So just plain text containing the Python code.
+
+Let's design function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # If empty or not 10 nor 11 digits => error
+    if len(digits) == 0:
+        raise ValueError("No digits found in phone number")
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        # Remove country code
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, etc. Should strip them.
+- If input is already just digits but wrong length => error.
+
+Test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert normalize_phone_number('+1 (800) 123-4567') == '8001234567'
+    assert normalize_phone_number('5551234') == '5551234'  # Actually this is only 7 digits; should raise error. Let's adjust.
+Better:
+
+Test valid US numbers:
+- '555-1234' => '5551234'? Wait that's 7-digit local number? Usually US numbers are 10 digits: area code + line number (e.g., 555-1234 is only 7). But we can test with valid ones.
+
+Let's create tests:
+
+assert normalize_phone_number('555-1234') == '5551234'   # Actually this yields 7 digits; but our function would accept any length of 10 or 11. So it will raise error because len(digits) = 7 => ValueError.
+
+Better to test with proper numbers:
+
+Valid:
+- '5551234567' -> '5551234567'
+- '(555) 123-4567' -> '5551234567'
+- '+1 (555) 123-4567' -> '5551234567'
+
+Invalid:
+- '' or None => ValueError
+- 'abc' => ValueError
+- '1234567890123' (13 digits) => ValueError
+- '12a34b56c78d9e0f1234567890' -> after stripping digits = 10? Actually many digits; but if it's not 10 or 11, raise error.
+
+Let's write at least five asserts:
+
+assert normalize_phone_number('555-1234-5678') == '5551234567'
+assert normalize_phone_number('(555) 123-4567') == '5551234567'
+assert normalize_phone_number('+1 (555) 123-

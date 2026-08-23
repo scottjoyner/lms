@@ -1,0 +1,25 @@
+
+```python
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(filter(str.isdigit, value))
+    if len(digits) == 10 or (len(digits) == 11 and digits.startswith('1')):
+        return digits
+    raise ValueError(f'Invalid phone number: {value}')
+
+if __name__ == '__main__':
+    assert normalize_phone_number('(555) 123-4567') == '5551234567'
+    assert normalize_phone_number('5551234567') == '5551234567'
+    assert normalize_phone_number('1-800-555-0199') == '18005550199'
+    try:
+        normalize_phone_number('abc')
+        raise AssertionError
+    except ValueError:
+        pass
+    try:
+        normalize_phone_number('12345')
+        raise AssertionError
+    except ValueError:
+        pass
+    assert normalize_phone_number('(800) 555-0123') == '8005550123'
+    print('All tests passed')
+```

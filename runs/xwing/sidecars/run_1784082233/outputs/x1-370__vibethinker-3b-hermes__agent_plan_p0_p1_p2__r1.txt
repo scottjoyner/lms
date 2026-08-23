@@ -1,0 +1,145 @@
+<think>The user wants me to create an implementation plan for adding several security features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical/must-haves), P1 (should-haves), and P2 (nice-to-haves) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what is a typical FastAPI service architecture looks like, but since it's existing we can be generic enough that the plan applies to most FastAPI services.
+
+Let me break down each feature:
+
+1. **User Authentication** - login/register, JWT or OAuth2, session management
+2. **API Key Rotation** - rotate API keys for different environments/requests, rotation mechanism, revocation
+3. **Audit Logging** - log all auth-related and system events with timestamps, user info, actions taken
+4. **Admin Dashboards** - UI for admins to view user stats, audit logs, key metrics
+
+Organize into P0 (critical), P1 (high priority but not critical), P2 (nice-to-have).
+
+Typically:
+- P0: Core security foundation â set up auth system and audit logging infrastructure
+- P1: API key rotation integration
+- P2: Admin dashboards UI
+
+But also could intermix. Let's think more carefully:
+
+**P0 tasks**: Must work for the service to be secure at all; if missing, the service is insecure.
+
+- Set up authentication framework (JWT or similar)
+- Implement user registration/login with auth middleware
+- Create audit logging infrastructure (logging setup, schema design)
+- Ensure proper input validation and sanitization
+
+**P1 tasks**: Important but not life-or-death; can be replaced later:
+- API key rotation mechanism
+- Admin dashboard UI features
+- Comprehensive testing for each feature
+
+**P2 tasks**: Enhancements, advanced features:
+- Multi-factor authentication (MFA)
+- API key lifecycle automation
+- Advanced audit log filtering
+- Mobile/web admin dashboards
+
+But the user only asked to add those four things. So P0 should cover auth and audit logging; P1 should cover API key rotation and admin dashboard; maybe split them.
+
+Let me propose:
+
+**P0: Core Security Foundation**
+- Task 1: Set up authentication middleware (JWT/OAuth2)
+- Task 2: Implement user model, database migration
+- Task 3: Create audit log schema and storage
+- Task 4: Add input validation and sanitization for auth flows
+
+**P1: API Key & Admin Features**
+- Task 5: Build API key registration/rotation system
+- Task 6: Implement revocation mechanism
+- Task 7: Create admin dashboard UI with metrics
+- Task 8: Integrate audit log into admin view
+
+**P2: Advanced Enhancements (optional)**
+- Task 9: Add MFA support
+- Task 10: Implement API key lifecycle automation
+- Task 11: Add advanced audit log filtering and retention policies
+- Task 12: Mobile/web admin dashboard customization
+
+But the user asked for "adding user authentication, API key rotation, audit logging, and admin dashboards". So P2 could be about customizing dashboards or adding more advanced features.
+
+Let me think of a realistic plan. Typically:
+
+P0 (Critical - Must Have):
+1. User Authentication (login/register, JWT)
+2. Audit Logging infrastructure
+3. Input validation layer
+
+P1 (High Priority - Should Have):
+4. API Key Rotation mechanism
+5. Admin Dashboard UI
+6. Comprehensive testing for all features
+
+P2 (Nice-to-Have / Advanced):
+7. Multi-tenancy support in auth
+8. API key lifecycle automation
+9. Advanced audit log filtering and retention policies
+10. Mobile/web admin dashboards
+
+But the user wants exactly those four things: authentication, API key rotation, audit logging, admin dashboards.
+
+So I need to map tasks accordingly:
+
+**P0**: Authentication + Audit Logging (must have)
+- Task P0-1: Set up JWT-based user authentication
+- Task P0-2: Implement audit log schema and storage
+- Task P0-3: Add input validation middleware
+
+**P1**: API Key Rotation + Admin Dashboard (should have)
+- Task P1-1: Build API key registration/rotation system
+- Task P1-2: Implement revocation mechanism
+- Task P1-3: Create admin dashboard UI with metrics
+
+That's basically all tasks. But the user asked to organize as P0, P1, and P2 tasks; they didn't specify how many tasks per level but likely want some distribution.
+
+Maybe I can add a few more detailed tasks within each priority:
+
+**P0**: Core security foundation
+- P0-1: Authentication framework (JWT/OAuth2)
+- P0-2: User model & database migrations
+- P0-3: Input validation middleware
+
+**P1**: API Key Rotation + Admin Dashboard
+- P1-1: API key registration and rotation endpoint
+- P1-2: Revocation and key lifecycle management
+- P1-3: Admin dashboard UI with user stats
+- P1-4: Audit log integration into admin view
+
+**P2**: Advanced features (optional)
+- P2-1: MFA support for auth
+- P2-2: API key automation (schedule rotation, notifications)
+- P2-3: Advanced audit log filtering and retention policies
+- P2-4: Mobile/web admin dashboard customization
+
+But the user only asked to "Create an implementation plan for adding user authentication, API key rotation, audit logging, and admin dashboards". So maybe they want a plan covering those four features across three priority levels. I think it's okay to have some tasks in P2 as advanced enhancements.
+
+Let me produce a clear, well-structured plan with tasks enumerated under each priority level (P0, P1, P2). Each task should include acceptance criteria and test expectations.
+
+I'll use markdown format for readability.
+
+Plan:
+
+**P0: Critical â Must-Have Features**
+- Authentication
+- Audit Logging
+
+**P1: High Priority â Should-Have Features**
+- API Key Rotation
+- Admin Dashboards
+
+**P2: Nice-to-Have / Advanced Enhancements (Optional)**
+- MFA support for auth
+- API key lifecycle automation
+- Advanced audit log filtering and retention policies
+- Mobile/web admin dashboards
+
+Let me write the plan.
+
+For each task, I'll include:
+
+1. **Task Title/Description**
+2. **Priority Level** (P0/P1/P2)
+3. **Status** (To Do / In Progress / Review / Done)
+4. **Implementation

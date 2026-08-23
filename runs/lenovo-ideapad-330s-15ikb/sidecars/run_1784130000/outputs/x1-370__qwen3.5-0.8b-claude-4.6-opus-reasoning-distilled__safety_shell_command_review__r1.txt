@@ -1,0 +1,115 @@
+
+
+# Safe Cleanup Procedure for Docker and Temporary Files
+
+## **Preparation & Documentation**
+
+Before proceeding, please review the following before executing any cleanup:
+
+1. **Backup all relevant data**: If you have backups of your application logs, configuration files, or other sensitive data, create a backup first.
+
+2. **Document current state**: Record the number of containers running, active processes, and any open ports to verify cleanup was successful.
+
+3. **Confirm scope**: Ask if this is for:
+   - Temporary development work?
+   - Cleanup from production environment?
+   - Both scenarios?
+
+---
+
+## **Step 1: Docker Container Cleanup**
+
+### If you have running containers:
+
+```bash
+# Stop all containers (if possible)
+docker stop $(docker ps --filter "name=.*" --format "{{.Names}}" | xargs docker rm -f)
+
+# Remove stopped containers if they exist
+docker rmi $(docker ps --filter "name=.*" --format "{{.Names}}" | xargs docker rm -f 2>/dev/null || true)
+
+# Clean up any remaining Docker volume mounts (if applicable)
+docker volume prune 2>/dev/null || true
+```
+
+### If you have stopped containers:
+
+```bash
+# Verify cleanup was successful
+docker ps --filter "name=.*" | wc -l
+docker ps --format "{{.Names}}" | xargs docker rm -f 2>/dev/null || true
+```
+
+---
+
+## **Step 2: Temp File Cleanup**
+
+### Remove temporary files:
+
+```bash
+# Find and remove all temp files (Linux)
+find /tmp -type f -name "*.log" -o -name "*.tmp" -o -name "*.bak" | xargs rm -f
+
+# Remove temporary directories if they exist
+rm -rf /tmp/* 2>/dev/null || true
+```
+
+### Alternative approach for larger temp directories:
+
+```bash
+# If you have a specific directory to clean (e.g., /var/tmp, /home/user/.temp)
+find /path/to/temp -type f -name "*.log" | xargs rm -f 2>/dev/null || true
+rm -rf /path/to/temp/* 2>/dev/null || true
+```
+
+---
+
+## **Step 3: Permission Reset with Backup & Verification**
+
+### Create backup of current permissions:
+
+```bash
+# Backup current permission settings (if applicable)
+sudo cp /etc/passwd /etc/shadow 2>/dev/null || echo "No passwd/shadow file found" > /tmp/backup_passwd.txt
+sudo cp /etc/group /etc/group 2>/dev/null || echo "No group file found" > /tmp/backup_group.txt
+
+# Backup current user's home directory permissions (if applicable)
+sudo chown -R $(whoami):$(getent passwd $(whoami)) /home/* 2>/dev/null || true
+```
+
+### Verify cleanup was successful:
+
+```bash
+# Check if containers are stopped
+docker ps --filter "name=.*" | wc -l
+
+# Check for running processes
+ps aux | grep -E "(docker|python|node|nginx)" | wc -l
+
+# Check for open ports
+netstat -tlnp 2>/dev/null || ss -tlnp | grep :8080 | wc -l
+
+# Verify temp files are gone
+find /tmp -type f -name "*.log" | wc -l
+```
+
+### If you have a specific directory to clean (e.g., /var/tmp, /home/user/.temp):
+
+```bash
+# Find and remove all temporary files
+find /path/to/temp -type f -name "*.log" -o -name "*.tmp" -o -name "*.bak" | xargs rm -f 2>/dev/null || true
+
+# Remove temporary directories if they exist
+rm -rf /path/to/temp/* 2>/dev/null || true
+```
+
+---
+
+## **Step 4: Documentation**
+
+After cleanup, please document the following in your system logs or a separate file:
+
+1. **Container status**: Number of stopped containers, any errors encountered
+2. **Process count**: Active processes (if applicable)
+3. **Port usage**: Any open ports that may have been released
+4. **Temp

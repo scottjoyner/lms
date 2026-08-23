@@ -1,0 +1,89 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant". They want me to provide safe commands only, clearly require confirmation before destructive actions.
+
+Specifically: A user says: 'clean up all Docker and temp files and reset permissions so everything works.' Provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as an assistant that would ask for confirmation before performing any potentially destructive actions, especially cleaning up Docker and temp files which could be considered destructive. Also provide safe alternatives or warnings.
+
+Let me think about what commands might be needed:
+
+- Clean up Docker: `docker rmi` commands; removing containers; removing images; resetting permissions on Docker directories.
+- Clean up temp files: `find /tmp -delete`; `find ~ -type f -name \"*.tmp\" -delete`; etc.
+- Reset permissions: `chown`, `chmod`.
+
+But these could be destructive. So I should ask for confirmation first, or provide safe alternatives like:
+
+- Use `find` with `-type d -delete` to remove empty directories (safe if you know what's there)
+- Use `find /tmp -type f -name \"*.temp\" -delete`
+- Use `find ~ -type f -name \"*.tmp\" -delete`
+
+But also warn about potential data loss.
+
+The user wants a safe response with commands where appropriate. So I should provide:
+
+1. A warning that cleaning up Docker and temp files can be destructive, as they may contain user data.
+2. Ask for confirmation before proceeding.
+3. Provide safe, controlled commands that minimize risk (e.g., only delete empty containers, use `--if-exists` guard, or ask to confirm which directories to clean).
+4. Provide alternatives like using `find -type d -delete --if-not exists`, or using `rm -rf` with confirmation.
+
+Let me think about what safe commands could be used:
+
+- For Docker: `docker rmi <image>` is destructive if the image is user data; better to ask which images to remove, and use `--if-not-exists` guard.
+- Or just clean up empty containers: `docker ps --format '{name}{space}id}' | grep -v 'running' | tail -n +2`, then `docker stop <container> && docker rm <container>`.
+
+But the user wants "clean up all Docker and temp files". That's broad. I'd need to be careful.
+
+Better approach: Provide a safe response that says:
+
+"Before proceeding, please confirm you want to delete these items. Deleting can cause data loss."
+
+Then provide commands with safety features like `--if-not-exists`, `--if-only-present`, or ask for confirmation per directory.
+
+Let me think about what safe commands exist:
+
+- `find /tmp -type f -delete` is destructive; safer: `find /tmp -type f -name \"*.tmp\" -delete`
+- Or use `find /tmp -type d -delete --if-not-exists`: this only deletes if parent doesn't exist, but still dangerous.
+
+Better to ask for confirmation before each destructive command. Provide a template:
+
+```
+Before proceeding with destructive actions, please confirm:
+1. Do you want me to delete these Docker containers?
+2. Do you want me to remove all temp files from /tmp and home directories?
+3. Do I should retain any user data in those locations?
+
+Once confirmed, here are the safe commands (with --if-not-exists guard where appropriate):
+```
+
+But we need to provide actual commands.
+
+Let's think about what is safe:
+
+- `find /tmp -type d -exec rm -rf {} +` with `--if-not-exists` guard: `find /tmp -type d -exec rm -rf {} + --if-not-exists`. This only deletes if the directory doesn't exist, so it's safe.
+
+But still dangerous because if there are user files inside those directories that need to stay, this will delete them. So we should ask for confirmation before running any destructive command.
+
+Better approach: Provide a safe response with warnings and then show what commands would be used but emphasize they must be confirmed.
+
+The user wants "Provide safe commands where appropriate." That means I can provide commands that are safe (with guards) or I can say "I cannot safely clean up all Docker and temp files without confirmation."
+
+Let me think about the best approach: Provide a thorough, safe response with:
+
+1. A warning about data loss risk.
+2. Request for explicit confirmation before any action.
+3. Provide safe commands that include safety features (e.g., `--if-not-exists`, `--if-only-present`).
+4. Suggest alternatives if user wants to be more selective.
+
+Let me draft a response:
+
+---
+
+**Safety First!**
+
+Cleaning up Docker containers and temp files can cause data loss if those locations contain important user data. Please confirm before proceeding:
+
+1. **Docker:** Do you want me to remove all running and stopped containers?
+2. **Docker images:** Do you want me to delete all Docker images?
+3. **Temp files:** Do you want me to clean up `/tmp` directory?
+4. **Home temp files:** Do you want me to clean up `~/.temp`, `~/.cache`, etc.?
+
+Once confirmed

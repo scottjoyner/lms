@@ -1,0 +1,15 @@
+# Root Cause  
+The error `TypeError: 'NoneType' object is not subscriptable` occurs because `payload['user']['id']` returns `None`. This typically happens when the `payload` dictionary does not contain a valid `user` key, or the nested structure breaks.
+
+# Safe Fix  
+Ensure the payload contains a valid user object before accessing its properties:
+```python
+user_id = payload.get('user', {}).get('id')  # Safely access nested keys
+```
+If the structure is uncertain, validate the presence of keys before accessing.
+
+# Regression Tests  
+1. **Test Case 1:** Valid payload with user â expected `user_id` is not None.  
+2. **Test Case 2:** Payload missing 'user' key â `payload.get('user', {})` returns empty dict, avoiding error.  
+
+Let me know if you need further assistance!

@@ -1,0 +1,89 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably with country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown. So just plain text containing the Python code.
+
+Let's design function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # If empty or not 10 nor 11 digits => error
+    if len(digits) == 0:
+        raise ValueError("No digits found")
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        # Remove country code
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, etc. Should strip them.
+- If input is already just digits but length not 10 or 11 => error.
+
+Testing block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('(123) 456-7890') == '1234567890'
+    assert normalize_phone_number('+1 (800) 123-4567') == '8001234567'
+    assert normalize_phone_number('5551234') == ValueError
+    assert normalize_phone_number('123456789012') == ValueError
+
+That's five asserts. Actually we have 5: the first two are good, third is good, fourth is good, fifth raises error (should raise ValueError), sixth also raises error; need at least five.
+
+Let me count:
+
+1. assert normalize_phone_number('123-456-7890') == '1234567890'
+2. assert normalize_phone_number('123.456.7890') == '1234567890'
+3. assert normalize_phone_number('(123) 456-7890') == '1234567890'
+4. assert normalize_phone_number('+1 (800) 123-4567') == '8001234567'
+5. assert normalize_phone_number('5551234') is ValueError
+That's five.
+
+We could also add more asserts for edge cases:
+
+assert normalize_phone_number('') is ValueError
+
+But at least 5 needed; we can have more.
+
+Make sure code uses correct syntax: raise ValueError('...'), not ValueError(...). Actually need parentheses. So:
+
+raise ValueError("No digits found") etc.
+
+Better to just use the simpler logic above.
+
+Let's write final code.
+
+We'll include docstring for clarity, but it's optional.
+
+Write as a single file with function and test block.
+
+Make sure no markdown fences.
+
+Check that we don't accidentally wrap in triple quotes or anything. Just plain text.
+
+Potential issues: The assert statements need to compare the returned value directly; for error case we can use 'is' comparison because ValueError is a subclass of Exception, but better to check isinstance:
+
+assert normalize_phone_number('5551234') == ValueError
+
+Actually comparing with == on exception raises TypeError. So should do:
+
+assert isinstance(normalize_phone_number('5551234'), ValueError)
+
+Better approach: Use try/except block.
+
+But the requirement

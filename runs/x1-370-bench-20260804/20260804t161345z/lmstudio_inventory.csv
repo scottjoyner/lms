@@ -1,0 +1,3 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+x1-370,192.168.1.241,1,http://100.64.43.123:8088/v1,1,1,lmstudio-x1-370.ornith-1.0-35b
+x1-370,192.168.1.241,1,http://100.64.43.123:8088/v1,1,2,lmstudio-x1-370.refinedtoolcallv5-3b

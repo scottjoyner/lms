@@ -1,0 +1,31 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want a JSON object with exactly these keys:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys. Must be valid JSON.
+
+We need to think about what the "task" is. The user hasn't specified any particular task; they just want me to produce some content with these fields. Usually, in such cases we can provide generic helpful information or something like that.
+
+The key constraints:
+
+- Output must be strict JSON only.
+- No markdown formatting (so no backticks, no code fences).
+- Must not include extra keys beyond the four specified.
+
+Thus I need to output a single line of JSON text (or multi-line but still valid JSON). The user wants "Return a JSON object with keys: task_fit, confidence, limitations, recommended_max_context_tokens." So we must produce something like:
+
+{
+  "task_fit": [...],
+  "confidence": X,
+  "limitations": [...],
+  "recommended_max_context_tokens": N
+}
+
+We need to decide on appropriate values.
+
+"task_fit" is

@@ -1,0 +1,4 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+x1-370,192.168.1.241,1,http://127.0.0.1:1234/v1,1,1,ornith-1.0-35b-mtp-apex
+x1-370,192.168.1.241,1,http://127.0.0.1:1234/v1,1,2,refinedtoolcallv5-3b@f16
+x1-370,192.168.1.241,1,http://127.0.0.1:1234/v1,1,3,liquid/lfm2-24b-a2b

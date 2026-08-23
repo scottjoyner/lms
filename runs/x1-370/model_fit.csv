@@ -1,0 +1,37 @@
+model_key,estimated_params_b,estimated_quant,estimated_bits_per_param,estimated_model_memory_gib,system_ram_gib,available_ram_gib,largest_nvidia_vram_gib,fit_grade,fit_notes
+google/gemma-4-12b-qat,12.0,unknown_assume_q4,4.5,7.54,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+hermes-qwen3.5-0.8b-sft-v7-fresh,0.8,unknown_assume_q4,4.5,0.5,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+laguna-s-2.1,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+laguna-xs-2.1,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+lfm2.5-1.2b-instruct,1.2,unknown_assume_q4,4.5,0.75,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+lfm2.5-8b-a1b,8.0,unknown_assume_q4,4.5,5.03,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+liquid/lfm2-24b-a2b,24.0,unknown_assume_q4,4.5,16.21,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+lmstudio-community/laguna-xs-2.1,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+minicpm5-1b-agentic-tooluse,1.0,unknown_assume_q4,4.5,0.63,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+mradermacher/vibethinker-3b-hermes,3.0,unknown_assume_q4,4.5,1.89,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+openai/gpt-oss-20b,20.0,unknown_assume_q4,4.5,13.09,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+orinth-1.0-9b,9.0,unknown_assume_q4,4.5,5.66,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+ornith-1.0-35b-mtp-apex,35.0,unknown_assume_q4,4.5,25.66,91.94,23.67,,borderline,"Estimated model may fit, but expect pressure from KV cache, context length, and other processes."
+ornith-1.0-35b-rocmfpx,35.0,unknown_assume_q4,4.5,25.66,91.94,23.67,,borderline,"Estimated model may fit, but expect pressure from KV cache, context length, and other processes."
+poolside-laguna-s-2.1-dflash@?,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+poolside-laguna-s-2.1-dflash@q4_k_m,,Q4_K_M,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+poolside-laguna-s-2.1-dflash@q8_0,,Q8_0,8.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+poolside/laguna-xs-2.1,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+prism-ml/bonsai-27b,27.0,unknown_assume_q4,4.5,18.66,91.94,23.67,,borderline,"Estimated model may fit, but expect pressure from KV cache, context length, and other processes."
+qwen3.5-0.8b,0.8,unknown_assume_q4,4.5,0.5,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,0.8,unknown_assume_q4,4.5,0.5,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-14b-a3b-claude-4.6-opus-reasoning-distilled-reap,14.0,unknown_assume_q4,4.5,8.8,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-9b-claude-4.6-highiq-instruct-heretic-uncensored,9.0,unknown_assume_q4,4.5,5.66,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.6-14b-a3b-vibeforged-v2,14.0,unknown_assume_q4,4.5,8.8,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex,35.0,unknown_assume_q4,4.5,25.66,91.94,23.67,,borderline,"Estimated model may fit, but expect pressure from KV cache, context length, and other processes."
+qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp,35.0,unknown_assume_q4,4.5,25.66,91.94,23.67,,borderline,"Estimated model may fit, but expect pressure from KV cache, context length, and other processes."
+refinedneuro/vibethinker-3b-hermes,3.0,unknown_assume_q4,4.5,1.89,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+refinedtoolcallv5-3b,3.0,unknown_assume_q4,4.5,1.89,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+refinedtoolcallv5-3b@f16,,F16,16.0,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+refinedtoolcallv5-3b@q6_k,,Q6_K,6.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+refinedtoolcallv5-3b@q8_0,,Q8_0,8.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+ternary-bonsai-27b@?,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+ternary-bonsai-27b@q4_1,,Q4_1,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+text-embedding-nomic-embed-text-v1.5,,unknown_assume_q4,4.5,,91.94,23.67,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+vibethinker-3b,3.0,unknown_assume_q4,4.5,1.89,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+vibethinker-3b-i1,3.0,unknown_assume_q4,4.5,1.89,91.94,23.67,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.

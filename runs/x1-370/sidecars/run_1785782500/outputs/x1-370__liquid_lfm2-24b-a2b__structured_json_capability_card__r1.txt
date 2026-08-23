@@ -1,0 +1,1 @@
+{"task_fit": ["Summarize the main points", "Identify key arguments"], "confidence": 0.95, "limitations": ["May misinterpret nuanced or ambiguous language.", "Requires careful handling of context to maintain accuracy.", "Responses depend on training data and may reflect biases present in the data."], "recommended_max_context_tokens": 1024}

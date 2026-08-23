@@ -1,0 +1,4 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1785900100,x1-370,192.168.1.241,http://127.0.0.1:8088/v1,lmstudio-joyner.vibethinker-3b-hermes,0.193,,,0.00,0.00,0.0000,30
+1785900100,x1-370,192.168.1.241,http://127.0.0.1:8088/v1,lmstudio-deathstar.qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,0.199,,,0.00,0.00,0.0000,30
+1785900100,x1-370,192.168.1.241,http://127.0.0.1:8088/v1,lmstudio-beelink-ryzen-7-mini-pc.refinedtoolcallv5-3b,0.196,,,0.00,0.00,0.0000,30

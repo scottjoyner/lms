@@ -1,0 +1,108 @@
+<think>The user wants me to create an implementation plan for adding several security features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning/assessment), P1 (doable now), and P2 (complexity/longer term) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to produce a structured plan with these categories. I should not ask clarifying questions unless absolutely blocked, but the user hasn't asked for clarification; they want me to create an implementation plan based on typical FastAPI architecture patterns.
+
+Let's think about what each category means:
+
+- P0: Planning/Assessment tasks - understanding current state, dependencies, risk assessment
+- P1: Low-hanging fruit / immediate deliverables - quick wins that can be done soon
+- P2: Complex tasks, longer timeline - core features and advanced capabilities
+
+The four topics are user authentication, API key rotation, audit logging, admin dashboards. I need to organize them across the three priority levels.
+
+Let me think about typical implementation order:
+
+1. **User Authentication (P0)**: Need to assess current app state; check if any existing auth exists; evaluate dependencies like database schema for users; risk is moderate-high.
+2. **API Key Rotation (P1)**: This could be done after authentication is stable, but it's also a core security feature that might need early planning. However, API key rotation often depends on having an API server to rotate keys and track usage â this can be integrated with auth or as separate.
+3. **Audit Logging (P2)**: Needs to integrate with existing logging infrastructure; requires writing custom middleware or endpoints for audit events; higher complexity.
+4. **Admin Dashboards (P2)**: Requires building a frontend or backend UI; needs data collection from audit logs and auth events; high complexity.
+
+Alternatively, I could group them differently:
+
+- P0: Assessment of current infrastructure, dependencies, risk assessment
+- P1: User Authentication (core), API Key Rotation (if not too complex)
+- P2: Audit Logging + Admin Dashboards
+
+But the user wants each task to include acceptance criteria and test expectations. So we need tasks at different priority levels.
+
+Let me design a comprehensive plan:
+
+**P0 - Planning & Assessment**
+- P0-1: Inventory current FastAPI service â existing modules, database schema, dependencies
+- P0-2: Assess existing auth patterns; identify gaps
+- P0-3: Evaluate third-party auth providers (OAuth2, JWT) selection criteria
+- P0-4: Audit logging infrastructure assessment
+- P0-5: API key management current state
+
+**P1 - Core Authentication & API Key Rotation**
+- P1-1: Implement user authentication layer â password hashing, JWT token generation, session handling
+- P1-2: Integrate API key rotation mechanism with request/response headers
+- P0 already covered assessment; these are doable soon.
+
+**P2 - Advanced Features (Audit Logging & Admin Dashboards)**
+- P2-1: Build comprehensive audit logging system â structured logs, retention policies, query capabilities
+- P2-2: Implement admin dashboard UI â data visualization of auth events, API key usage, audit log summaries
+
+But I need to ensure each task includes acceptance criteria and test expectations.
+
+Let me flesh out each:
+
+**P0-1 (Inventory Current Service)**:
+- Acceptance Criteria: Complete list of modules, endpoints, database tables, dependencies, existing auth methods
+- Test Expectations: Unit tests for inventory script; integration tests verifying all components are identified
+
+**P0-2 (Assess Existing Auth Patterns)**:
+- Acceptance Criteria: No existing auth found or identified as incompatible; security gaps identified; compliance requirements met
+- Test Expectations: Security audit report; compatibility matrix of current vs new auth
+
+**P0-3 (Select Auth Provider)**:
+- Acceptance Criteria: Chosen provider meets compliance (SOC2, GDPR); supports JWT; compatible with existing infrastructure
+- Test Expectations: Integration test verifying token generation, validation, refresh flow; compliance verification
+
+**P0-4 (Audit Logging Infrastructure)**:
+- Acceptance Criteria: Existing logging framework identified; log format defined; retention policy specified
+- Test Expectations: Log formatting tests; retention policy adherence tests; audit query testing
+
+**P0-5 (API Key Management State)**:
+- Acceptance Criteria: No rotation in place; key storage mechanism identified; key lifecycle policies defined
+- Test Expectations: Key existence checks; rotation flow tests; key revocation tests
+
+**P1-1 (User Authentication Layer)**:
+- Acceptance Criteria: Users can register, login, reset passwords, view profile; tokens are valid and expire correctly; session management works
+- Test Expectations: Unit tests for registration flow; integration tests for login flow; security tests (brute force protection); edge case tests
+
+**P1-2 (API Key Rotation)**:
+- Acceptance Criteria: API keys can be rotated via admin endpoint; rotation is atomic (old key invalidated, new valid); rotation logs are recorded
+- Test Expectations: Rotation flow test; old key validation failure; new key works; rotation logging captured; concurrency handling tests
+
+**P2-1 (Audit Logging System)**:
+- Acceptance Criteria: All auth events logged (login, logout, password changes); API key usage logged; all actions recorded with timestamps and user IDs
+- Test Expectations: Event capture tests; log query testing; audit report generation; data retention verification; false positive/negative detection
+
+**P2-2 (Admin Dashboard)**:
+- Acceptance Criteria: Dashboard displays auth activity metrics, API key usage stats, audit log summaries; filters by time period; export to CSV/Excel
+- Test Expectations: UI rendering tests; filter functionality tests; metric calculation tests; export functionality tests; user role-based access control
+
+I should also consider adding a P2-3 for integration testing across all features.
+
+Let me structure this clearly:
+
+```
+# Implementation Plan: Security Features for FastAPI Service
+
+## P0 â Planning & Assessment (Low Effort, High Impact)
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+| P0-1 | Inventory Current Service | ... | ... | ... |
+...
+
+## P1 â Core Implementation (Medium Effort)
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+| P1-1 | User Authentication Layer | ... | ... | ... |
+...
+| P1-2 | API Key Rotation | ... | ... | ... |
+
+## P2

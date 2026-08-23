@@ -1,0 +1,13 @@
+<think>
+The context contains many repeated "Project note" statements about a benchmark runner, and one line that says:
+
+"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+This clearly answers the question. Let me extract the relevant information.
+
+Control code: ORION-7429
+Proof sentence: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+I need to return JSON with keys "control_code" and "evidence_quote". The evidence_quote should be the exact quote from the context.
+</think>
+{"control_code": "ORION-7429", "evidence_quote": "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."}

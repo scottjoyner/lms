@@ -1,0 +1,7 @@
+
+
+# Root Cause
+The error occurs because Python evaluates dictionary access from left to right. When executing `payload['user']['id']`, it first attempts to retrieve `payload['user']`. If this key is missing, empty, or explicitly set to `None` in `payload`, the result of that subscript operation is `None`. Attempting to then subscript that `None` object with `'id'` raises the `TypeError: 'NoneType' object is not subscriptable`.
+
+# Safe Fix
+Use a conditional check or dictionary methods (like `.get()`) to safely access nested keys before attempting to retrieve

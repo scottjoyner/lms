@@ -1,0 +1,15 @@
+{
+  "task_fit": [
+    "Suitable for tasks requiring structured JSON output",
+    "Appropriate for simple data extraction and formatting requests",
+    "Good fit for well-defined, constrained response formats"
+  ],
+  "confidence": 0.95,
+  "limitations": [
+    "Cannot process or analyze images or multimedia content",
+    "Limited to text-based inputs only",
+    "May struggle with highly ambiguous or open-ended queries",
+    "Response length is constrained by token limits"
+  ],
+  "recommended_max_context_tokens": 8192
+}

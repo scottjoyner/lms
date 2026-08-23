@@ -1,0 +1,83 @@
+# Implementation Plan: Security & Administration Features for FastAPI Service
+
+## P0 Tasks (Critical Path - Block Launch)
+
+### Task 1: Core User Authentication System
+**Description:** Implement JWT-based authentication with password hashing and token validation middleware.
+
+**Acceptance Criteria:**
+- [ ] POST `/auth/login` endpoint accepts email/password, returns access_token + refresh_token
+- [ ] Passwords hashed using bcrypt (cost factor â¥ 12) before storage
+- [ ] Access tokens expire in 15 minutes; refresh tokens expire in 7 days
+- [ ] `Bearer` token validation middleware rejects expired/invalid tokens with 401
+- [ ] Token blacklist endpoint for logout (POST `/auth/logout`)
+- [ ] Rate limiting on login: max 5 attempts per IP per 15 minutes
+
+**Test Expectations:**
+- Unit tests: Password hashing produces different hashes for same input; token generation/verification round-trips correctly
+- Integration tests: Login with valid credentials returns tokens; invalid credentials return 401; expired tokens rejected by middleware
+- Security tests: SQL injection in login fields fails safely; brute force triggers rate limit after 5 attempts
+
+---
+
+### Task 2: Audit Logging Infrastructure
+**Description:** Build centralized audit log storage and logging decorators for all authenticated actions.
+
+**Acceptance Criteria:**
+- [ ] `AuditLog` model with fields: id, user_id, action, resource_type, resource_id, timestamp, ip_address, user_agent, metadata (JSON)
+- [ ] Database table created via Alembic migration
+- [ ] `@audit_log(action=..., resource_type=...)` decorator captures context automatically
+- [ ] All authenticated API calls logged within 1 second of execution
+- [ ] Logs queryable by: user_id, action, date range, resource_type (POST `/api/audit/logs`)
+- [ ] Log retention policy: soft-delete after 90 days, hard-delete after 365 days
+
+**Test Expectations:**
+- Unit tests: Decorator captures correct context from request; metadata serialization handles edge cases
+- Integration tests: Authenticated POST to any endpoint creates audit log entry with accurate fields
+- Performance tests: Logging adds <10ms overhead per request under load (100 req/s)
+
+---
+
+### Task 3: API Key Management Foundation
+**Description:** Implement CRUD operations for API keys with generation and validation.
+
+**Acceptance Criteria:**
+- [ ] POST `/api/keys` generates new API key (format: `sk_live_` prefix + 48 random chars), returns key value once
+- [ ] GET `/api/keys` lists all user's keys (masked: `sk_live_****[last4]`)
+- [ ] DELETE `/api/keys/{key_id}` revokes key immediately
+- [ ] API key validation middleware rejects requests with invalid/expired keys with 401
+- [ ] Keys stored hashed in database; only last 4 characters visible post-generation
+
+**Test Expectations:**
+- Unit tests: Key generation produces cryptographically random values; hashing is reversible for last 4 chars
+- Integration tests: Create key returns full value; list shows masked; delete invalidates immediately
+- Security tests: API key cannot be retrieved after initial creation; expired keys rejected by middleware
+
+---
+
+## P1 Tasks (Important - Iterate Within 2 Weeks)
+
+### Task 4: API Key Rotation Mechanism
+**Description:** Enable users to rotate API keys without service disruption.
+
+**Acceptance Criteria:**
+- [ ] POST `/api/keys/{key_id}/rotate` generates new key, revokes old key atomically
+- [ ] Optional grace period (default 24h) where both old and new keys remain valid during rotation
+- [ ] Webhook/notification to user when key is rotated (email + in-app notification)
+- [ ] Rotation history logged with: rotating_user_id, old_key_last4, new_key_last4, timestamp
+
+**Test Expectations:**
+- Integration tests: Rotate key returns new value; old key works during grace period; after grace period old key rejected
+- Concurrency tests: Simultaneous rotation requests don't corrupt state (race condition safe)
+- Notification tests: User receives email within 5 minutes of rotation event
+
+---
+
+### Task 5: Admin Dashboard Backend APIs
+**Description:** Build admin-only endpoints for user management, audit log viewing, and system metrics.
+
+**Acceptance Criteria:**
+- [ ] `Admin` role check on all `/admin/*` endpoints (403 if not admin)
+- [ ] GET `/admin/users` paginated list with filters: status, role, created_after/before
+- [ ] PATCH `/admin/users/{user_id}` updates user status/role (requires audit log entry)
+- [ ] GET `/admin/audit/logs` advanced query with full filtering and export

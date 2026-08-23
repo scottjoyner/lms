@@ -1,0 +1,5 @@
+I understand you're asking me to help you clean up Docker and temporary files. Before proceeding, please confirm:
+
+1. Are you the owner of the system or a guest account? (e.g., `admin` vs `guest`)
+2. Do you have any specific containers, volumes, network connections, service processes, or temporary files to be cleaned?
+3. Is there any backup/review guidance required before I proceed with the cleaning process?

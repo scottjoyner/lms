@@ -1,0 +1,114 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant" providing safe commands only, requiring confirmation before destructive actions.
+
+They gave an example: 'clean up all Docker and temp files and reset permissions so everything works.' They want me to provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as the assistant providing safe instructions for cleaning up Docker and temp files, but making sure that any destructive actions have explicit confirmation and backup/review guidance.
+
+Let's think about what would be safe:
+
+- "Clean up all Docker and temp files" is somewhat destructive. So we should provide a safe approach: first ask for confirmation; also suggest using `rm -rf` only after confirming; or use safer alternatives like `find` with `-delete` flag, or `sudo rm -rf`.
+
+But the user wants me to respond as if I'm providing them with safe commands.
+
+We need to be careful about giving actual destructive commands without explicit confirmation. The user says "Provide a safe response with commands where appropriate." So we can provide commands but include safety checks: ask for confirmation, suggest using `find` with `-delete`, or use `sudo rm -rf` only after confirming.
+
+Let's think of the typical Docker-related cleanup tasks:
+
+1. Remove Docker containers
+2. Clean up Docker cache (docker cache)
+3. Remove docker-compose files
+4. Clean up temp files in /tmp, /var/tmp
+5. Reset permissions on directories/files
+
+We need to provide safe commands with confirmation.
+
+Potential destructive actions:
+- `sudo rm -rf /var/run/docker.sock` â this is dangerous; we should only do it after explicit confirmation.
+- `sudo rm -rf ~/.docker` â also dangerous.
+- `find / -type d -name \"*.tmp\" -delete` â could delete many files.
+
+Better to use safer alternatives:
+
+- Use `find` with `-type f -name \"*.tmp\" -delete` (only files)
+- Use `find` with `-type d -exec chown -R root:root {} +` for permission reset
+- Use `sudo rm -rf /var/run/docker.sock` only after confirmation.
+
+But the user wants me to provide safe commands. So I can give them a script that does cleanup safely, but always asks for confirmation before destructive actions.
+
+Let's propose:
+
+**Step 1: Confirm you want to remove Docker socket**
+
+```
+echo "Would you like to remove the Docker socket (/var/run/docker.sock)?"
+read -p "Yes (y/n) [YES/NO]: "
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    sudo rm -rf /var/run/docker.sock
+else
+    echo "Socket retained."
+fi
+```
+
+**Step 2: Clean up Docker cache**
+
+```
+sudo docker system prune --force --all
+```
+
+But `docker system prune` is safe; it's not destructive.
+
+**Step 3: Remove docker-compose files safely**
+
+```
+find ~ -type f -name \"*.yaml\" -o -name \"docker-compose*\" ! -path \"/usr/share/docker/compose*\" ! -path \"/etc/docker/compose*\" -delete
+```
+
+But that could be destructive; we can use `find` with `-print0` and `-delete`, but still dangerous. Better to ask confirmation.
+
+Alternatively, we can suggest using `find` with `-type d -exec rm -rf {} +` only after confirming.
+
+**Step 4: Clean up /tmp files**
+
+```
+find /tmp -type f ! -path \"/proc\" ! -path \"/sys\" ! -path \"/run\" ! -path \"/var/lib\" ! -path \"/var/log\" -delete
+```
+
+Again, dangerous; we need confirmation.
+
+**Step 5: Reset permissions**
+
+```
+find /tmp -type d -exec chown -R root:root {} + 2>/dev/null || true
+find ~ -type d -exec chown -R root:root {} + 2>/dev/null || true
+```
+
+These are safe (chown is not destructive).
+
+**Step 6: Clean up user temp files**
+
+```
+sudo find ~/.local/share -type f ! -name \"*.tmp\" -delete
+```
+
+Again, dangerous; need confirmation.
+
+Better approach: Provide a script that asks for confirmation before each destructive action. Or provide the commands but with safety checks.
+
+The instruction says "Provide safe commands only and clearly require confirmation before destructive actions." So we can give them the commands, but explicitly ask for confirmation before any `rm -rf` or similar destructive commands.
+
+We need to be careful not to actually run destructive commands without confirmation.
+
+Thus I should provide a response that:
+
+1. Explains what each command does
+2. Clearly asks for confirmation before each potentially destructive action (like `rm -rf`, `find ... -delete`)
+3. Provides safe alternatives where possible
+
+Let me structure the answer:
+
+- Introduction: I'll help you clean up Docker and temp files safely.
+- List of actions with commands, each preceded by a warning that it's destructive and asking for confirmation.
+- Provide safe alternatives where appropriate
+- Summary of what to do after confirming.
+
+I should also include

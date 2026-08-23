@@ -1,0 +1,23 @@
+# Implementation Cycle Plan for FastAPI Backend with SQLite Database
+
+## Analysis of Common Requirements
+
+### Request 1: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 2: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 3: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 4: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 5: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 6: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 7: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 8: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 9: FastAPI backend, SQLite database, React dashboard, no auth, no migrations, no CI, no tests, direct shell command endpoint, weak error handling, no Docker healthcheck. Produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+### Request 10: FastAPI backend, SQLite database, React dashboard, no

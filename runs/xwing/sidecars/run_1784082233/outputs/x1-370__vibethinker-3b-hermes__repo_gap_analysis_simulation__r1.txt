@@ -1,0 +1,126 @@
+<think>The user wants me to act as a codebase review agent reviewing a repository summary. The repository is:
+
+- FastAPI backend
+- SQLite database
+- React dashboard
+- No auth
+- No migrations
+- No CI
+- No tests
+- Direct shell command endpoint
+- Weak error handling
+- No Docker healthcheck
+
+I need to produce a concise implementation cycle plan with P0, P1.1, P1.2, and P2 items. Include security issues, logic gaps, and test deliverables.
+
+So I should create a structured plan that addresses these issues in order of priority: P0 is critical immediate tasks; P1.1 and P1.2 are high priority; P2 is medium/long term.
+
+I need to cover:
+
+- Security issues (SQL injection, XSS, etc.)
+- Logic gaps (auth missing, migrations, CI)
+- Test deliverables
+
+Let me think about what items would be appropriate for each priority level.
+
+First, let's list the major issues:
+
+1. **No authentication** - security critical; need to add auth system
+2. **SQLite database without migrations** - risk of data corruption and schema changes; needs migrations
+3. **No CI/CD pipeline** - development workflow; important but not immediate security risk
+4. **No tests** - quality; critical for reliability
+5. **Direct shell command endpoint** - security vulnerability (execute arbitrary commands)
+6. **Weak error handling** - security and user experience issues
+7. **No Docker healthcheck** - deployment stability
+
+Now, I need to map these into a cycle plan.
+
+P0: Immediate high-impact items that must be fixed quickly:
+
+- P0.1: Add authentication layer (JWT/OAuth) with proper validation; secure session management.
+- P0.2: Implement database migrations using Alembic; ensure schema versioning and data integrity.
+- P0.3: Replace direct shell command endpoint with safe execution (e.g., subprocess with sandbox, or use a dedicated API service); address security risk.
+
+P1.1: High priority items that need attention soon:
+
+- P1.1.1: Implement input validation and sanitization for all endpoints; prevent SQL injection and XSS.
+- P1.1.2: Add comprehensive error handling with structured logging; return consistent error format; improve user experience.
+- P1.1.3: Set up test framework (pytest) and run tests on PR; ensure test coverage >80%.
+
+P1.2: Medium priority items:
+
+- P1.2.1: Implement CI/CD pipeline (GitHub Actions); automated testing, linting, building.
+- P1.2.2: Add Docker setup with proper image management; include base images, dependencies, and multi-stage builds.
+- P1.2.3: Add Docker healthcheck for container stability.
+
+P2 items:
+
+- P2.1: Implement Docker Compose for local development; easier dev environment.
+- P2.2: Add documentation (README, API docs with Swagger UI) for the frontend and backend.
+- P2.3: Add monitoring and logging infrastructure (Prometheus/Grafana or similar).
+- P2.4: Security audit and penetration testing plan.
+
+But I need to be concise; maybe combine some items.
+
+Let me think about a more refined approach:
+
+**P0**: Critical security and stability issues
+
+1. **P0.1 - Authentication** â Add JWT-based auth, password hashing (bcrypt), session management.
+2. **P0.2 - Shell Command Endpoint** â Replace with safe execution; use subprocess with sandboxing or a dedicated service; remove direct shell access.
+
+**P1.1**: Security and reliability
+
+3. **P1.1.1 - Input Validation & Sanitization** â Use Pydantic models, parameterized queries; prevent SQL injection.
+4. **P1.1.2 - Error Handling** â Standardize error responses (JSON), use structured logging; add rate limiting.
+
+**P1.2**: Development workflow
+
+5. **P1.2.1 - CI/CD Pipeline** â GitHub Actions: lint, test, build, push; automated deployment to staging.
+6. **P1.2.2 - Docker Setup & Healthcheck** â Create docker-compose.yml with healthcheck; base images, dependencies.
+
+**P2**: Long-term quality and operations
+
+7. **P2.1 - Testing Infrastructure** â Add pytest, test fixtures, coverage reports; unit + integration tests.
+8. **P2.2 - Documentation** â API docs (Swagger), README, onboarding docs.
+9. **P2.3 - DevOps** â Set up GitLab CI/CD or similar; container registry; network policies.
+
+But the user asked for P0, P1.1, P1.2, and P2 items. So I need to structure it as:
+
+- P0: (list)
+- P1.1: (list)
+- P1.2: (list)
+- P2: (list)
+
+Each should have concise description.
+
+Also include "security issues", "logic gaps", "test deliverables" in the plan.
+
+Let me produce a clear, concise implementation cycle plan with these sections.
+
+I'll use bullet points and numbering for clarity.
+</think>
+## Implementation Cycle Plan â Codebase Review
+
+| Priority | Item | Description |
+|----------|------|-------------|
+| **P0** (Critical) | P0.1 â **Authentication layer** | Add JWT/OAuth2, bcrypt password hashing, session management; address the *noâauth* gap. |
+| | P0.2 â **Shell command endpoint** | Replace `shell` endpoint with sandboxed `subprocess` or a dedicated service; eliminate arbitraryâcommand execution risk. |
+| **P1.1** (High) | P1.1.1 â **Input validation & sanitization** | Pydantic models + parameterized queries â prevent SQL injection and XSS; close the *weak error handling* logic gap. |
+| | P1.1.2 â **Standardised error responses** | Consistent JSON error format, structured logging, rateâlimiting; improve security & UX. |
+| **P1.2** (Medium) | P1.2.1 â **CI/CD pipeline** | GitHub Actions: lint â test â build â push; automate integration on every PR. |
+| | P1.2.2 â **Docker setup + healthcheck** | `docker-compose.yml` with base images, dependencies, `healthcheck` checks; resolve *no Docker healthcheck*. |
+| **P2** (Longâterm) | P2.1 â **Testing infrastructure** | pytest + test fixtures â >80% code coverage; add unit & integration tests. |
+| | P2.2 â **Documentation** | Swagger UI / ReDoc for API, README with setup instructions, onboarding guide. |
+| | P2.3 â **DevOps ops** | Container registry, network policies, automated rollâbacks; complete the deployment pipeline. |
+
+---
+
+### Security Issues Identified & Addressed
+
+| Issue | Severity | Fix Applied |
+|-------|----------|-------------|
+| **No authentication** â unauthorized access | **Critical (P0)** | JWT + bcrypt auth layer |
+| **Direct shell command endpoint** â arbitrary code execution | **Critical (P0)** | Sandboxed `subprocess` / dedicated service |
+| **SQLite without migrations** â schema drift, data loss | **High (P1.1)** | Alembic migrations; versionâcontrolled schemas |
+| **Weak error handling** â unstructured errors, info leakage | **High (P1.1

@@ -1,0 +1,21 @@
+model_key,estimated_params_b,estimated_quant,estimated_bits_per_param,estimated_model_memory_gib,system_ram_gib,available_ram_gib,largest_nvidia_vram_gib,fit_grade,fit_notes
+gemma-4-e4b-uncensored-hauhaucs-aggressive,,unknown_assume_q4,4.5,,91.94,76.64,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+google/gemma-4-12b-qat,12.0,unknown_assume_q4,4.5,7.54,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+lfm2-1.2b-tool,1.2,unknown_assume_q4,4.5,0.75,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+lfm2.5-8b-a1b,8.0,unknown_assume_q4,4.5,5.03,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch,8.0,unknown_assume_q4,4.5,5.03,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+openai/gpt-oss-20b,20.0,unknown_assume_q4,4.5,13.09,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+ornith-1.0-35b,35.0,unknown_assume_q4,4.5,25.66,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+ornith-1.0-9b,9.0,unknown_assume_q4,4.5,5.66,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,0.8,unknown_assume_q4,4.5,0.5,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-4b-claude-4.6-opus-reasoning-distilled-v2,4.0,unknown_assume_q4,4.5,2.51,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-4b-neo-heretic-i1,4.0,unknown_assume_q4,4.5,2.51,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-4b-uncensored-hauhaucs-aggressive,4.0,unknown_assume_q4,4.5,2.51,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-9b-neo,9.0,unknown_assume_q4,4.5,5.66,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-9b-neo-heretic-i1,9.0,unknown_assume_q4,4.5,5.66,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.6-12b-iq-ultra-heretic-uncensored-thinking-v2-hightop,12.0,unknown_assume_q4,4.5,7.54,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex,35.0,unknown_assume_q4,4.5,25.66,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+refinedtoolcallv5-3b,3.0,unknown_assume_q4,4.5,1.89,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+text-embedding-nomic-embed-text-v1.5,,unknown_assume_q4,4.5,,91.94,76.64,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+vibethinker-3b-hermes,3.0,unknown_assume_q4,4.5,1.89,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+vibethinker-3b-i1,3.0,unknown_assume_q4,4.5,1.89,91.94,76.64,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.

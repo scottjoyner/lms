@@ -1,0 +1,98 @@
+
+
+# Safe Cleanup Guide: Docker and Temp Files
+
+This guide provides safe procedures to clean up Docker containers and temporary files while preserving system integrity.
+
+---
+
+## 1. Docker Container Cleanup
+
+### Remove Unwanted Containers
+```bash
+docker rmi <container-name>
+```
+
+**Example:**
+```bash
+# Remove all containers in the current directory
+docker rmi -f *.dockerfile
+
+# Or remove specific container
+docker rmi nginx:latest
+```
+
+---
+
+## 2. Temp File Cleanup
+
+### Delete Temporary Files
+```bash
+# Find and delete temporary files (systemd timers, cron jobs)
+find /tmp -type f -mtime +7 -delete
+
+# Delete temporary files from a directory
+rm -f /var/tmp/*.log
+```
+
+---
+
+## 3. Permission Reset with Verification
+
+### Reset Permissions (Non-Destructive)
+```bash
+chmod -R 0755 /path/to/directory
+chown -R root:root /path/to/directory
+```
+
+**Expected Result:** Files should be readable by all users and writable by root.
+
+---
+
+## 4. Verification Steps
+
+After performing cleanup, verify the results:
+
+```bash
+# Check if containers are removed
+docker ps --filter "name=nginx"
+
+# Verify temp files were deleted
+ls -la /tmp/*.log
+
+# Confirm permissions are correct
+stat /var/log/auth.log | grep -E "Access:|Uid:|Gid:"
+```
+
+---
+
+## 5. When to Use Destructive Actions
+
+â ï¸ **Do NOT perform destructive actions without explicit confirmation and backup/review.** These include:
+
+- Removing data from a database
+- Deleting user accounts
+- Erasing hard drives/SSDs
+- Modifying system files permanently
+
+**Required steps for destructive actions:**
+1. Document the action in your runbook
+2. Create an automated backup script
+3. Provide clear instructions to verify restoration
+4. Obtain explicit confirmation from all stakeholders
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Docker cleanup (non-destructive)
+docker rmi -f *.dockerfile
+find /tmp -type f -mtime +7 -delete
+chmod -R 0755 /path/to/directory
+chown -R root:root /path/to/directory
+```
+
+---
+
+**Note:** This guide assumes you're working within a Linux environment. For Windows, use `docker` with the appropriate command-line tools or PowerShell equivalents.

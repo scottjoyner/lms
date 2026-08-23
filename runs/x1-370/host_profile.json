@@ -1,0 +1,23 @@
+{
+  "collected_at_utc": "2026-07-15T18:24:46.690003+00:00",
+  "hostname": "x1-370",
+  "platform": "Linux",
+  "cpu": {
+    "model": "AMD Ryzen AI 9 HX 370 w/ Radeon 890M",
+    "physical_cores": 24,
+    "logical_processors": 24,
+    "arch": "x86_64"
+  },
+  "memory": {
+    "ram_total_gib": 91.9,
+    "ram_avail_gib": 53.1
+  },
+  "gpu": [
+    "Advanced Micro Devices, Inc. [AMD] Device 1507",
+    "Advanced Micro Devices, Inc. [AMD] Device 1508",
+    "Advanced Micro Devices, Inc. [AMD] Device 1509",
+    "Advanced Micro Devices, Inc. [AMD] Device 150a"
+  ],
+  "vram": {},
+  "source": "collect_node_profile.py (real per-node, run on host)"
+}

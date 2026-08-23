@@ -1,0 +1,1 @@
+I understand you're looking to clean up Docker and temporary files, as well as reset permissions. Please confirm if you'd like me to proceed with these actions. I recommend backing up any important data before making changes to ensure safety.

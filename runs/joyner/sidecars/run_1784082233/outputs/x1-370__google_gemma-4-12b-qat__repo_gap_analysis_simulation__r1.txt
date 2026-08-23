@@ -1,0 +1,35 @@
+### Codebase Review Summary & Risk Assessment
+
+**Critical Risks Identified:**
+*   **Security:** The "direct shell command endpoint" is a **Critical Remote Code Execution (RCE)** vulnerability. It allows any user to execute arbitrary commands on the host OS.
+*   **Security:** Lack of authentication means the entire dashboard and backend are exposed to the public internet.
+*   **Reliability:** Lack of migrations and tests means the database schema is brittle and changes will cause production downtime.
+*   **Stability:** Weak error handling will lead to unhandled 500 errors and potential information leakage (stack traces) to the frontend.
+
+---
+
+### Implementation Cycle Plan
+
+#### **P0: Critical Security & Infrastructure (Blockers)**
+*   **Security - RCE Mitigation:** Immediately remove the shell command endpoint or replace it with a strictly whitelisted, parameterized execution logic (if absolutely necessary).
+*   **Security - Auth Layer:** Implement JWT-based authentication or Session cookies. Protect all FastAPI routes with dependency injection for `current_user`.
+*   **Database - Migrations:** Integrate **Alembic** with SQLAlchemy/SQLModel. Establish a versioned schema to prevent data loss during deployment.
+*   **Logic - Input Validation:** Implement strict **Pydantic** models for all request bodies to prevent injection and malformed data.
+
+#### **P1.1: Core Stability & Reliability**
+*   **Error Handling:** Implement a global FastAPI exception handler to catch all `500` errors and return standardized JSON responses (no stack traces in production).
+*   **Testing - Backend:** Establish a **Pytest** suite covering core business logic and API endpoints (using `TestClient`).
+*   **Testing - Frontend:** Implement basic **Jest/React Testing Library** coverage for critical dashboard components (e.g., data tables, forms).
+*   **Database - Connection Pooling:** Ensure SQLite is handled correctly for concurrent requests (e.g., using `check_same_thread=False` or a proper connection pool).
+
+#### **P1.2: DevOps & Deployment Readiness**
+*   **CI/CD Pipeline:** Setup **GitHub Actions/GitLab CI** to run linting (Ruff/Flake8), type checking (MyPy), and the test suite on every PR.
+*   **Dockerization:** Create a production-ready `Dockerfile` and `docker-compose.yml`.
+*   **Healthchecks:** Add `HEALTHCHECK` instructions to Docker and a `/health` endpoint in FastAPI to monitor DB connectivity and app status.
+*   **Environment Management:** Move all secrets (DB URLs, JWT Keys) to `.env` files using `python-dotenv`.
+
+#### **P2: Optimization & Polish**
+*   **Logging:** Implement structured logging (e.g., `structlog`) to track errors and user actions.
+*   **Frontend State Management:** Refactor React dashboard to use a robust state management pattern (e.g., TanStack Query) for caching and loading states.
+*   **Performance:** Implement pagination and filtering on all dashboard data endpoints.
+*   **Documentation:** Auto-generate and refine Swagger/OpenAPI docs with proper descriptions and examples.

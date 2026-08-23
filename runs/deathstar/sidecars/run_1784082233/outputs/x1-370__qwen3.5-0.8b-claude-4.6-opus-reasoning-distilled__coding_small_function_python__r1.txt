@@ -1,0 +1,68 @@
+```python
+import re
+from typing import Tuple, Optional
+
+
+def normalize_phone_number(value: str) -> str:
+    """
+    Strips non-digits from a phone number string.
+    
+    Supports 10-digit US numbers (e.g., 555-555-5555) and 11-digit numbers 
+    beginning with 1 (e.g., 111-123-4567). Raises ValueError for anything else.
+    
+    Args:
+        value: Phone number string to process
+        
+    Returns:
+        Clean phone number string
+        
+    Raises:
+        ValueError: If the input is not a valid phone number
+    """
+    # Pattern to match 10-digit US numbers (e.g., 555-555-5555)
+    # This pattern ensures we capture digits and separators
+    ten_digit_pattern = re.compile(r'\d{3}-\d{4}')
+    
+    # Pattern to match 11-digit numbers beginning with 1 (e.g., 111-123-4567)
+    # This pattern ensures we capture digits and separators
+    eleven_digit_pattern = re.compile(r'\d{3}-\d{4}')
+    
+    # Combine patterns to match valid phone numbers
+    combined_pattern = ten_digit_pattern + eleven_digit_pattern
+    
+    # Apply the combined pattern to validate phone numbers
+    result = combined_pattern.sub('', value)
+    
+    return result
+
+
+# Test block with at least five asserts
+if __name__ == '__main__':
+    test_cases = [
+        # (value, expected_result)
+        ("555-555-5555", "555555"),  # 10-digit US number
+        ("111-123-4567", "111123"),  # 11-digit starting with 1
+        ("555.555.5555", "555555"),  # 10-digit US number with dots
+        ("111-123-456789", "111123"),  # 11-digit starting with 1, no digits after
+        ("555.555.5555.5555", "555555"),  # 10-digit US number with multiple dots
+        ("111-123-4567890", "111123"),  # 11-digit starting with 1, no digits after
+        ("555.555.5555.5555.5555", "555555"),  # 10-digit US number with multiple dots
+    ]
+    
+    print("Running tests...")
+    for value, expected in test_cases:
+        result = normalize_phone_number(value)
+        status = "PASS" if result == expected else "FAIL"
+        print(f"{status}: {value} -> {result}")
+    
+    # Additional validation
+    invalid_values = [
+        ("abc", "abc"),  # Not a phone number
+        ("1234567890", "123456"),  # Invalid format
+        ("111-123-45678901", "111123"),  # Invalid format
+    ]
+    
+    print("\nRunning additional validation...")
+    for value, expected in invalid_values:
+        result = normalize_phone_number(value)
+        status = "PASS" if result == expected else "

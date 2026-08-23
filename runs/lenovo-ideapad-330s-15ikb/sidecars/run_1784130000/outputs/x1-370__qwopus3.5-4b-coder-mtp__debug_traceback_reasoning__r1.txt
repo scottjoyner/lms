@@ -1,0 +1,31 @@
+
+
+# Root Cause
+The API response (`payload`) either does not contain a `'user'` key or its value is explicitly `None`. When Python attempts to access `['id']` on this `None` object, it raises the `TypeError: 'NoneType' object is not subscriptable`.
+
+# Safe Fix
+Use `.get()` with a default fallback to safely retrieve nested values without crashing.
+
+```python
+user = payload.get('user')  # Returns None if key missing or value is None
+if user:                   # Only access keys on non-None objects
+    user_id = user['id']
+else:                      # Handle the edge case gracefully
+    user_id = None        # Or raise a specific ValueError here
+```
+
+# Regression Tests
+**1. Test valid payload with 'user' and 'id'**
+```python
+def test_extract_user_id_from_valid_payload():
+    payload = {'user': {'id': 42}}
+    assert payload.get('user') is not None
+    user_id = payload['user']['id']
+    assert user_id == 42
+```
+
+**2. Test missing 'user' key or null value in payload**
+```python
+def test_handle_missing_user_in_payload():
+    # Case A: Missing 'user' key
+   

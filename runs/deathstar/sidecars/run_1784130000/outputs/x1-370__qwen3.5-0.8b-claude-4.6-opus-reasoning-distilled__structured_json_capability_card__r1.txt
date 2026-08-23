@@ -1,0 +1,6 @@
+{
+  "task_fit": ["analysis", "drafting", "reviewing"],
+  "confidence": 0.85,
+  "limitations": ["context window constraints apply", "personalization requires user input"],
+  "recommended_max_context_tokens": 2048
+}

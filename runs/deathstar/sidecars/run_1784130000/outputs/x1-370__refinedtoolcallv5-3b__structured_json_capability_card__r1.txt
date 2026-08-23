@@ -1,0 +1,27 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1 (so probably something like 0.85)
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular task; they just want me to produce a JSON object with those fields. I can create plausible content for these fields based on typical usage.
+
+Let's propose:
+
+- task_fit: array of strings describing tasks that could be performed
+- confidence: maybe 0.9 (high confidence)
+- limitations: an array of strings about limitations
+- recommended_max_context_tokens: integer, e.g., 4096
+
+We need to ensure the JSON is valid and no extra keys.
+
+The user wants "strict JSON only". So we must output just a JSON object as plain text. No markdown fences, no code block markers.
+
+Thus I'll produce something like:
+
+{"task_fit": ["Analyze data patterns", "Generate summaries", "Answer factual queries", "Create explanations"], "confidence": 0

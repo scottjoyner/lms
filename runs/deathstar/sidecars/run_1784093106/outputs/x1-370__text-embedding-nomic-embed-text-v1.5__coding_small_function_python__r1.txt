@@ -1,0 +1,42 @@
+<think>We need to write Python code only (no markdown). The function normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (presumably the country code).
+- Returns a cleaned string of digits? Likely returns just the digits, or maybe returns normalized format like "(XXX) XXX-XXXX"? The spec says "strips non-digits" which suggests returning only digits. But typical phone normalization might also add formatting.
+
+Let's interpret: It strips non-digits from input; then if resulting number is 10 digits (US number), it's valid; if it's 11 digits and starts with '1', that means it has an optional country code, so we should strip the leading 1 as well? Or maybe just keep all digits but note that it's a US number with country code. The spec says "supports 10-digit US numbers and 11-digit numbers beginning with 1". That suggests both are considered valid inputs; after stripping non-digits, if we have either length (10 or 11 starting with '1'), then it should be normalized.
+
+Normalization could mean returning just the digits. Or maybe formatting like "(XXX) XXX-XXXX"? The spec doesn't specify format but says "normalize". Usually normalization means removing formatting characters and optionally adding standard formatting. Let's think: If we have input "(555) 123-4567", stripping non-digits yields '5551234567', which is a valid US number; returning that string would be normalized (just digits). That seems plausible.
+
+Alternatively, they might want to return something like "555-1234" or "(555) 123-4567". But the spec says "strips non-digits", which suggests we only keep digits. So I think returning just digits is correct.
+
+Thus function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip all characters that are not digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate: either 10 digits, or 11 digits starting with '1'
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        # Remove the leading country code '1' for US numbers
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+    
+But note that if we have an 11-digit number starting with 1, after stripping non-digits we get e.g. "15551234567". Should we return the full 11 digits or just the 10-digit local part? The spec says supports both; but normalization might mean returning a consistent format: either always 10-digit numbers (without country code). Usually normalizing phone numbers means removing formatting and optional country codes, leaving only the local number. So I think we should strip the leading '1' for 11-digit numbers.
+
+But let's double-check typical expectations:
+
+- Input "5551234567" -> output "5551234567"
+- Input "+1 (555) 123-4567" -> after stripping non-digits: '15551234567'; it's 11 digits starting with 1; we should return "5551234567"
+
+Thus the function returns a string of only digits, either 10-digit local number.
+
+Edge cases:
+
+- Input empty or None -> after stripping non-digits yields '' => len=0 => ValueError
+- Input contains letters and punctuation but forms valid digits: e.g., "abc-555-123-4567" -> '5551234567' => OK.
+- Input with extra digits beyond allowed length: e.g., "55512345678" (11 digits not starting with 1) => ValueError
+- Input with exactly 

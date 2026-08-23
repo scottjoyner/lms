@@ -1,0 +1,25 @@
+
+
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+---
+
+## P0 â Foundational Security (Must-have before anything else)
+
+### **P0-T1: User Authentication with JWT/OAuth2**
+
+| | |
+|---|---|
+| **Description** | Implement secure user authentication using JWT tokens via OAuth2 flow. Users must be able to log in, receive access/refresh tokens, and have their identity verified on every protected endpoint. |
+| **Acceptance Criteria** | 1. User can register with email/password (or existing auth provider) <br>2. User can login and receives a valid JWT access token + refresh token <br>3. Access token is signed with HS256/RS256, includes `sub`, `exp`, `iat` claims <br>4. Token expiration enforces logout after expiry (HTTP 401) <br>5. Refresh token can be used to obtain a new access token without re-authentication <br>6. Tokens are stored securely in HTTP-only cookies or secure headers |
+| **Test Expectations** | - `POST /auth/register` returns 201 with user data and JWT <br>- `POST /auth/login` returns 200 with access_token, refresh_token, expires_in <br>- `GET /protected/endpoint` with valid token â 200 OK <br>- `GET /protected/endpoint` without token â 401 Unauthorized <br>- `GET /protected/endpoint` with expired token â 401 Unauthorized <br>- `POST /auth/logout` returns 200 and invalidates refresh token on next use |
+
+---
+
+### **P0-T2: API Key Generation & Storage**
+
+| | |
+|---|---|
+| **Description** | Generate cryptographically secure API keys for users, store them securely in the database with metadata (name, scope, expiry), and expose a protected endpoint to retrieve/rotate them. |
+| **Acceptance Criteria** | 1. Admin can generate an API key for a user via `/api-keys` <br>2. Generated key is 32+ character random hex string stored in DB with `user_id`, `name`, `created_at`, `expires_at` fields <br>3. Key is never returned in plain text during generation (only hashed or encrypted) <br>4. User can retrieve their own API keys via `/api-keys/me` <br>5. Admin can revoke/delete an existing key <br>6. Keys are scoped by endpoint/method if required |
+| **Test Expectations** | - `POST /api-keys` (admin only) returns 201 with key metadata, NOT the raw key value

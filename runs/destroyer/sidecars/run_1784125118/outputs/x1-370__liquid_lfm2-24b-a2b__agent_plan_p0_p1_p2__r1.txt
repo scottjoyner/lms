@@ -1,0 +1,104 @@
+### **Implementation Plan: FastAPI Service Enhancements**  
+*(P0: Authentication, P1: API Key Rotation, P2: Audit Logging & Admin Dashboards)*  
+
+
+#### **P0: User Authentication**  
+**Objective:** Secure the API with JWT-based authentication, including user registration, login, and token validation.  
+
+**Tasks:**  
+1. **Database Schema Update**  
+   - Add `User` model (username, hashed_password, email, created_at).  
+   - Add `RefreshToken` model (user_id, token, expires_at, is_revoked).  
+
+2. **Authentication Endpoints**  
+   - Implement `/register` (POST): Validate input, hash password, store user.  
+   - Implement `/login` (POST): Verify credentials, issue access/refresh tokens.  
+   - Implement `/me` (GET): Return user data if authenticated.  
+
+3. **Token Management**  
+   - Use PyJWT for token generation/signing.  
+   - Store refresh tokens in DB; validate on refresh requests.  
+
+4. **Middleware Integration**  
+   - Add JWT authentication middleware to protect routes (e.g., `/protected`).  
+
+**Acceptance Criteria:**  
+- Users can register with valid credentials.  
+- Login returns valid access/refresh tokens.  
+- Protected routes reject unauthenticated requests.  
+- Refresh token endpoint invalidates old tokens and issues new ones.  
+
+**Test Expectations:**  
+- Unit tests for `/register` (valid/invalid inputs).  
+- Integration tests for login/logout flows.  
+- API tests to confirm middleware blocks unauthorized access.  
+
+
+#### **P1: API Key Rotation**  
+**Objective:** Enable secure rotation of API keys with automatic expiration and revocation.  
+
+**Tasks:**  
+1. **Key Storage & Generation**  
+   - Add `ApiKey` model (user_id, key, expires_at, is_active).  
+   - Generate unique keys via UUID or cryptographically secure random strings.  
+
+2. **Rotation Endpoints**  
+   - Implement `/api-keys` (GET): List active keys for a user.  
+   - Implement `/api-keys/{key_id}` (PUT): Rotate key (generate new, invalidate old).  
+   - Implement `/api-keys/{key_id}/revoke` (POST): Revoke a specific key.  
+
+3. **Key Validation Middleware**  
+   - Add middleware to check API keys in headers (`X-API-Key`).  
+   - Enforce expiration and revocation checks.  
+
+4. **Key Expiration**  
+   - Auto-revoke expired keys (e.g., 90-day TTL).  
+
+**Acceptance Criteria:**  
+- Users can rotate keys without downtime.  
+- Old keys are invalidated post-rotation.  
+- Expired keys are rejected automatically.  
+
+**Test Expectations:**  
+- API key rotation returns new key and invalidates old.  
+- Requests with expired/revoked keys fail with `401 Unauthorized`.  
+- Key listing endpoint returns only active keys.  
+
+
+#### **P2: Audit Logging & Admin Dashboards**  
+**Objective:** Track critical actions (auth, API key changes) and provide an admin interface for monitoring.  
+
+**Tasks:**  
+1. **Audit Log Model**  
+   - Add `AuditLog` model (user_id, action_type, details, timestamp).  
+
+2. **Logging Middleware**  
+   - Log all auth events (login, logout), API key rotations, and admin actions.  
+   - Include user ID, action type, and relevant details (e.g., old/new keys).  
+
+3. **Admin Dashboard**  
+   - Build a simple UI (or API) with:  
+     - Active users/API keys.  
+     - Recent audit logs (filterable by date/user).  
+     - Key rotation history.  
+
+4. **Role-Based Access Control (RBAC)**  
+   - Restrict dashboard access to admins (via `/admin` routes).  
+
+**Acceptance Criteria:**  
+- All critical actions are logged with timestamps.  
+- Admin dashboard displays active users, keys, and logs.  
+- Non-admins cannot access the dashboard.  
+
+**Test Expectations:**  
+- Audit logs contain entries for auth events and key rotations.  
+- Dashboard filters logs by date/user correctly.  
+- RBAC blocks non-admin access to `/admin`.  
+
+
+### **Summary**  
+- **P0 (Authentication):** Secures user access with JWT.  
+- **P1 (API Keys):** Ensures secure rotation and revocation.  
+- **P2 (Logging/Dashboards):** Provides visibility into system activity.  
+
+Each phase includes clear criteria, tests, and validation to ensure reliability.

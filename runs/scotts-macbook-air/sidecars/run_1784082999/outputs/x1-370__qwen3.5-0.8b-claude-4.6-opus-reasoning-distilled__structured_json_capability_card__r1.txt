@@ -1,0 +1,8 @@
+
+
+{
+  "task_fit": ["complex", "moderate", "low"],
+  "confidence": 0.72,
+  "limitations": ["context window limited", "model requires tuning"],
+  "recommended_max_context_tokens": 8192
+}

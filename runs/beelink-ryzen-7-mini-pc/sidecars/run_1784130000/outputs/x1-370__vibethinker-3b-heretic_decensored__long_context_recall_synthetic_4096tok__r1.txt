@@ -1,0 +1,13 @@
+<think>We need to read the synthetic context, find the "control code" which appears as "The LMS control code for this benchmark is ORION-7429". The question asks: "What is the control code and what exact sentence proves it?" So answer should be JSON with keys "control_code" and "evidence_quote". The control code is "ORION-7429". The evidence quote is the exact sentence from context that proves it: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly." Possibly include the segment context as well. Let's locate the exact sentence:
+
+In the text: "Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 56."
+
+But earlier: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let's capture exact sentence: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Thus JSON:
+
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "The LMS control code

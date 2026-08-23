@@ -1,0 +1,19 @@
+# Root Cause  
+The variable `payload` is `None` when the code runs line 42. This means the expected dictionary containing `'user'` and `'id'` was not loaded or parsed correctly (e.g., missing data, failed API call, or incorrect parsing).
+
+# Safe Fix  
+Check if `payload` is not `None` before accessing nested keys:  
+```python
+if payload and 'user' in payload and 'id' in payload['user']:
+    user_id = payload['user']['id']
+else:
+    # Handle error (e.g., log, raise exception, or set default)
+    user_id = None  # or raise ValueError("Invalid payload structure")
+```
+
+# Regression Tests  
+1. **Test with valid payload**:  
+   Input: `payload = {'user': {'id': 123}}` â Expected output: `user_id = 123`.  
+
+2. **Test with invalid/None payload**:  
+   Input: `payload = None` or `payload = {}` â Expected behavior: No error, handle gracefully (e.g., `user_id = None`).

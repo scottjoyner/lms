@@ -1,0 +1,60 @@
+
+**Root Cause**  
+The error `TypeError: 'NoneType' object is not subscriptable` means that the expression `payload['user']['id']` tried to index a value of type **None**. This happens when `payload.get('user')` returns `None` (e.g., because the incoming request body was empty, malformed JSON, or the API returned an error before populating the payload). The code assumes that every valid payload contains a nonânull `'user'` object with an `'id'` field.
+
+**Safe Fix**  
+Add defensive checks and fail fast:
+
+```python
+def get_user_id(payload: dict) -> int | None:
+    """
+    Safely extract the user ID from a request payload.
+    Returns None if the ID cannot be determined, but never raises TypeError.
+    """
+    # 1ï¸â£ Ensure 'user' exists and is a dictionary
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        raise ValueError("Missing or malformed 'user' field in payload")
+    
+    # 2ï¸â£ Extract the id safely; return None when it's missing/absent
+    return user.get('id')
+
+# Example usage:
+# payload = {"user": {"id": "123"}}
+# print(get_user_id(payload))   # â 123
+
+# payload = {}                     # â raises ValueError
+# payload = {"user": {}}            # â returns None (no crash)
+```
+
+*Key points*:  
+- `payload.get('user')` guards against a missing key.  
+- Explicit type checking prevents the subscript error.  
+- The function now **fails gracefully** instead of raising an unhandled exception.
+
+**Regression Tests**  
+
+```python
+import pytest
+
+# fixtures â common payloads used by both tests
+@pytest.fixture
+def normal_payload():
+    return {
+        "user": {"id": "abc123", "name": "Alice"},
+        # optional extra fields are ignored
+    }
+
+@pytest.fixture
+def missing_user():
+    """Payload where 'user' key is absent."""
+    return {"some_other_field": 1}
+
+@pytest.fixture
+def null_user():
+    """Payload with a user object but no 'id' field."""
+    return {"user": {}}   # or {"user": None}
+```
+
+```python
+# Test 1: Normal payload â

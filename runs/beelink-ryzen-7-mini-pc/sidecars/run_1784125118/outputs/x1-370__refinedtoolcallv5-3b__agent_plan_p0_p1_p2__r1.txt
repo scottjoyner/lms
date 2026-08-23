@@ -1,0 +1,131 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning/assessment), P1 (quick wins/mid-level), and P2 (complexity/integration). Each task must include acceptance criteria and test expectations.
+
+I need to produce a structured plan with tasks under each priority level. I should not ask clarifying questions unless absolutely blocked, so let's proceed directly.
+
+First, let me think about what the implementation plan would look like:
+
+- P0: Assessment & Prerequisites
+  - Review existing codebase for auth requirements
+  - Assess database schema needs
+  - Identify API key endpoints that need protection
+  - Determine audit logging requirements
+  - Plan admin dashboard features
+
+- P1: Core Authentication (P1 tasks)
+  - Implement JWT token-based authentication layer
+  - Create user registration and login endpoints
+  - Add password hashing with bcrypt/Argon2
+  - Implement refresh token system
+  - Set up secure session storage
+
+- P1: API Key Protection (P1 tasks)
+  - Create API key validation middleware
+  - Implement rate limiting per API key
+  - Add API key rotation mechanism
+  - Document how to rotate keys
+
+- P0.5: Audit Logging (maybe P1 or P2, but let's think about ordering)
+
+Actually, audit logging should be integrated with auth and API key protection; it may be P2 because it requires data modeling changes.
+
+Let me structure:
+
+P0:
+1.0 Assessment & Requirements
+   - Current auth state assessment
+   - Database schema design for auth (users, tokens)
+   - API key endpoint mapping
+   - Audit log table design
+
+2.0 Prerequisites
+   - Dependencies inventory
+   - Environment variables configuration
+   - Testing framework setup
+
+P1:
+- Authentication Layer
+  - Task A: JWT token generation & storage
+  - Task B: User registration endpoint (acceptance criteria)
+  - Task C: Login endpoint with password hashing
+  - Task D: Refresh token handling
+  - Task E: Protected route decorator
+
+- API Key Protection
+  - Task F: Middleware to validate API key header
+  - Task G: Rate limiting per API key
+  - Task H: Rotation mechanism (store old keys, rotate on expiry)
+  - Task I: Rotate key for admin users
+
+P2:
+- Audit Logging
+  - Task J: Audit log model & schema
+  - Task K: Log all auth events (login, logout, token expiration)
+  - Task L: Log API key usage and rotation events
+  - Task M: Log user activity and system events
+  - Task N: Query audit logs with filters
+
+- Admin Dashboard
+  - Task O: Frontend dashboard layout
+  - Task P: User management UI (list, edit, delete)
+  - Task Q: Token management UI
+  - Task R: API key management UI
+  - Task S: Audit log search & view
+  - Task T: Report generation endpoint
+
+- Integration & Validation
+  - Task U: End-to-end integration tests
+  - Task V: Security audit of all new features
+  - Task W: Performance optimization for auth endpoints
+  - Task X: Documentation updates (API docs, runbooks)
+
+I need to ensure each task has acceptance criteria and test expectations.
+
+Let me write a comprehensive plan. I'll use clear headings and bullet points.
+
+The user wants an implementation plan; they didn't ask for code, just the plan with tasks organized into P0, P1, P2, each having acceptance criteria and test expectations.
+
+I should produce something like:
+
+```
+# Implementation Plan: User Auth, API Key Rotation, Audit Logging & Admin Dashboard
+
+## P0 â Assessment & Prerequisites
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+| P0-1 | ... | | ... | ... |
+
+...
+
+## P1 â Core Features
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+
+...
+
+## P2 â Advanced & Integration
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+...
+```
+
+Let me flesh out each task with realistic acceptance criteria and test expectations.
+
+I'll aim for about 10-12 tasks across the three priority levels. Let's create a comprehensive plan.
+</think>
+# Implementation Plan: User Authentication, API Key Rotation, Audit Logging & Admin Dashboard  
+
+**Scope:** Existing FastAPI service â add user authentication, API key rotation, audit logging, and admin dashboards.  
+**Owner:** Architecture Agent | **Timeline:** 6â9 months  
+
+---
+
+## P0 â Assessment & Prerequisites  
+
+| # | Task | Description | Acceptance Criteria | Test Expectations |
+|---|------|-------------|---------------------|-------------------|
+| **P0-1** | **Current State Audit** | Scan the existing codebase for: (a) existing auth endpoints, (b) API key usage patterns, (c) audit log existence, (d) any security gaps. | â¢ No false positives on existing auth endpoints < 5 min review <br>â¢ Complete inventory of all API keys used <br>â¢ No existing audit logging in code <br>â¢ No admin dashboard built yet | **Security Scan** â SecurityTesting.io or OWASP ZAP; **Unit Tests** â unit_test/tests/audit_log_test.py; **Integration Test** â verify no broken auth endpoints exist |
+| **P0-2** | **Database Schema Design** | Define tables: `users`, `auth_tokens` (type, refresh_type), `api_keys` (user_id, key, expires_at), `audit_logs`. Include indexes on user_id, token_id, api_key_id. | â¢ Schema in `db/schemas/` directory <br>â¢ All foreign keys validated against `users` table <br>â¢ Indexes for query performance <br>â¢ Data types: UUID, DateTime, JSONB (audit log) | **Unit Tests** â create test tables and insert valid rows; verify `CREATE TABLE` works; **Integration Test** â run full DB migrations |
+| **P0-3** | **Dependency Inventory & Environment** | List all external dependencies (Pydantic, SQLAlchemy, etc.) and their version constraints. Set up environment variables for: `SECRET_KEY`, `ALGORITHM`, `JWT_SECRET`, `API_KEY_MAX_RETRIES`, `AUDIT_LOG_LEVEL`. | â¢ Complete `py

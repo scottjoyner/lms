@@ -1,0 +1,76 @@
+``We need to produce a Python string. The phone number number function is named: normalize, it's a..
+ We have to write a function function python We must return code only string, no markdown, and include the final code in a file block.
+
+ at least five asserts name  # name_ = '
+   print('a')  #name_ = "test"
+We So for the function def We:
+ 
+ We we
+
+ """
+
+We We a a
+
+We We We'll write a Python
+   - We'll use re module
+  We import it
+  It's easy to understand
+
+
+
+
+  It
+   # 
+ 
+
+ #
+ 
+  #  We must return
+
+ We We we
+ We We'll We'll
+  #
+  We'll write a python script
+  We'll use regular expressions
+  We'll write a function
+  It's easier to use re module for this
+  We'll write a, etc.
+We'll write and
+
+ So I we We'll write  We We'll
+  We'll We'll
+
+ We'll write to
+
+ We'll We'll
+ # We'll We'll We # We
+ We'll write a python
+
+  #
+ We'll write a #
+ We'll write
+ 
+  It'll We
+  We'll
+We'll we
+ We'll
+ We'll
+
+
+
+ We'll we
+ 
+ We We
+
+
+ We We # #
+ # We'll write We'll # # # We'll # # # We'll # # #
+ We'll # # # # # # # # We # # # We'll # # # # We'll # # # # We'll # # # # # #
+
+ We'll write a python #
+  We'll use re # 
+
+
+ So, the we, must # we # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # ##
+ # # # # # # # # # We'll write # # # # # # # # # # # # # # # # # # # # # # # # # # # # We'll'll # # # # # # # # # # # # # # # # # # # # # # # # # # # # We'll use # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # ## # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+ # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

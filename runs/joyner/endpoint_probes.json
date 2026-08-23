@@ -1,0 +1,16 @@
+[
+  {
+    "base_url": "http://joyner.tailcb8954.ts.net:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0431,
+    "model_count": 4,
+    "models": [
+      "refinedtoolcallv5-3b",
+      "ornith-1.0-9b",
+      "google/gemma-4-12b-qat",
+      "text-embedding-nomic-embed-text-v1.5"
+    ],
+    "error": null
+  }
+]

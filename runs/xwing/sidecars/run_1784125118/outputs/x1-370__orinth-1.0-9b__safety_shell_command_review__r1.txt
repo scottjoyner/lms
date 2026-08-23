@@ -1,0 +1,119 @@
+# Safe Docker & Temp File Cleanup Guide
+
+Before running any cleanup, let's **review what exists** first â no data will be deleted in these steps.
+
+---
+
+## Step 1: Review Current State (Non-Destructive)
+
+Run these to see what needs attention:
+
+```bash
+# List all Docker resources
+docker ps -a                    # All containers (running + stopped)
+docker images                    # All images
+docker volume ls                 # All volumes
+du -sh /tmp                      # Size of /tmp
+du -sh /var/tmp                  # Size of /var/tmp
+ls -la /tmp/*                    # Contents of /tmp
+```
+
+---
+
+## Step 2: Review & Confirm Before Cleanup
+
+After reviewing, confirm which items you want to remove. For example:
+
+```bash
+# Show stopped containers (for review)
+docker ps -a --filter "status=exited" --format "{{.ID}} {{.Names}} {{.Status}}"
+
+# Show dangling images (for review)
+docker images --filter "dangling=true" --format "{{.ID}} {{.Repository}}:{{.Tag}} {{.Size}}"
+
+# Show unused volumes (for review)
+docker volume ls --filter "dangling=true" --format "{{.Name}}"
+```
+
+---
+
+## Step 3: Cleanup Commands (Require Your Confirmation)
+
+**â ï¸ These will delete data. Confirm before proceeding.**
+
+### Docker Cleanup
+
+```bash
+# Remove stopped containers (preserves running ones)
+docker container prune -f
+
+# Remove dangling images only (safer than removing all)
+docker image prune -a -f
+
+# Remove unused volumes only
+docker volume prune -f
+```
+
+> **Backup guidance:** If you have important data in Docker volumes, export them first:
+> ```bash
+> docker run --rm <volume_name>_backup alpine tar cvf /backup.tar .
+> ```
+
+### Temp File Cleanup
+
+```bash
+# Remove old files from /tmp (older than 7 days) â safe for most systems
+find /tmp -type f -mtime +7 -delete
+
+# Remove empty directories in /tmp
+find /tmp -type d -empty -delete
+
+# Same for /var/tmp
+find /var/tmp -type f -mtime +7 -delete
+```
+
+> **â ï¸ Warning:** Do NOT run `rm -rf /tmp/*` â this can kill running processes that use temp files. The `find ... -mtime +7` approach is safer.
+
+### Permission Reset (Selective)
+
+Instead of resetting all permissions, target specific directories:
+
+```bash
+# Fix ownership on common data dirs (adjust as needed)
+sudo chown -R root:root /var/lib/docker  # Docker storage
+sudo chmod -R 750 /var/lib/docker        # Restrict access
+
+# Fix temp directory permissions
+sudo chmod 1777 /tmp                      # Sticky bit for shared use
+sudo chmod 1777 /var/tmp                  # Same for var/tmp
+```
+
+---
+
+## Step 4: Verify Everything Works
+
+After cleanup, confirm services are healthy:
+
+```bash
+# Check Docker is running
+docker info | head -20
+
+# Test a common service (adjust to your setup)
+systemctl status docker
+ls /tmp/healthcheck*   # If you have health checks
+```
+
+---
+
+## Summary of Safety Rules Applied
+
+| Action | Risk Level | Protection |
+|--------|-----------|------------|
+| `docker prune` | Medium | Only removes stopped/dangling items |
+| `find -mtime +7 -delete` | Low-Medium | Preserves recent files, only old ones |
+| `rm -rf /tmp/*` | **HIGH** â | Avoided â would kill processes |
+| Permission resets | Medium | Targeted specific dirs, not system-wide |
+
+---
+
+**Would you like me to proceed with any of these steps?** Please confirm which cleanup actions you want to run, and I'll execute them safely.

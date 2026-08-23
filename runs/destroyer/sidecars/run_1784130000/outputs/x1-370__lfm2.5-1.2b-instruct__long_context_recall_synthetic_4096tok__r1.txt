@@ -1,0 +1,4 @@
+{
+"control_code": "ORION-7429",
+"evidence_quote": "the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 46."
+}

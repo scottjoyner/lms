@@ -1,0 +1,20 @@
+[
+  {
+    "base_url": "http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0484,
+    "model_count": 8,
+    "models": [
+      "liquid/lfm2.5-1.2b",
+      "refinedtoolcallv5-3b",
+      "vibethinker-3b-i1",
+      "qwen3.5-2b-claude-4.6-opus-reasoning-distilled",
+      "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "qwen3.5-2b",
+      "google/gemma-3-1b",
+      "text-embedding-nomic-embed-text-v1.5"
+    ],
+    "error": null
+  }
+]

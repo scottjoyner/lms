@@ -1,0 +1,8 @@
+def normalize_phone_number(value: str) -> str:
+    """Normalize a phone number by removing non-digits and validating format."""
+    cleaned = value.replace('-', '').replace(' ', '')
+    
+    if not cleaned.isdigit():
+        raise ValueError("Invalid phone number format")
+    
+    return cleaned

@@ -1,0 +1,66 @@
+# Root Cause
+
+The error occurs because either `payload` itself is `None`, or `payload['user']` evaluates to `None`, and you're attempting to subscript (`[]`) a `NoneType` object. Common scenarios:
+
+- API returned no data â `payload = None`
+- User field exists but has null value â `payload['user'] = None`
+- Missing key returns default `None` instead of raising KeyError
+
+The chain `payload['user']['id']` fails at the first `None` encountered during traversal.
+
+# Safe Fix
+
+```python
+# Option 1: Defensive access with .get() and defaults
+user_id = (payload or {}).get('user', {}) or {}
+user_id = user_id.get('id')
+
+# Option 2: Explicit validation
+if payload is None:
+    raise ValueError("Payload cannot be None")
+user = payload.get('user')
+if user is None:
+    raise KeyError("'user' key missing or null in payload")
+user_id = user.get('id')
+```
+
+# Regression Tests
+
+```python
+import unittest
+
+class TestUserExtraction(unittest.TestCase):
+    
+    def test_valid_payload(self):
+        """Normal case should extract user_id correctly"""
+        payload = {'user': {'id': 123}}
+        # Using safe extraction logic
+        user_id = (payload or {}).get('user', {}) or {}
+        result = user_id.get('id')
+        self.assertEqual(result, 123)
+    
+    def test_none_payload(self):
+        """None payload should not raise TypeError"""
+        payload = None
+        # Safe extraction handles this gracefully
+        user_id = (payload or {}).get('user', {}) or {}
+        result = user_id.get('id')
+        self.assertIsNone(result)  # Returns None instead of crashing
+    
+    def test_missing_user_field(self):
+        """Missing 'user' key should not raise TypeError"""
+        payload = {'other_key': 'value'}
+        user_id = (payload or {}).get('user', {}) or {}
+        result = user_id.get('id')
+        self.assertIsNone(result)  # Returns None instead of crashing
+    
+    def test_null_user_field(self):
+        """Null 'user' value should not raise TypeError"""
+        payload = {'user': None}
+        user_id = (payload or {}).get('user', {}) or {}
+        result = user_id.get('id')
+        self.assertIsNone(result)  # Returns None instead of crashing
+
+if __name__ == '__main__':
+    unittest.main()
+```

@@ -1,0 +1,21 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting, just plain JSON text.
+
+They want a JSON object with specific keys:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys. Must be strict JSON only (i.e., no markdown fences, no code formatting). So just output something like:
+
+{"task_fit": [...], "confidence": ..., "limitations": [...], "recommended_max_context_tokens": ...}
+
+We need to think about what task they want me to produce? The user says: "Return a JSON object with keys..." but doesn't specify the content of those values. It seems like this is a meta-request where I'm supposed to generate appropriate content for these fields based on some context.
+
+Given no further context, we can assume generic helpful output about what kind of task fits or something? Let's interpret: The user wants me to produce JSON describing my capabilities or guidelines for tasks. Or maybe they want me to fill out a template with plausible values.
+
+We need to decide appropriate content:
+
+- task_fit: array of strings describing the types of tasks I can handle
+- confidence: number

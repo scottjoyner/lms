@@ -1,0 +1,43 @@
+## Root Cause
+
+`payload` is `None`, so attempting `payload['user']['id']` fails because you can't subscript a `NoneType`. This typically happens when:
+
+- The upstream API/service returned no response or an empty body
+- A middleware/decoder failed silently and set the variable to `None`
+- An exception occurred earlier in the pipeline that was caught but not propagated, leaving state inconsistent
+
+## Safe Fix
+
+Add defensive checks before subscripting:
+
+```python
+if payload is None:
+    raise ValueError("Missing or invalid payload from upstream")
+
+user_id = payload['user']['id']
+```
+
+Or use `.get()` with a fallback for less critical paths:
+
+```python
+user_id = payload.get('user', {}).get('id') if payload else None
+```
+
+## Regression Tests
+
+**Test 1 â Handles `None` payload gracefully:**
+
+```python
+def test_none_payload_raises_clear_error():
+    payload = None
+    with pytest.raises(ValueError, match="Missing or invalid payload"):
+        user_id = payload['user']['id']
+```
+
+**Test 2 â Validates normal path still works:**
+
+```python
+def test_valid_payload_extracts_user_id():
+    payload = {"user": {"id": "abc-123"}}
+    assert payload['user']['id'] == 'abc-123'
+```

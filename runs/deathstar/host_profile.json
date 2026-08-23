@@ -1,0 +1,5 @@
+{ "collected_at_utc":"2026-07-15T18:00:00+00:00", "hostname":"deathstar", "platform":"Linux",
+  "cpu":{"model":"Intel Core i7 (owner-provided)","logical_processors":null,"arch":"x86_64"},
+  "memory":{"ram_total_gib":24.0,"ram_avail_gib":null},
+  "gpu":["AMD Radeon RX 480 8GB"], "vram":{"vram_total_mib":8192,"vendor":"amd"},
+  "source":"manual (owner-provided 2026-07-15): 24 GiB RAM, i7, RX480 8 GiB VRAM" }

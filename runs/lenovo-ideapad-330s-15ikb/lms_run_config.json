@@ -1,0 +1,15 @@
+{
+  "run_id": "lenovo-ideapad-330s-15ikb",
+  "created_at_utc": "2026-07-15T15:59:23.164830+00:00",
+  "endpoints": [
+    "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1"
+  ],
+  "inventory_csv": "/home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/lmstudio_inventory.csv",
+  "suite_file": "/home/scott/git/lms/benchmarks/agent_skill_suite.v1.json",
+  "models": [],
+  "exclude_models": [],
+  "max_models": 50,
+  "repeats": 1,
+  "timeout": 900,
+  "max_context_tokens": 4096
+}

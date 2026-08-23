@@ -1,0 +1,3 @@
+<think>The user asks: "Reply with exactly: LMS_HEALTH_OK". They want me to reply with that exact text.
+
+I should just output exactly "L

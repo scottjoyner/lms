@@ -1,0 +1,12 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,liquid/lfm2-24b-a2b,1.140,10.081,4.723,1.00,0.90,0.9738,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,mradermacher/vibethinker-3b-hermes,0.422,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,refinedneuro/vibethinker-3b-hermes,0.162,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,vibethinker-3b-i1,0.012,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp,0.009,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex,0.051,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,google/gemma-4-12b-qat,0.007,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,lfm2.5-8b-a1b,20.746,98.616,1.578,0.40,0.00,0.1000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,text-embedding-nomic-embed-text-v1.5,0.024,,,0.00,0.00,0.0000,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,lfm2.5-1.2b-instruct,45.682,3.083,8.057,0.50,0.30,0.4300,10
+1784131163,destroyer,192.168.1.241,http://destroyer.tailcb8954.ts.net:1234/v1,openai/gpt-oss-20b,0.006,,,0.00,0.00,0.0000,10

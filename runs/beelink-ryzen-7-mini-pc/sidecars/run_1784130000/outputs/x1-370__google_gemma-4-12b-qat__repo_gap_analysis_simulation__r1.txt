@@ -1,0 +1,44 @@
+This repository is currently in a **high-risk state**, primarily due to the Remote Code Execution (RCE) vulnerability and the lack of basic deployment safeguards.
+
+### **Implementation Cycle Plan**
+
+#### **P0: Critical Security & Blockers (Immediate)**
+*   **Remove Shell Command Endpoint:** Delete the direct shell command execution logic immediately. Replace with specific, pre-defined API actions.
+*   **Authentication Layer:** Implement JWT-based authentication or OAuth2. Secure all endpoints behind a middleware.
+*   **Global Exception Handling:** Replace generic `try/except` blocks with a centralized FastAPI exception handler to prevent internal stack trace leakage.
+*   **Input Validation:** Enforce strict Pydantic models for all request bodies to prevent injection attacks.
+
+#### **P1.1: Core Infrastructure & Data Integrity**
+*   **Database Migrations:** Integrate **Alembic**. Move away from manual SQLite schema changes to version-controlled migrations.
+*   **Unit & Integration Testing:** Establish a `pytest` suite covering core business logic and API endpoints using `TestClient`.
+*   **Environment Configuration:** Implement a `.env` management system (e.g., `python-dotenv`) to remove hardcoded secrets/strings.
+
+#### **P1.2: Stability & CI/CD**
+*   **CI Pipeline:** Setup GitHub Actions/GitLab CI to run linting (Ruff/Flake8), type checking (MyPy), and the test suite on every PR.
+*   **Dockerization:** Create a production-ready `Dockerfile` and `docker-compose.yml` including a `HEALTHCHECK` instruction.
+*   **Structured Logging:** Replace `print` statements with a structured logging library (e.g., `structlog` or standard `logging`) for better traceability.
+
+#### **P2: Optimization & Observability**
+*   **Database Optimization:** Add indexes to frequently queried SQLite columns.
+*   **Frontend State Management:** (If applicable) Refactor React state to ensure consistency between the dashboard and backend state.
+*   **Monitoring:** Implement basic Prometheus metrics or a health check endpoint (`/health`) for container orchestration.
+
+---
+
+### **Gap Analysis Summary**
+
+#### **Security Issues**
+1.  **Remote Code Execution (RCE):** The shell command endpoint allows any user to execute arbitrary OS commands. **(Critical)**
+2.  **Broken Access Control:** No authentication means the entire backend and database are exposed to the public internet.
+3.  **Information Disclosure:** Weak error handling likely leaks database schema details or file paths in 500 errors.
+
+#### **Logic Gaps**
+1.  **Schema Drift:** Without migrations, the database state is non-deterministic across environments (Dev vs. Prod).
+2.  **Lack of Idempotency:** Without proper request handling and validation, repeated API calls may result in duplicate data or inconsistent states.
+3.  **No Request Lifecycle:** Lack of middleware for CORS, Rate Limiting, or Request ID tracking.
+
+#### **Test Deliverables**
+*   **Unit Tests:** Coverage for all utility functions and business logic.
+*   **Integration Tests:** End-to-end flow testing for the "Happy Path" of the dashboard actions.
+*   **Security Scan:** Automated dependency check (e.g., `safety` or `bandit`) integrated into the CI pipeline.
+*   **Load Test:** Basic stress test to ensure SQLite handles concurrent connections (via `WAL` mode).

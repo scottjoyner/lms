@@ -1,0 +1,110 @@
+# â ï¸ Docker & Temp File Cleanup â Review Required
+
+Before running any destructive commands, here is a full breakdown of what will be affected and the safe workflow to follow.
+
+---
+
+## ð What This Involves
+
+| Category | Impact | Reversible? |
+|----------|--------|-------------|
+| Stop containers | Pauses running services | Yes (can restart) |
+| Remove unused images | Deletes Docker image layers | â No (unless backed up) |
+| Prune volumes | Removes persistent data | â No (data loss!) |
+| Clean temp files (`/tmp`, etc.) | Removes temporary system files | â ï¸ Some may be needed |
+| Reset permissions | Fixes ownership/access issues | Yes (can re-apply) |
+
+---
+
+## ð Step 1: Preview â Review Before Any Deletion
+
+Run these **read-only** commands first to see what exists:
+
+```bash
+# List all running containers
+docker ps -a
+
+# List all images (including dangling)
+docker images -a
+
+# List unused volumes
+docker volume ls
+
+# Check for large temp files (>10MB in /tmp)
+find /tmp -type f -size +10M 2>/dev/null
+
+# Check current permission issues on common paths
+ls -la /var/lib/docker/ 2>/dev/null || echo "Docker data dir not found"
+```
+
+> **Please review the output above before proceeding.** If you see critical volumes or images you want to keep, tell me which ones and I'll exclude them.
+
+---
+
+## ð¡ï¸ Step 2: Backup Critical Data (Recommended)
+
+Before any removal, export important data:
+
+```bash
+# Export specific volumes if needed
+docker run --rm -v <volume_name>:/data alpine tar czf /backup/<volume_name>.tar.gz -C /data .
+
+# Save running container configs
+for c in $(docker ps -q); do
+    docker export "$c" > "/backup/container_$(echo $c | tr -d '/').tar" 2>/dev/null
+done
+```
+
+---
+
+## ð§¹ Step 3: Safe Cleanup Commands (Require Your Confirmation)
+
+Once you've reviewed the preview and backed up what matters, confirm with **"GO"** or **"PROCEED"** to run these:
+
+### A. Stop & Remove Containers
+```bash
+docker stop $(docker ps -aq) && docker rm $(docker ps -a -q)
+```
+
+### B. Prune Unused Images (keeps tagged ones by default)
+```bash
+docker image prune -f
+```
+
+### C. Prune Volumes (â ï¸ DATA LOSS â confirm explicitly)
+```bash
+docker volume prune -f
+```
+
+### D. Clean Temp Files Safely
+```bash
+# Remove files older than 7 days in /tmp
+find /tmp -type f -mtime +7 -delete 2>/dev/null
+
+# Clear Docker's internal temp cache (if applicable)
+rm -rf /var/lib/docker/tmp/* 2>/dev/null || true
+```
+
+### E. Reset Common Permission Issues
+```bash
+# Fix ownership on Docker data directory (requires root)
+sudo chown -R $(whoami):$(id -gn) /var/lib/docker/ 2>/dev/null || sudo chown -R root:root /var/lib/docker/
+
+# Ensure common paths are readable
+chmod a+rX /etc/docker/ 2>/dev/null || true
+```
+
+---
+
+## Confirmation Required
+
+**Please reply with one of:**
+
+- **"GO"** â Run all cleanup commands as listed above
+- **"PROCEED EXCEPT [specific item]"** â I'll adjust the plan
+- **"BACKUP FIRST"** â I'll help you create a full backup before cleaning
+- **"STOP"** â No changes will be made; we can discuss alternatives
+
+---
+
+> ð **Safety Note:** Docker volumes often contain application data, databases, and configuration. Pruning them is irreversible. Always verify what's inside before removing.

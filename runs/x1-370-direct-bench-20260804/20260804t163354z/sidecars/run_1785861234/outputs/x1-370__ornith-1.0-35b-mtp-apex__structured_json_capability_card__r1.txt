@@ -1,0 +1,8 @@
+```json
+{
+  "task_fit": ["text_generation", "code_completion", "summarization"],
+  "confidence": 0.85,
+  "limitations": ["context_window_constraints", "token_limitations", "performance_degradation_at_max_length"],
+  "recommended_max_context_tokens": 4096
+}
+```

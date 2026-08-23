@@ -1,0 +1,95 @@
+### **Implementation Plan: FastAPI Service Enhancements**  
+
+---
+
+#### **P0: Foundation & Security Prep**  
+*Goal: Establish secure infrastructure and dependencies to support new features.*  
+
+**Tasks:**  
+1. **Secure Dependencies & Config**  
+   - Integrate environment variables for secrets (e.g., JWT keys, API key rotation policies) using `python-decouple` or similar.  
+   - Add dependency injection for secret management in FastAPI.  
+
+2. **Database Schema Updates**  
+   - Extend user model to include:  
+     - `authentication_hashed_password` (for password hashing).  
+     - `api_key` (unique, encrypted if sensitive).  
+     - `audit_logs` (JSONB field for structured logging).  
+   - Update admin/user tables to support audit trail fields (e.g., `last_modified_by`, `created_at`).  
+
+3. **Authentication Middleware**  
+   - Implement JWT-based authentication with `fastapi-jwt-auth` or custom middleware.  
+   - Add password hashing (bcrypt) for user credentials.  
+
+**Acceptance Criteria:**  
+- All secrets are externalized and not hardcoded.  
+- Database schema changes are backward-compatible (no downtime).  
+- JWT tokens are generated/validated correctly; password hashing meets security standards (e.g., bcrypt cost factor â¥12).  
+
+**Test Expectations:**  
+- Unit tests verify secret injection and dependency injection works.  
+- Integration tests confirm JWT token issuance and validation.  
+- Database migration scripts run without errors; schema changes are reflected in ORM models.  
+
+
+#### **P1: Core Feature Implementation**  
+*Goal: Build authentication, API key rotation, and audit logging.*  
+
+**Tasks:**  
+1. **User Authentication Endpoints**  
+   - Create `/auth/login` endpoint to issue JWT tokens on valid credentials.  
+   - Add `/auth/logout` (optional, if stateless auth is preferred).  
+
+2. **API Key Rotation**  
+   - Implement `/api-keys/generate` to create new API keys with expiration (e.g., 90 days).  
+   - Add `/api-keys/{key_id}/rotate` to invalidate old keys and issue a new one.  
+   - Enforce key validation in middleware for protected routes.  
+
+3. **Audit Logging**  
+   - Add middleware to log:  
+     - Timestamp, user ID (if authenticated), action type (e.g., "create_user", "rotate_api_key"), and IP address.  
+   - Store logs in a dedicated table/collection with structured fields (JSONB).  
+
+**Acceptance Criteria:**  
+- Authentication endpoints return valid JWT tokens; invalid credentials return 401.  
+- API key rotation updates the database and invalidates old keys; rotation requires valid existing keys.  
+- Audit logs capture all critical actions with required metadata.  
+
+**Test Expectations:**  
+- API tests verify token generation/validation (e.g., `/auth/login` returns 200 with token).  
+- Key rotation tests confirm old keys are marked invalid and new keys work.  
+- Logging tests check that audit logs contain expected fields for each action.  
+
+
+#### **P2: Admin Dashboards & Monitoring**  
+*Goal: Expose admin-facing tools for monitoring and management.*  
+
+**Tasks:**  
+1. **Admin Dashboard Endpoints**  
+   - Build `/admin/dashboard` to display:  
+     - Active users (with roles).  
+     - Recent API key rotations.  
+     - Audit log summaries (last 24h).  
+   - Add `/admin/users` with role-based access control (RBAC) for admin-only access.  
+
+2. **Admin-Specific Logging**  
+   - Extend audit logs to include admin actions (e.g., "deleted_user", "reset_password").  
+   - Add rate limiting to admin endpoints to prevent abuse.  
+
+3. **UI Integration (Optional)**  
+   - If a frontend exists, expose dashboard via Swagger UI or a custom React/Vue app.  
+
+**Acceptance Criteria:**  
+- Admin dashboards return 200 with valid data; unauthorized access returns 403.  
+- Logs include admin-specific actions and are queryable (e.g., filter by date/user).  
+- Rate limiting blocks excessive requests to admin endpoints.  
+
+**Test Expectations:**  
+- Admin endpoints require valid JWT tokens with admin role.  
+- Dashboard data matches backend records (e.g., user counts, recent rotations).  
+- Rate limiting tests confirm throttling after X requests.  
+
+
+---
+
+**Outcome:** The FastAPI service gains secure authentication, dynamic API key management, comprehensive audit trails, and admin visibilityâall validated via structured testing.

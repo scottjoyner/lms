@@ -1,0 +1,41 @@
+## Root Cause
+
+`payload` is `None` (likely because the HTTP request body was empty or not parsed), so attempting `payload['user']['id']` fails since you can't subscript `None`. Common triggers: missing Content-Type header, empty body, or an exception during JSON parsing that silently returned `None`.
+
+## Safe Fix
+
+Validate and parse defensively before accessing nested keys:
+
+```python
+import json
+
+try:
+    payload = request.get_json(force=True)  # force=True handles non-JSON bodies
+except Exception:
+    payload = None
+
+if payload is not None and isinstance(payload, dict):
+    user_id = payload['user']['id']
+else:
+    return jsonify({"error": "Invalid or missing user data"}), 400
+```
+
+## Regression Tests
+
+**Test 1 â Empty body returns error instead of crashing:**
+```python
+def test_empty_body():
+    client.post("/api/endpoint", content_type="application/json", data=b"")
+    response = client.get("/api/endpoint")  # or whatever route triggers line 42
+    assert response.status_code == 400
+    assert "Invalid or missing user data" in response.json["error"]
+```
+
+**Test 2 â Valid payload still works:**
+```python
+def test_valid_payload():
+    client.post("/api/endpoint", json={"user": {"id": 123}})
+    response = client.get("/api/endpoint")
+    assert response.status_code == 200
+    assert response.json["user_id"] == 123
+```

@@ -1,0 +1,17 @@
+<think>
+The user wants me to read a synthetic context and return JSON with keys "control_code" and "evidence_quote". The context contains many filler facts about a benchmark runner, and one control code: "ORION-7429".
+
+I need to find the exact sentence that proves it. Looking at the context:
+
+> "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+That's the only statement containing the control code.
+
+So:
+- control_code: "ORION-7429"
+- evidence_quote: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let me format that as JSON.
+</think>
+{
+  \"control_code\": \"ORION-7429\",\n  \"evidence_quote\": \"The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.\"\n}

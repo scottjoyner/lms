@@ -1,0 +1,1 @@
+{"task_fit": ["Summarize key points", "Generate creative story ideas"], "confidence": 0.95, "limitations": ["May produce incorrect or nonsensical answers", "Can be verbose and overly detailed", "May lack depth in highly specialized or niche topics"], "recommended_max_context_tokens": 1024}

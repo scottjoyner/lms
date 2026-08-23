@@ -1,0 +1,19 @@
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(filter(str.isdigit, value))
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits.startswith('1'):
+        return digits[1:]
+    else:
+        raise ValueError("Invalid phone number")
+
+if __name__ == '__main__':
+    assert normalize_phone_number("(123) 456-7890") == "1234567890"
+    assert normalize_phone_number("11234567890") == "1234567890"
+    assert normalize_phone_number("1234567890") == "1234567890"
+    assert normalize_phone_number("11112222333") == "112222333"
+    try:
+        normalize_phone_number("12345")
+        assert False, "Should have raised ValueError"
+    except ValueError:
+        pass

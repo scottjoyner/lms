@@ -1,0 +1,121 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (critical/essential), P1 (nice-to-have/maybe), and P2 (optional/advanced) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what these tasks would be:
+
+- User Authentication: password hashing, JWT token management, login/register endpoints, protected routes.
+- API Key Rotation: mechanism for rotating API keys, revocation, audit trail of changes.
+- Audit Logging: logging all auth events, key rotations, user actions; structured logging; queryable logs.
+- Admin Dashboards: UI for admin to view stats, logs, users, keys, etc.
+
+We need to categorize tasks into P0 (must-have), P1 (nice-to-have), and P2 (optional/advanced). Typically:
+
+P0:
+- Set up database schema for auth (users, tokens)
+- Implement password hashing
+- Integrate JWT library; create login/register endpoints; protect routes
+- Implement audit logging infrastructure
+
+P1:
+- API key rotation mechanism: generate new keys, rotate old ones, revocation
+- Audit logging enhancements: detailed event types, correlation IDs
+- Admin dashboard: basic stats view (users, tokens, active sessions)
+- API key management UI for admins
+
+P2:
+- Advanced audit logging: log-level filtering, queryable logs via REST endpoint
+- API key rotation with expiration windows and backup keys
+- Admin dashboard features: log search, alerting on suspicious activity, key usage analytics
+- Performance optimization of auth pipeline; support for multiple tokens (refresh tokens)
+- Security hardening: rate limiting on auth endpoints, key rotation frequency
+
+But we need to be careful not to ask clarifying questions. The user wants a plan now.
+
+Let me create a comprehensive implementation plan with tasks organized under P0, P1, and P2 categories. Each task should have:
+
+- Task ID / Title
+- Description
+- Priority (P0/P1/P2)
+- Acceptance Criteria (clear, testable criteria)
+- Test Expectations
+
+I'll aim for about 8-12 tasks total across the three priority levels.
+
+Let me think through each feature and how to break them down:
+
+### User Authentication
+
+1. **Database schema** - users table with id, email, hashed_password, is_active, created_at; tokens table with user_id, token_type (access/refresh), token_hash, expires_at
+2. **Password hashing** - use bcrypt or argon2; store hash, verify on login
+3. **JWT library integration** - use python-jose for JWT; create access and refresh tokens
+4. **Login / Register endpoints** - POST /auth/login, POST /auth/register with validation
+5. **Protected routes** - middleware to check valid access token; require auth header
+6. **Token expiration & refresh flow** - refresh endpoint that uses refresh token
+
+### API Key Rotation
+
+1. **Key storage** - store current active key per client (maybe per app instance)
+2. **Rotation mechanism**: generate new random key, update client-side, notify admin
+3. **Revocation**: invalidate old keys; mark as inactive
+4. **Audit log entries** for rotation events
+5. **API key validation endpoint** to verify client's current key
+
+### Audit Logging
+
+1. **Log schema** - event_id, timestamp, user_id (or None), action_type, description, path/to resource, tags
+2. **Log storage** - SQLite or PostgreSQL; persist every auth event, rotation, admin actions
+3. **Structured logging** for integration tests; JSON logs for production
+4. **Event types**: login, logout, token_access, key_rotation, user_action, admin_action
+
+### Admin Dashboards
+
+1. **Frontend UI** - React/Vue component with charts (users count, active tokens, key usage)
+2. **Stats endpoint** - GET /admin/stats returns counts
+3. **Log query endpoint** - filter by date, user_id, action_type; export to CSV/Excel
+4. **Alerting endpoint** - flag suspicious activity (multiple failed attempts within window)
+5. **Key management UI** - view current keys, rotate, revoke
+
+Now categorize:
+
+#### P0: Critical â Must have for service to work correctly
+- Database schema & auth core (P0-1)
+- Password hashing & JWT integration (P0-2)
+- Login/Register endpoints (P0-3)
+- Protected route middleware (P0-4)
+
+#### P1: Nice-to-have â Good but not mandatory
+- Token refresh endpoint (P1-1)
+- API key rotation mechanism (P1-2)
+- Audit logging with event types (P1-3)
+- Admin dashboard stats endpoint (P1-4)
+
+#### P2: Advanced â Optional / Future improvements
+- Key revocation & deactivation (P2-1)
+- Detailed audit log queries (P2-2)
+- Frontend admin UI (P2-3)
+- Rate limiting on auth endpoints (P2-4)
+- Multi-token support (access + refresh stored separately) (P2-5)
+
+Let me flesh out each task with acceptance criteria and test expectations.
+
+**Acceptance Criteria**: Should be a list of concrete requirements that the implementation must meet. For example:
+
+- The `/auth/login` endpoint returns {user_id, access_token, refresh_token}
+- The `get_current_user` middleware validates the JWT token
+- All auth events are logged with event_type='login', user_id=..., path='/api/users'
+
+**Test Expectations**: Should describe what tests should pass:
+- Unit tests for password hashing verification
+- Integration tests for login flow
+- E2E tests for protected routes
+- Unit tests for audit logging (assert log entry exists)
+- Integration tests for admin dashboard endpoints
+
+Let me write this out clearly.
+
+I'll create a markdown format plan. Let's produce it now.</think>## Implementation Plan â FastAPI Service: Auth, API Key Rotation, Audit Logging & Admin Dashboard  
+
+| Priority | Task ID | Task | Description |
+|----------|---------|------|-------------|
+| **P0** (Critical) | P0â1 | **Database Schema & User Authentication Core** | Set up tables, password hashing, JWT integration, login/register endpoints, protectedâroute middleware. | â |
+| **P0** | P0â2 | **Password Hashing & JWT Integration** | Implement bcrypt/Argon2 hash storage, `python-jose` JWT library, accessâtoken generation, refreshâtoken creation, token validation middleware. | â |
+|

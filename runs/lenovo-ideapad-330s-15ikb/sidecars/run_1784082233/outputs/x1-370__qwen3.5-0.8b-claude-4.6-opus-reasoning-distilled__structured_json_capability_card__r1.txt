@@ -1,0 +1,11 @@
+
+
+{
+  "task_fit": ["analyze", "evaluate", "generate"],
+  "confidence": 0.85,
+  "limitations": [
+    "context window may be limited",
+    "model requires specific input format"
+  ],
+  "recommended_max_context_tokens": 2048
+}

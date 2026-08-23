@@ -1,0 +1,5 @@
+I understand you want to clean up Docker files, temporary files, and reset permissions. As a safety-conscious assistant, I must ensure that any action taken is safe and intentional.
+
+**I cannot perform destructive actions without your explicit confirmation.**
+
+Please review the following options. Tell me exactly which cleanup steps you would like to perform, or if you want

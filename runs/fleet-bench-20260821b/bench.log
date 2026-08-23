@@ -1,0 +1,14 @@
+Creating LMS run: runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected
+Inventory rows: 12
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected --timeout 900 --inventory-csv runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/lmstudio_inventory.csv --probe-base-url http://100.108.99.47:1234/v1 --probe-base-url http://100.81.57.77:1234/v1 --probe-base-url http://192.168.1.178:1234/v1 --probe-base-url http://100.69.158.114:1234/v1 --probe-base-url http://192.168.1.81:1234/v1
+wrote runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/machine_profile.json
+wrote runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/machine_synopsis.md
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected --sidecar-dir runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/sidecars --timeout 900 --repeats 1 --max-context-tokens 8192 --exclude-models text-embedding-nomic-embed-text-v1.5
+Wrote results to runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/run_results.csv
+Wrote summary to runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/run_summary.csv
+Wrote task summary to runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/task_summary.csv
+Wrote sidecars to runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/sidecars/run_1787372960
+wrote runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/capability_matrix.csv
+wrote runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/agent_recommendations.md
+wrote runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/routing_rules.yaml
+Done. Read runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/agent_recommendations.md

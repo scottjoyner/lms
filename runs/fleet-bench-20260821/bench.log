@@ -1,0 +1,4 @@
+usage: lms [-h] [--version]
+           {doctor,probe,inventory,profile,quick,runs,show,recommend,route,compare,eval}
+           ...
+lms: error: unrecognized arguments: liquid/lfm2-24b-a2b qwen3.5-0.8b-mlx lfm2.5-1.2b

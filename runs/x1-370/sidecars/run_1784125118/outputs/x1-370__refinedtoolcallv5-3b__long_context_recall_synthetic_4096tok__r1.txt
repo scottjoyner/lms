@@ -1,0 +1,17 @@
+<think>
+The user wants me to read a synthetic context and return JSON with keys `control_code` and `evidence_quote`. The context contains many filler facts about a "benchmark runner" that records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. It also mentions a "LMS control code" which is ORION-7429.
+
+I need to find the exact sentence that proves it (i.e., confirms or explains what the control code is). Let me search through the context:
+
+Looking at the text:
+> The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly.
+
+That's the only statement about a control code. That seems to be the proof/evidence that the control code is ORION-7429.
+
+So I'll return JSON with:
+- control_code: "ORION-7429"
+- evidence_quote: "The LMS control code for this benchmark is ORION-7429 and it must be preserved exactly."
+
+Let me make sure that's the only relevant sentence. The rest are filler facts about the benchmark runner.
+</think>
+{"control_code": "ORION-7429", "evidence_quote":

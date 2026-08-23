@@ -1,0 +1,66 @@
+# Implementation Cycle Plan
+
+## P0 â Critical (Block Deployment)
+
+| # | Item | Type | Risk |
+|---|------|------|------|
+| 1 | **Remove or secure direct shell command endpoint** | Security | Command injection / arbitrary code execution |
+| 2 | **Implement authentication & authorization** | Security | Unauthorized data access, privilege escalation |
+| 3 | **Fix weak error handling** (expose stack traces, internal paths) | Security | Information leakage to attackers |
+| 4 | **Add Docker HEALTHCHECK** (`CMD ["curl", "-f", "http://localhost:8000/health"]`) | Reliability | Failed containers not detected by orchestrator |
+
+## P1.1 â Foundation (Infrastructure & Data)
+
+| # | Item | Type |
+|---|------|------|
+| 5 | **Replace ad-hoc SQLite with Alembic migrations** (`alembic init`, versioned schema changes) | Logic gap |
+| 6 | **Set up CI pipeline** (GitHub Actions / GitLab CI): lint, type check, test, build image | Process |
+| 7 | **Add structured logging** (`logging.config.dictConfig` + JSON formatter) | Observability |
+
+## P1.2 â Security & Quality
+
+| # | Item | Type |
+|---|------|------|
+| 8 | **Input validation on all endpoints** (Pydantic models, `min_length`, `pattern`) | Logic gap |
+| 9 | **Rate limiting middleware** (`slowapi` or Redis-backed) | Security |
+| 10 | **CORS configuration** â restrict origins to React build URL | Security |
+| 11 | **Write test suite** (pytest + httpx): unit, API integration, auth flows | Test deliverable |
+
+## P2 â Enhancements
+
+| # | Item | Type |
+|---|------|------|
+| 12 | Multi-stage Dockerfile optimization | Performance |
+| 13 | Database connection pooling (`SQLAlchemy` + `alembic`) | Logic gap |
+| 14 | Monitoring dashboard (Prometheus + Grafana) | Observability |
+
+---
+
+## Security Issues Summary
+
+- **Command injection** via shell endpoint â highest severity
+- **No auth** exposes all data to unauthenticated users
+- **Error responses leak internals** (file paths, DB schema, stack traces)
+- **Missing CORS config** allows cross-origin attacks from any origin
+- **No rate limiting** enables brute-force / DoS
+
+## Logic Gaps Summary
+
+- No versioned migrations â schema drift across environments
+- No input validation â SQL injection, type errors at runtime
+- No connection pooling â SQLite lock contention under load
+- No structured logging â no audit trail for incidents
+
+## Test Deliverables
+
+| Priority | Scope | Tooling |
+|----------|-------|---------|
+| P1.2 | Unit tests (models, services) | `pytest` + `faker` |
+| P1.2 | API integration tests (all endpoints) | `httpx` / `TestClient` |
+| P0 | Auth flow tests (login, token refresh, RBAC) | â |
+| P1.1 | CI pipeline with test gate | GitHub Actions + `pytest-cov` |
+
+---
+
+**Recommended execution order:** P0 â P1.2 â P1.1 â P2  
+P0 items must be resolved before any public deployment; P1.2 tests should run in the new CI pipeline defined in P1.1.

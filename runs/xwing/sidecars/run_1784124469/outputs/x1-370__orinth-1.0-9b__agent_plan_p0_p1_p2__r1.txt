@@ -1,0 +1,64 @@
+# Implementation Plan: Auth, Key Rotation, Audit Logging & Admin Dashboards
+
+## Architecture Overview
+
+```
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â                    FastAPI Service                   â
+ââââââââââââ¬âââââââââââ¬âââââââââââ¬âââââââââââââââââââââ¤
+â  Auth    â  API     â  Audit   â    Admin           â
+â  Module  â  Key     â  Logger  â    Dashboard       â
+ââââââ¬ââââââ´âââââ¬ââââââ´âââââ¬ââââââ´âââââââââââ¬ââââââââââ
+     â          â          â                â
+     â¼          â¼          â¼                â¼
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+â              PostgreSQL + Redis                     â
+âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+```
+
+---
+
+## P0 â Foundation & Authentication (Critical Path)
+
+### P0-1: Database Schema for Auth & Audit
+
+| Item | Details |
+|------|---------|
+| **Description** | Create migration schemas for users, sessions, API keys, and audit log entries |
+| **Acceptance Criteria** | 1. `users` table with email, hashed password (argon2), role enum (user/admin), created_at, updated_at<br>2. `api_keys` table with key_hash, owner_id, scopes, expires_at, rotated_at<br>3. `audit_log` table with event_type, actor_id, resource, action, metadata JSONB, timestamp<br>4. All tables have indexes on frequently queried columns (email, role, created_at)<br>5. Migration passes Alembic/SQLAlchemy migration checks |
+| **Test Expectations** | 1. `pytest` schema tests verify all table/column constraints<br>2. Migration runs clean with no errors in staging DB<br>3. Query performance test: < 50ms for user lookup by email under load |
+
+### P0-2: JWT Authentication System
+
+| Item | Details |
+|------|---------|
+| **Description** | Implement OAuth2 password flow, token generation/validation, and dependency injection |
+| **Acceptance Criteria** | 1. POST `/auth/login` returns access_token (JWT) + refresh_token<br>2. Token payload includes: sub (user_id), role, exp, iat, jti<br>3. Access tokens expire at 15min; refresh tokens at 7 days<br>4. Dependency `get_current_user` extracts and validates token from Authorization header<br>5. Failed login returns 401 with rate-limit headers (max 5 attempts/minute per IP)<br>6. Password reset flow via email template |
+| **Test Expectations** | 1. Unit tests: JWT encode/decode, payload claims validation<br>2. Integration test: full login â token extraction â protected endpoint access<br>3. Security test: expired token returns 401; tampered token returns 401<br>4. Rate-limit test: 6th request in window returns 429<br>5. Refresh token rotation: new refresh replaces old after use |
+
+### P0-3: API Key Generation & Storage
+
+| Item | Details |
+|------|---------|
+| **Description** | Generate, store, and validate HMAC-based API keys with scope enforcement |
+| **Acceptance Criteria** | 1. POST `/api-keys` generates key (64-char hex), stores hashed version in DB<br>2. Key has configurable scopes: `read`, `write`, `admin`<br>3. GET `/api-keys/{key}` validates key and returns user info + scope summary<br>4. DELETE `/api-keys/{key}` revokes key immediately (soft delete with tombstone)<br>5. Middleware intercepts X-API-Key header, validates HMAC signature, attaches user context |
+| **Test Expectations** | 1. Unit test: HMAC generation matches expected format; invalid signatures rejected<br>2. Integration test: generate â use in request â validate scope enforcement<br>3. Scope test: `read` key cannot POST to write endpoints (403)<br>4. Revocation test: deleted key returns 401 on subsequent requests |
+
+---
+
+## P1 â Key Rotation & Audit Logging
+
+### P1-1: Automatic API Key Rotation
+
+| Item | Details |
+|------|---------|
+| **Description** | Implement scheduled rotation with backward compatibility during transition period |
+| **Acceptance Criteria** | 1. Keys auto-rotate every 90 days (configurable via `app.config.KEY_ROTATION_DAYS`)<br>2. During rotation: old key remains valid for 7 days grace period<br>3. Rotation event logged to audit trail with before/after key hashes<br>4. Admin can trigger manual rotation via POST `/admin/api-keys/{key}/rotate`<br>5. Notification sent to owner email on successful rotation |
+| **Test Expectations** | 1. Unit test: rotation logic produces valid new key; old key still validates in grace window<br>2. Integration test: rotate â use old key (grace) â use new key (active)<br>3. Audit log verification: rotation event captured with correct metadata<br>4. Edge case: concurrent rotation requests handled safely (no duplicate keys)<br>5. Config test: custom rotation interval respected |
+
+### P1-2: Structured Audit Logging Pipeline
+
+| Item | Details |
+|------|---------|
+| **Description** | Build audit logger middleware that captures all state-changing operations with full context |
+| **Acceptance Criteria**

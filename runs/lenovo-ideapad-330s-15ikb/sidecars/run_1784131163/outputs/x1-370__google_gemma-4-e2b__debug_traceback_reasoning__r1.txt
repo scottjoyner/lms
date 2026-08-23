@@ -1,0 +1,59 @@
+## Root Cause
+
+The error `TypeError: 'NoneType' object is not subscriptable` occurs because one of the dictionary lookups in the chain (`payload['user']` or `payload['user']['id']`) returned `None`. This typically happens when the input data (`payload`) is missing expected keys, or a key exists but its value is explicitly set to `None`, causing subsequent attempts to treat that `None` as a dictionary.
+
+## Safe Fix
+
+Use the `.get()` method for safe dictionary access, providing default values (like an empty dictionary `{}`) to prevent crashes if a key is missing.
+
+```python
+# Original problematic line: user_id = payload['user']['id']
+
+# Safe fix:
+user_data = payload.get('user', {})  # Safely get 'user' or an empty dict if it doesn't exist
+user_id = user_data.get('id')       # Safely get 'id' from the result, defaulting to None if missing
+```
+
+**Full Example Implementation:**
+
+```python
+try:
+    user_data = payload.get('user', {})
+    if user_data:
+        user_id = user_data.get('id')
+    else:
+        user_id = None # Handle case where 'user' key is missing
+
+except AttributeError:
+    # Catch potential errors if payload itself is not a dictionary
+    user_id = None 
+```
+
+## Regression Tests
+
+### Test 1: Successful Data Path (Happy Path)
+
+**Goal:** Ensure the script correctly extracts data when all required keys are present.
+
+**Input Payload:**
+```python
+payload_success = {'user': {'id': 12345, 'name': 'Alice'}}
+```
+
+**Expected Output:** `user_id` should be `12345`.
+
+### Test 2: Missing Data Path (Failure Path)
+
+**Goal:** Ensure the script handles missing keys gracefully without raising a `TypeError`.
+
+**Input Payload A (Missing 'user' key):**
+```python
+payload_missing_user = {'data': 'some value'}
+```
+**Expected Output:** `user_id` should be `None`.
+
+**Input Payload B (Missing 'id' within 'user'):**
+```python
+payload_missing_id = {'user': {'name': 'Bob'}}
+```
+**Expected Output:** `user_id` should be `None`.

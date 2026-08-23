@@ -1,0 +1,85 @@
+
+
+## Root Cause
+
+The error occurs because the `payload` variable was not initialized in your code, resulting in it being `None`. When you attempt to access `payload['user']['id']`, Python raises a TypeError since dictionaries cannot be subscripted when their value is `None`.
+
+**Common causes:**
+- Missing initialization of `payload` in the script
+- Using `payload` from an external context that doesn't contain this data
+- A dictionary being created but not populated with required keys
+
+---
+
+## Safe Fix
+
+Use `.get()` method or a try-except block to safely handle potential `None` values:
+
+```python
+# Option 1: Use .get() with default value (recommended)
+user_id = payload.get('user', {}).get('id') if payload else None
+
+# Option 2: Wrap in try-except for broader error handling
+try:
+    user_id = payload['user']['id']
+except KeyError as e:
+    print(f"KeyError: {e}")
+```
+
+---
+
+## Regression Tests
+
+### Test 1: Explicitly None payload
+```python
+# test_none_payload.py
+def test_none_payload():
+    payload = None
+    assert user_id is None, f"Expected None, got {user_id}"
+    print("â Test passed: None payload handled correctly")
+
+def test_empty_dict_payload():
+    payload = {}
+    # This should raise KeyError instead of TypeError
+    try:
+        user_id = payload['user']['id']
+        assert False, "Should have raised KeyError"
+    except KeyError as e:
+        print(f"â Test passed: Empty dict raises KeyError: {e}")
+
+def test_normal_payload():
+    payload = {'user': {'id': 123}}
+    user_id = payload['user']['id']
+    assert user_id == 123, f"Expected 123, got {user_id}"
+    print("â Test passed: Normal payload works")
+
+if __name__ == "__main__":
+    test_none_payload()
+    test_empty_dict_payload()
+    test_normal_payload()
+```
+
+### Test 2: Context without payload data
+```python
+# test_context_without_data.py
+def test_context_no_payload():
+    # Simulate a context that doesn't have this data
+    payload = None
+    with pytest.raises(TypeError, match="not subscriptable"):
+        user_id = payload['user']['id']
+
+if __name__ == "__main__":
+    test_context_no_payload()
+```
+
+### Test 3: Verify .get() works correctly
+```python
+# test_get_method.py
+def test_get_with_default():
+    payload = {'user': {'id': 456}}
+    user_id = payload.get('user', {}).get('id')
+    assert user_id == 456, f"Expected 456, got {user_id}"
+
+if __name__ == "__main__":
+    test_get_with_default()
+```

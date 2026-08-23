@@ -1,0 +1,6 @@
+{
+  "task_fit": [
+    "instruction_following",
+    "structured_output_generation"
+  ],
+  "

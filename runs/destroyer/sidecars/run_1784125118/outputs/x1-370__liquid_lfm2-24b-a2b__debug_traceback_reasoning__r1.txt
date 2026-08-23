@@ -1,0 +1,35 @@
+# Root Cause  
+The variable `payload` is `None` when the code runs line 42. This means the expected dictionary (containing `'user'` and `'id'`) was not loaded or parsed correctly.
+
+# Safe Fix  
+Before accessing nested keys, ensure `payload` is not `None` and that required keys exist:
+
+```python
+if payload and 'user' in payload and isinstance(payload['user'], dict):
+    user = payload['user']
+    if 'id' in user:
+        user_id = user['id']
+    else:
+        # Handle missing 'id'
+        user_id = None  # or raise an error
+else:
+    # Handle invalid payload
+    user_id = None
+```
+
+# Regression Tests  
+1. **Test with valid payload**:  
+   ```python
+   def test_valid_payload():
+       payload = {'user': {'id': 123}}
+       assert get_user_id(payload) == 123
+   ```
+
+2. **Test with None payload**:  
+   ```python
+   def test_none_payload():
+       payload = None
+       assert get_user_id(payload) is None
+   ```
+
+(Replace `get_user_id` with your function name.)

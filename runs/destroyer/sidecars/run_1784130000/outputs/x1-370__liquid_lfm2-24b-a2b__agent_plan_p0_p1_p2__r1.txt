@@ -1,0 +1,81 @@
+### **Implementation Plan for FastAPI Service Enhancements**  
+Organized into **P0 (Critical)**, **P1 (High Priority)**, and **P2 (Medium Priority)** tasks with clear acceptance criteria and test expectations.  
+
+---
+
+### **P0: Core Security & Compliance Foundations**  
+*(Must be completed before P1/P2 to ensure baseline security and compliance.)*  
+
+#### **Task 1: User Authentication Implementation**  
+**Description:** Integrate JWT-based authentication with password hashing (bcrypt) and role-based access control (RBAC).  
+
+**Acceptance Criteria:**  
+- Users can register with email/password; passwords are hashed using bcrypt.  
+- Login endpoint validates credentials and returns a JWT token with `exp` (expiry) and `role` claims.  
+- Protected endpoints require valid JWT tokens; invalid/expired tokens return `401 Unauthorized`.  
+- Admin-only endpoints are inaccessible to non-admin users.  
+
+**Test Expectations:**  
+- Unit tests verify password hashing strength (e.g., bcrypt cost factor â¥12).  
+- Integration tests confirm token generation, expiry, and role claims.  
+- Authentication bypass attempts (e.g., missing token, invalid signature) fail with `401`.  
+
+---
+
+#### **Task 2: API Key Rotation & Management**  
+**Description:** Implement secure API key generation, storage, rotation, and revocation.  
+
+**Acceptance Criteria:**  
+- Users can generate/rotate API keys via a secure endpoint (e.g., `POST /api/keys`).  
+- Each API key is stored encrypted in the database with an expiration date.  
+- Old keys are invalidated upon rotation; expired keys return `403 Forbidden`.  
+- API key usage is logged with timestamps and user context.  
+
+**Test Expectations:**  
+- Key generation returns a valid UUID and stores it securely (e.g., hashed).  
+- Rotation endpoint updates the active key and invalidates old ones.  
+- Unauthorized requests with missing/expired keys fail; valid keys grant access.  
+
+---
+
+### **P1: Audit Logging & Monitoring**  
+*(Builds on P0 to ensure compliance and traceability.)*  
+
+#### **Task 3: Audit Logging Implementation**  
+**Description:** Log critical user actions (login, key rotation, admin actions) with timestamps and context.  
+
+**Acceptance Criteria:**  
+- All P0/P1 endpoints trigger audit logs (e.g., "User X rotated API key Y at T").  
+- Logs include: user ID, action type, timestamp, IP address, and outcome (success/failure).  
+- Logs are stored in a centralized system (e.g., Elasticsearch) with retention â¥30 days.  
+
+**Test Expectations:**  
+- Verify logs are created for every P0/P1 action via database/log inspection.  
+- Test edge cases: failed logins, key rotation errors, and admin actions generate logs.  
+- Logs are immutable (no post-creation edits).  
+
+---
+
+### **P2: Admin Dashboard Development**  
+*(Enhances usability for admins; dependent on P0/P1 completion.)*  
+
+#### **Task 4: Admin Dashboard Implementation**  
+**Description:** Build a UI/dashboard for admins to monitor users, keys, and logs.  
+
+**Acceptance Criteria:**  
+- Admins can view user roles, API key status (active/expired), and recent audit logs.  
+- Dashboard includes filters (e.g., date range, user ID) and export options (CSV/JSON).  
+- Unauthorized users cannot access the dashboard; access restricted to admin roles.  
+
+**Test Expectations:**  
+- UI components render correctly (no broken elements).  
+- Filters return expected data subsets (e.g., expired keys highlighted).  
+- Export functionality generates valid files with correct data.  
+
+---
+
+### **Summary**  
+- **P0** ensures security and compliance (auth, keys, logs).  
+- **P1** adds observability (audit logs).  
+- **P2** improves usability (admin dashboard).  
+Each task includes measurable criteria to validate implementation success.

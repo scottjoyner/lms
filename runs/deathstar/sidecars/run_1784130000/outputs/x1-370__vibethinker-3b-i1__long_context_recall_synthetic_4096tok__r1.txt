@@ -1,0 +1,24 @@
+<think>We need to parse the instruction carefully.
+
+The user says:
+
+"Read the synthetic context below. It contains many filler facts and one control code. Return JSON only with keys control_code and evidence_quote.
+
+[... long context ...]
+
+Question: What is the control code and what exact sentence proves it?"
+
+We must answer only with a JSON object that has two keys: "control_code" and "evidence_quote". The value for control_code should be the control code string (presumably "ORION-7429") as indicated in the context. The evidence_quote should be the exact sentence from the context that proves it, i.e., the quote that states the control code.
+
+We must not include any other text besides the JSON object. Must ensure proper quoting and formatting.
+
+The instruction: "Return JSON only with keys control_code and evidence_quote." So we need to output something like:
+
+{
+  "control_code": "ORION-7429",
+  "evidence_quote": "Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 56."
+}
+
+But we must pick the exact sentence that mentions the control code. Let's locate it.
+
+In the context, there

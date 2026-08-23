@@ -1,0 +1,62 @@
+## Root Cause
+
+The error occurs because `payload` may be `None` (not passed as argument), or `'user'` exists but lacks an `'id'` attribute, or the data structure is different from expected. The code attempts to subscript a `None` value directly without checking for its existence first.
+
+## Safe Fix
+
+```python
+# Option 1: Use .get() with default value (most flexible)
+user_id = payload.get('user', {}).get('id') if payload else None
+
+# Option 2: Wrap in try-except block (catches unexpected errors)
+try:
+    user_id = payload['user']['id']
+except KeyError as e:
+    print(f"KeyError: {e}")
+    user_id = None
+
+# Option 3: Validate structure before accessing
+if 'user' not in payload or not payload['user']:
+    raise ValueError("Payload must contain a 'user' key")
+```
+
+## Regression Tests
+
+```python
+# Test 1: When payload is None (should return None)
+def test_payload_none():
+    payload = None
+    assert user_id == None, f"Expected None but got {user_id}"
+    print("â Test 1 passed: payload=None returns None")
+
+# Test 2: When 'user' key doesn't exist in payload (should return None)
+def test_payload_missing_user():
+    payload = {'other': 'data'}
+    assert user_id == None, f"Expected None but got {user_id}"
+    print("â Test 2 passed: missing 'user' returns None")
+
+# Test 3: When 'id' doesn't exist on user object (should return None)
+def test_payload_missing_user_id():
+    payload = {'user': {'name': 'test'}}
+    assert user_id == None, f"Expected None but got {user_id}"
+    print("â Test 3 passed: missing 'id' returns None")
+
+# Test 4: Normal case where both exist (should return correct value)
+def test_normal_payload():
+    payload = {'user': {'id': 123}}
+    assert user_id == 123, f"Expected 123 but got {user_id}"
+    print("â Test 4 passed: normal case works")
+
+# Test 5: Verify default behavior when 'user' exists but no 'id'
+def test_default_behavior():
+    payload = {'user': {'name': 'test'}}
+    assert user_id == None, f"Expected None but got {user_id}"
+    print("â Test 5 passed: defaults to None when id missing")
+
+# Test 6: Verify default behavior when payload is None
+def test_default_behavior_none():
+    assert user_id == None, f"Expected None but got {user_id}"
+    print("â Test 6 passed: defaults to None when payload is None")
+
+print("\nAll regression tests completed!")
+```

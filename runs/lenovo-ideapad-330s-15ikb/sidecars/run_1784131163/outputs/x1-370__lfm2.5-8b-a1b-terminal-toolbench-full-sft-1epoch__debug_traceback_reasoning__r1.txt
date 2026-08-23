@@ -1,0 +1,12 @@
+
+**Root Cause**  
+The error occurs because `payload['user']` is **None** (or the key `'user'` does not exist). When Python tries to subscript a `NoneType` object it raises  
+
+```
+TypeError: 'NoneType' object is not subscriptable
+```  
+
+Typical scenarios:
+
+* The incoming JSON payload was empty or malformed.  
+* An upstream service returned `null` for the user field, and the caller assumed it would

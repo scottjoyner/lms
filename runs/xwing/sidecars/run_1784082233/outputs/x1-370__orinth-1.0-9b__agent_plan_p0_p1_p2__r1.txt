@@ -1,0 +1,107 @@
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+## Architecture Assumptions
+
+| Component | Technology Choice | Rationale |
+|-----------|-------------------|-----------|
+| Auth | JWT + OAuth2 password flow | Stateless, scalable, industry standard |
+| API Keys | HMAC-signed tokens with TTL | Compatible with existing HTTP client patterns |
+| Audit Log | Structured JSON â PostgreSQL/Redis | Append-only, queryable, durable |
+| Admin Dashboard | React SPA + WebSocket SSE | Real-time updates without polling overhead |
+
+---
+
+## P0 â Foundation & Authentication (Week 1â2)
+
+### P0-1: User Registration & Login System
+
+**Acceptance Criteria:**
+- [ ] Users can register with email, password (min 8 chars), and optional name
+- [ ] Passwords are hashed using Argon2id with per-user salt
+- [ ] Login returns a signed JWT access token + refresh token pair
+- [ ] Refresh tokens have configurable TTL (default: 30 days)
+- [ ] Failed login attempts tracked; account locked after 5 consecutive failures for 15 minutes
+- [ ] Rate limiting applied at endpoint level (max 20 requests/min per IP)
+
+**Test Expectations:**
+| Test Case | Expected Behavior |
+|-----------|-------------------|
+| `test_register_valid` | Returns 201 with user ID, JWT access token, and refresh token |
+| `test_register_duplicate_email` | Returns 409 Conflict |
+| `test_login_success` | Returns valid JWT pair; payload includes `sub`, `exp`, `iat`, `iss` claims |
+| `test_login_invalid_credentials` | Returns 401 Unauthorized after first attempt |
+| `test_account_lockout` | Returns 423 Locked with Retry-After header after 5 failures |
+| `test_refresh_token_rotation` | New refresh token issued on each use; old one invalidated |
+| `test_rate_limit_exceeded` | Returns 429 Too Many Requests with Retry-After header |
+
+---
+
+### P0-2: JWT Token Validation & Middleware
+
+**Acceptance Criteria:**
+- [ ] All protected endpoints require valid access token in `Authorization: Bearer <token>` header
+- [ ] Token claims validated against issuer, expiration, and audience
+- [ ] Optional role-based authorization (admin/user scopes) enforced via middleware
+- [ ] Token refresh endpoint accepts old refresh token, returns new pair
+
+**Test Expectations:**
+| Test Case | Expected Behavior |
+|-----------|-------------------|
+| `test_protected_endpoint_no_token` | Returns 401 Unauthorized |
+| `test_protected_endpoint_expired_token` | Returns 401 with error code `token_expired` |
+| `test_protected_endpoint_invalid_signature` | Returns 401 with error code `invalid_signature` |
+| `test_admin_scope_check` | Non-admin user attempting admin endpoint returns 403 Forbidden |
+| `test_token_refresh_valid_old` | Returns new access + refresh token pair |
+| `test_token_refresh_expired_old` | Returns 401 Unauthorized |
+
+---
+
+### P0-3: API Key Generation & Management
+
+**Acceptance Criteria:**
+- [ ] Users can generate API keys (up to 5 per account) with optional name and scope
+- [ ] API keys are HMAC-SHA256 signed tokens with configurable TTL (default: 90 days)
+- [ ] Keys authenticate via `X-API-Key` header or query parameter `api_key=`
+- [ ] Key revocation immediately invalidates the key without waiting for expiration
+- [ ] Key usage logged to audit trail
+
+**Test Expectations:**
+| Test Case | Expected Behavior |
+|-----------|-------------------|
+| `test_generate_api_key` | Returns 201 with key ID, creation timestamp, and expiry |
+| `test_api_key_auth_header` | Request with valid `X-API-Key` header passes auth middleware |
+| `test_api_key_query_param` | Request with `api_key=` query parameter authenticates correctly |
+| `test_revoke_api_key` | Revoked key returns 401 on subsequent use; audit log entry created |
+| `test_max_keys_per_user` | Attempting to create 6th key returns 429 Too Many Keys |
+| `test_api_key_expiration` | Expired key returns 401 after TTL elapses |
+
+---
+
+### P0-4: Audit Logging Infrastructure
+
+**Acceptance Criteria:**
+- [ ] All authenticated requests logged with: timestamp, user_id, action, resource, IP address, status code, response time
+- [ ] Log entries stored in append-only table with partitioning by date
+- [ ] Logs queryable via REST API (`GET /api/audit`) with pagination and filtering (user, date range, action)
+- [ ] Sensitive fields (passwords, tokens) never logged
+- [ ] Audit log writes are idempotent and survive partial failures
+
+**Test Expectations:**
+| Test Case | Expected Behavior |
+|-----------|-------------------|
+| `test_audit_log_created` | POST request creates audit entry with all required fields |
+| `test_audit_query_pagination` | Returns paginated results; cursor-based or offset pagination works |
+| `test_audit_filter_by_user` | Filter returns only entries for specified user_id |
+| `test_audit_no_sensitive_data` | Passwords, tokens, and API keys are NOT present in log entries |
+| `test_audit_write_failure_handling` | Database write failure does not crash the application; entry queued for retry |
+| `test_audit_log_retention` | Entries older than retention period (configurable, default 90 days) are purged |
+
+---
+
+## P1 â API Key Rotation & Enhanced Security (Week 3â4)
+
+### P1-1: Automatic API Key Rotation
+
+**Acceptance Criteria:**
+- [ ] API keys rotate automatically every N days (default: 30 days, configurable per key)
+- [ ] Old key remains valid until rotation completes

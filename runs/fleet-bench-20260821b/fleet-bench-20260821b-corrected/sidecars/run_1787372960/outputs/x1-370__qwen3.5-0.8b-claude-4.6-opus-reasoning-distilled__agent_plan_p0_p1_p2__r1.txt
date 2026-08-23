@@ -1,0 +1,145 @@
+# Implementation Plan: FastAPI Service Enhancement
+
+## Overview
+This plan adds security, auditability, and admin functionality to an existing FastAPI authentication service. Each component is prioritized by business value and technical complexity.
+
+---
+
+## P0 - Foundation & Security Setup (Priority 1)
+
+### Task 0.1: Authentication Middleware Implementation
+
+#### Acceptance Criteria:
+- JWT token validation middleware implemented in `app.py`
+- Token expiration set to 7 days with refresh token support
+- Token verification endpoint returns proper error responses for invalid tokens
+- Refresh token storage and retrieval mechanism working correctly
+- Token scope validation (e.g., only "user:read" or "user:update")
+
+#### Test Expectations:
+```python
+# Expected behavior:
+def test_jwt_token_validation():
+    # Valid token should return user info with valid claims
+    assert response.status_code == 200
+    
+    # Invalid token should return error responses
+    assert response.status_code in [401, 403]
+    
+    # Token verification should include:
+    # - User ID (if present)
+    # - Issuer name (e.g., "auth-service")
+    # - Expiration timestamp
+    # - Scope claims
+    
+def test_refresh_token():
+    # Should be able to refresh expired token
+    assert response.status_code == 200
+    assert user.refresh_token is not None
+```
+
+#### Implementation Details:
+```python
+# app.py - Authentication Middleware
+from fastapi import FastAPI, HTTPException, Depends
+from pydantic_settings import BaseSettings
+from typing import Optional
+import jwt
+from datetime import timedelta
+from jose import JWTError, jwt_decode
+from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Settings configuration
+class AuthConfig(BaseSettings):
+    SECRET_KEY: str = os.getenv("SECRET_KEY")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_ALGORITHM: str = "HS256"
+
+# Middleware decorator for token validation
+@app.middleware("http")
+async def auth_middleware(request: FastAPIRequest, call_next):
+    try:
+        # Verify the request is from authenticated user
+        if not request.auth or not request.auth.get("sub"):
+            raise HTTPException(
+                status_code=401,
+                detail="Unauthorized - No valid token provided"
+            )
+        
+        # Decode and validate JWT token
+        decoded_token = jwt_decode(request.auth)
+        
+        # Check if token is expired
+        if not decoded_token["exp"] or int(decoded_token["exp"]) < int(time.time()):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid or Expired Token"
+            )
+        
+        # Verify scope
+        required_scopes = ["user:read", "user:update"]
+        if not decoded_token.get("sub") or decoded_token["sub"] != request.user.id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid Token - Invalid user ID"
+            )
+        
+        # Store refresh token
+        app.config["REFRESH_TOKEN"] = jwt.encode(
+            decoded_token["token"],
+            decoded_token["secret"],
+            algorithm=decoded_token["alg"]
+        )
+        
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    
+    return await call_next(request)
+
+# User model with password hashing
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import Session
+from typing import Optional
+import bcrypt
+
+engine = create_engine(
+    "sqlite:///:memory:", 
+    pool_pre_ping=True,
+    pool_size=10
+)
+
+SessionLocal = sessionmaker(bind=engine)
+session = SessionLocal()
+
+
+# User model with password hashing
+class User(Base):
+    __tablename__ = "users"
+    
+    id: int = Column(Integer, primary_key=True)
+    username: str = Column(String(50), unique=True, nullable=False)
+    email: Optional[str] = Column(String(128), nullable=False)
+    password_hash: Optional[str] = Column(String(64), nullable=False)
+    role: str = Column(String(20))  # 'admin', 'user'
+    
+    created_at: datetime = Column(Datetime, default=datetime.utcnow)
+    updated_at: datetime = Column(Datetime, default=datetime.utcnow)
+    
+    # Password reset token (optional for security)
+    reset_token: Optional[str] = Column(String(256), nullable=True)
+    
+    async def save(self, data: dict):
+        hashed_password = bcrypt.hashpw(data.get("password"), self.secret_key)
+        self.password_hash = hashed_password
+        await session.add(self)
+        await session.commit()
+        await session.refresh(self)
+        
+    async def get_password_hash(self) -> Optional[str]:
+        return self.password_hash
+    
+    async def set_password(self, password: str):
+        self.password_hash = bcrypt.hashpw(password.encode(), self.secret_key)
+        await

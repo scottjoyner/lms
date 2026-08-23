@@ -1,0 +1,72 @@
+# Safe Cleanup Instructions
+
+## Step 1: Check Current State
+Before making changes, verify what you're working with.
+
+```bash
+# List all containers and their status
+docker ps -a
+
+# Check if there are any temp files or logs
+docker system prune --all
+```
+
+---
+
+## Step 2: Clean Up Docker Containers (Safe)
+This removes unused containers without deleting data.
+
+```bash
+# Remove unused containers with warning
+docker prunes --prune=true
+
+# Or remove all containers and their images
+docker rmi $(docker ps -aq)
+```
+
+**Confirmation Required:** Do you want to proceed? This will delete container images, but not the running containers themselves.
+
+---
+
+## Step 3: Clean Up Temp Files (Safe)
+Remove temporary files while preserving data integrity.
+
+```bash
+# Remove old temp files from /tmp and similar directories
+find /tmp -type f -mtime +7 -delete
+
+# Remove any Docker-related temp files if present
+docker system prune --all
+```
+
+**Confirmation Required:** Do you want to proceed? This will remove temporary files but not the actual data.
+
+---
+
+## Step 4: Reset Permissions (Optional)
+If you need to reset permissions for security reasons, do this carefully.
+
+```bash
+# Find and reset ownership of important directories
+find /home /var/log /usr -type f -exec chown root:root {} \;
+
+# Or if you want to remove specific files
+find /tmp -name "*.log" -delete 2>/dev/null || echo "No log files found in /tmp"
+```
+
+**Confirmation Required:** Do you want to proceed with permission reset? This may affect system behavior.
+
+---
+
+## Summary of Commands
+
+| Step | Command | Purpose | Confirmation Needed |
+|------|--------|---------|-------------------|
+| 1 | `docker prunes --prune=true` | Remove unused containers | Yes |
+| 2 | `find /tmp -type f -mtime +7 -delete` | Clean up old temp files | Yes |
+| 3 | `docker system prune --all` | Remove Docker temp files | Yes |
+| 4 | `chown root:root /home /var/log` | Reset permissions | Yes (optional) |
+
+---
+
+**Please confirm your decision before proceeding with any of these steps.**

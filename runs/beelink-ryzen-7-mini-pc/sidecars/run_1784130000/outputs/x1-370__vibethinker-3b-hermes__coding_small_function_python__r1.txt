@@ -1,0 +1,35 @@
+<think>The user wants me to write a Python function named normalize_phone_number(value: str) -> str that:
+
+- Strips non-digits from the input string.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably the country code +1).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+The user says "Return code only, no markdown." So I must output plain text code without any markdown formatting. That means just raw Python code lines.
+
+I need to write the function and tests. Let's think about what exactly is needed:
+
+- The function receives a string value.
+- It strips all non-digit characters (like spaces, dashes, parentheses, etc.) from it.
+- Then we check if the resulting digits are either 10 digits or 11 digits starting with '1'.
+- If so, return just the cleaned digits as a string. Probably for 11-digit numbers beginning with 1, they want to strip the leading 1? The spec says "supports 10-digit US numbers and 11-digit numbers beginning with 1". It doesn't explicitly say whether to keep or remove the leading 1. Usually normalizing phone numbers means removing formatting characters but keeping the digits; for 11-digit numbers starting with 1, you might want to strip the country code (the 1) leaving a 10-digit number. But it's ambiguous.
+
+Let me interpret: The function should "normalize" by stripping non-digits and supporting both US 10-digit numbers and international 11-digit numbers beginning with 1. Usually normalization would mean returning just the digits, optionally removing the leading 1 for the country code. Letâs think about typical usage:
+
+- Input: "(123) 456-7890" -> should return "1234567890"
+- Input: "+1 (123) 456-7890" -> Should probably return "1234567890" as well, i.e., strip the +1 country code. Or maybe they want to keep it? The spec says supports both types; I think returning just digits is fine.
+
+But what about 11-digit numbers beginning with 1 that are not typical US numbers (like local numbers)? If we remove the leading 1, then any number starting with 1 would be normalized. But maybe they want to keep it as-is if it's exactly 11 digits and starts with 1? Let me read carefully: "strips non-digits, supports 10-digit US numbers and 11-digit numbers beginning with 1". That suggests that after stripping non-digits we accept either a 10-digit string or an 11-digit string starting with '1'. Then return the cleaned digits (the entire digit string). It doesn't say to strip the leading 1. So I think returning all digits is fine.
+
+But typical normalization would be: if it's 11 digits and starts with 1, remove the leading 1 so you get a standard 10-digit number. However, the spec says "supports" not "converts". It might just want to accept both formats but return them as they are after stripping non-digits.
+
+Let me think about typical use cases: If someone inputs "+1 (555) 123-4567", you'd want to normalize it to "5551234567". That's a common pattern. So I'll implement that behavior: strip non-digits, then if length is 11 and starts with '1', remove the leading '1' (country code) before returning.
+
+But what about numbers like "102-345-6789"? That would be 10 digits after stripping. That's fine too.
+
+If it's exactly 10 digits, just return them as is.
+
+If it's any other length or doesn't start with '1' when length=11, raise ValueError.
+
+Edge cases: empty string -> ValueError; "abc" -> ValueError; "1234567890a" -> after stripping non-digits

@@ -1,0 +1,16 @@
+import re
+
+def normalize_phone_number(value: str) -> str:
+    digits = "".join(filter(str.isdigit, value))
+    
+    if len(digits) == 10:
+        return digits
+    
+    if len(digits) == 11 and digits.startswith('1'):
+        return digits
+        
+    raise ValueError(f"Invalid phone number: {value}")
+
+if __name__ == "__main__":
+    assert normalize_phone_number("(555) 123-4567") == "5551234567"
+    assert normalize_phone_number("1-555-123-456

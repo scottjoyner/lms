@@ -1,0 +1,75 @@
+Here's a safe breakdown of your request. I've separated **review-only** commands from actions that require explicit confirmation before execution. Destructive operations are paused until you approve them.
+
+---
+
+### ð Step 1: Review Current State (Safe)
+Run these to see what will be affected without making changes:
+
+```bash
+# Docker: Show disk usage and dangling resources
+docker system df
+docker images --filter "dangling=true" -q
+
+# Temp files: List contents of /tmp
+ls -lh /tmp | head -50
+
+# Permissions: Check current ownership/permissions on a target path (replace with your directory)
+ls -ld /path/to/target
+```
+
+---
+
+### â ï¸ Step 2: Docker Cleanup (Requires Confirmation)
+**Destructive action:** Removes stopped containers, unused networks, dangling images, and build cache.  
+**Risk:** Data loss if volumes are included unintentionally.
+
+**Safe command (no volumes):**
+```bash
+docker system prune
+```
+
+**Full cleanup (includes volumes â â ï¸ IRREVERSIBLE):**
+```bash
+docker system prune -a --volumes
+```
+
+ð **Do you want to proceed with `docker system prune`?**  
+Reply `yes` to confirm, or specify if you need volume removal.
+
+---
+
+### ðï¸ Step 3: Temp Files Cleanup (Requires Confirmation)
+**Destructive action:** Deletes files in `/tmp`.  
+**Risk:** Active services may break if they rely on temp data.
+
+**Safe command (review first):**
+```bash
+# List what would be deleted
+find /tmp -maxdepth 1 -type f -mtime +7 -ls
+```
+
+**Cleanup command (files older than 7 days):**
+```bash
+sudo find /tmp -maxdepth 1 -type f -mtime +7 -delete
+```
+
+ð **Do you want to delete temp files older than 7 days?**  
+Reply `yes` to confirm, or adjust the age threshold.
+
+---
+
+### ð§ Step 4: Reset Permissions (Clarification Needed)
+"Reset permissions" is vague and can be dangerous if applied globally (e.g., `chmod -R 777 /`).  
+
+**Please specify:**
+1. **Target path**: Which directory? (`/var/www`, `/home/user`, etc.)
+2. **Desired state**: 
+   - Owner: `chown user:group`?
+   - Permissions: `644` (files) / `755` (dirs)?
+   - Service-specific: e.g., web server, database?
+
+**Example safe command:**
+```bash
+sudo chown -R www-data:www-data /var/www/html
+find /var/www/html -type d -exec chmod 755 {} \;
+find /var/www/html -type f -exec chmod 644

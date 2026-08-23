@@ -1,0 +1,35 @@
+
+
+# Implementation Plan: Security & Observability Enhancements
+
+---
+
+## P0 â Core Security & Compliance (Must have before production)
+
+### Task P0-1: User Authentication (JWT/OAuth2)
+
+**Description:** Implement secure user authentication using JWT tokens with refresh token rotation, supporting password-based login and OAuth2 provider integration.
+
+| Sub-task | Description |
+|---|---|
+| **P0-1-A** | Create `User` model with hashed passwords, email verification status, and role field |
+| **P0-1-B** | Implement JWT token generation (access + refresh tokens) with 15min / 24h expiry |
+| **P0-1-C** | Build password hashing using Argon2 or bcrypt (Argon2 preferred for security) |
+| **P0-1-D** | Add OAuth2 provider support (Google/GitHub) with PKCE flow |
+| **P0-1-E** | Implement token validation middleware at all protected routes |
+
+**Acceptance Criteria:**
+- [ ] All protected endpoints require valid JWT in `Authorization: Bearer <token>` header
+- [ ] Invalid/expired tokens return HTTP 401 with JSON error body
+- [ ] Password hashing uses Argon2 (cost parameter â¥ 13) â no plaintext passwords stored
+- [ ] OAuth2 providers support PKCE and redirect URI validation
+- [ ] Refresh token can be used to obtain new access tokens without re-authenticating
+- [ ] Token revocation works via `/auth/revoke` endpoint
+
+**Test Expectations:**
+| Test | Expected Result |
+|---|---|
+| `test_valid_jwt_auth` | Returns 200 with user data for valid token |
+| `test_expired_token` | Returns 401 Unauthorized |
+| `test_invalid_signature` | Returns 401 Unauthorized |
+| `test_password_hashing` | Hash

@@ -1,0 +1,38 @@
+## Root Cause
+
+`payload` is `None` (likely because the HTTP request body was empty or deserialization failed), so indexing it with `['user']['id']` fails. Common triggers: missing Content-Type header, malformed JSON, or an upstream service returning no response body.
+
+## Safe Fix
+
+Validate that `payload` exists and contains expected keys before subscripting:
+
+```python
+if payload is None:
+    raise ValueError("Request body is empty")
+
+user = payload.get('user')
+if user is None:
+    raise ValueError("Missing 'user' key in request body")
+
+user_id = user['id']  # safe â we've already confirmed structure
+```
+
+## Regression Tests
+
+**Test 1 â Empty/missing body:**
+
+```python
+def test_empty_payload():
+    payload = None
+    with pytest.raises(ValueError, match="Request body is empty"):
+        _process_user(payload)  # calls the guarded subscript path
+```
+
+**Test 2 â Missing nested key:**
+
+```python
+def test_missing_user_key():
+    payload = {"user": None}
+    with pytest.raises(ValueError, match="Missing 'user' key"):
+        _process_user(payload)
+```

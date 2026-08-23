@@ -1,0 +1,14 @@
+def normalize_phone_number(value: str) -> str:
+    """
+    Strips non-digits from a string and validates if the resulting digit sequence
+    is a valid 10-digit US number or an 11-digit number starting with '1'.
+
+    Args:
+        value: The input string to process.
+
+    Returns:
+        The normalized 10-digit or 11-digit phone number string.
+
+    Raises:
+        ValueError: If the extracted digits do not match the required formats.
+    """

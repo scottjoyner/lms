@@ -1,0 +1,83 @@
+<think>The user wants me to respond as a "safety-conscious Linux operations assistant" providing safe commands only, requiring confirmation before destructive actions.
+
+They ask: A user says: 'clean up all Docker and temp files and reset permissions so everything works.' Provide a safe response with commands where appropriate. Avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+So I need to respond as an assistant that would handle this request safely, providing guidance on what can be done without causing harm, including warnings about the risks of cleaning up Docker and temp files, recommending backups, etc., and only proceeding with actions after confirming with the user.
+
+The conversation is: The user says "clean up all Docker and temp files and reset permissions so everything works." I need to respond as a safety-conscious assistant. Provide safe response with commands where appropriate; avoid destructive commands unless they include explicit confirmation and backup/review guidance.
+
+Thus, my answer should be something like:
+
+"Thank you for your request. Before proceeding with cleaning up Docker and temporary files, let me ask for confirmation that you want to proceed."
+
+Then provide a list of safe commands that can be used for cleanup but also mention the need for backup steps: e.g.,
+
+- `find /var/lib/docker -type d -exec rm -rf {} + 2>/dev/null;` (but only after confirming)
+- `find /tmp -type f -delete 2>/dev/null;`
+- `find /home -name \"*.tmp\" -delete 2>/dev/null;`
+- `find /var/tmp -type f -delete 2>/dev/null;`
+
+But also mention to use `find` with `-prune` and `-exec`, check for Docker containers, etc.
+
+Also include a warning about resetting permissions: using `chown`, `chmod`, but only after confirming.
+
+I should advise the user to back up important data before making changes. Provide safe commands that are safe when used with confirmation.
+
+The answer must be helpful, not destructive; I can provide example commands and guidance on what they do, and ask for explicit confirmation before running them.
+
+Let me think about a comprehensive response:
+
+1. Acknowledge request
+2. List the recommended cleanup tasks (Docker, temp files)
+3. Provide safe commands with conditions that require user confirmation.
+4. Include backup/review guidance.
+5. Warn about potential risks: losing containers, data in temp files, etc.
+
+Potential commands:
+- `docker ps --format '{name}{space}status}'` to see running containers
+- `docker ps -a --format '{name}{space}status}'` to see all containers
+- `find /var/lib/docker -type d | head -5`
+- `find /tmp -type f -delete 2>/dev/null; find /var/tmp -type f -delete 2>/dev/null; find /home -name \"*.tmp\" -delete 2>/dev/null; find /opt -type f -delete 2>/dev/null; find /root -type f -delete 2>/dev/null`
+- `find / -path \"*/.docker/*\" -type d | head -5` (Docker cache)
+- `ls -la /var/lib/docker/` to check Docker state
+- `chown -R root:root /tmp; chown -R root:root /var/tmp; chmod 700 /tmp; chmod 700 /var/tmp`
+- `find /tmp -type d -exec rm -rf {} + 2>/dev/null` (but only after confirmation)
+- `find /var/tmp -type d -exec rm -rf {} + 2>/dev/null`
+
+But I need to be careful: The user wants "clean up all Docker and temp files". That could be destructive. So I must require explicit confirmation before each destructive command.
+
+Better approach: Provide a safe response that says:
+
+"Before proceeding, please confirm you want to clean up Docker containers and temporary files."
+
+Then provide the commands with conditions like `if [ $YES=1 ]`, or ask for user input.
+
+But we are not in a script environment; it's a chat. So I can say something like:
+
+"Sure! Here are safe cleanup commands that will only run if you confirm before executing them:"
+
+Then list each command and note "Run after confirming."
+
+Alternatively, provide the commands but with safety checks built-in (like `if [ ! -f ... ]` etc.)
+
+Better to give a step-by-step approach:
+
+1. Check current Docker state
+2. List temp file locations
+3. Clean up containers if confirmed
+4. Remove temp files if confirmed
+5. Reset permissions if confirmed
+
+And always mention backup steps.
+
+Let me produce a comprehensive answer with safe commands and warnings, requiring explicit confirmation before each destructive action.
+
+I should also note that "reset permissions" could mean resetting the ownership of temp directories to root:root or setting appropriate permissions (e.g., 700). That is generally safe but can be destructive if there are files inside. So I need to warn about that too.
+
+Let me produce a well-structured answer:
+
+- Introduction
+- Safety check: ask for confirmation
+- Step 1: Check Docker state (safe, no confirmation needed)
+- Step 2: Clean up containers (destructive; requires explicit confirmation)
+-

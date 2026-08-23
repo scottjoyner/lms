@@ -1,0 +1,113 @@
+<think>The user wants me (as a delivery-focused software architecture agent) to create an implementation plan for adding user authentication, API key rotation, audit logging, and admin dashboards to an existing FastAPI service. They want the plan organized as P0, P1, and P2 tasks. Each task must include acceptance criteria and test expectations.
+
+I need to think about what's needed:
+
+- User authentication: password hashing (bcrypt/argon2), JWT token generation and validation, user registration, login, session management
+- API key rotation: generating new API keys, rotating them per client, revoking old ones, handling invalid keys gracefully
+- Audit logging: logging all auth-related actions, API calls, user activity, with structured JSON logs, retention policies
+- Admin dashboards: UI for admin to view audit logs, user stats, API key usage, etc.
+
+Organize into P0 (must-haves), P1 (nice-to-haves/optional), and P2 (long-term enhancements). Each task must have acceptance criteria and test expectations. I need to be thorough but concise.
+
+Let me think about the logical ordering:
+
+P0 tasks likely are:
+- P0-1: Set up authentication infrastructure (database models, password hashing, JWT setup)
+- P0-2: Implement user registration and login endpoints
+- P0-3: Implement session management and protected routes
+- P0-4: Basic audit logging integration (log auth actions)
+
+P1 tasks likely are:
+- P1-1: API key rotation system
+- P1-2: Full audit logging with request context, structured logs, retention
+- P1-3: Admin dashboard UI (React/Next.js or similar)
+- P1-4: Integration testing for all features
+
+P2 tasks likely are:
+- P2-1: Advanced auth features (role-based access control, password reset)
+- P2-2: API key lifecycle automation (revocation on logout, auto-renewal)
+- P2-3: Multi-tenant support
+- P2-4: Performance optimization and security hardening
+
+But the user wants a plan for adding these four features. So I need to map them across P0-P2.
+
+Let me think about what's essential vs nice-to-have:
+
+User authentication is fundamental - must have registration, login, token management (P0). API key rotation is important but could be optional early on; maybe P1. Audit logging is also core for security - probably P0 or P1. Admin dashboards are more of a UI feature that can be added later.
+
+Let me propose:
+
+**P0: Core Infrastructure & Basic Features**
+
+- P0-1: Authentication framework setup (Pydantic models, bcrypt/argon2 hashing, JWT library)
+- P0-2: User registration and login endpoints with validation
+- P0-3: Session management and protected route decorator
+- P0-4: Audit logging integration for auth actions
+
+**P1: Advanced Features & Integration**
+
+- P1-1: API key rotation system (generate, rotate, revoke)
+- P1-2: Complete audit logging (all HTTP requests, user actions, system events)
+- P1-3: Admin dashboard UI with data visualization
+- P1-4: End-to-end integration testing
+
+**P2: Advanced & Production Readiness**
+
+- P2-1: RBAC and permission-based access control
+- P2-2: API key lifecycle automation (auto-renew, expiration)
+- P2-3: Multi-tenant support with per-tenant auth tokens
+- P2-4: Security hardening and performance optimization
+
+But the user wants a plan for adding these four features. So I need to ensure each feature is covered across the phases.
+
+Let me think more carefully:
+
+User authentication (P0) - must have registration, login, token generation, protected routes.
+API key rotation (P1) - generate new keys, rotate per client, revoke old ones; this could be P1 because it's a higher-level feature that builds on auth infrastructure.
+Audit logging (P0 or P1?) - audit logs for all auth actions and API calls. Probably P0-4 as part of core security, but maybe better to keep it in P1 since it involves more integration.
+
+Admin dashboards (P2) likely because UI development is later.
+
+Let me propose:
+
+**P0: Foundation & Core Authentication**
+
+- P0-1: Authentication framework setup
+- P0-2: User registration and login endpoints
+- P0-3: JWT token generation, storage, and validation
+- P0-4: Session management
+
+**P1: Security Enhancements & Audit Logging**
+
+- P1-1: API key rotation system
+- P1-2: Comprehensive audit logging (auth actions + all HTTP requests)
+- P1-3: Admin dashboard UI
+
+**P2: Advanced Features & Production Readiness**
+
+- P2-1: RBAC and permission enforcement
+- P2-2: Multi-tenant support with tenant isolation
+- P2-3: API key lifecycle automation (auto-renew, expiration)
+- P2-4: Performance optimization and security hardening
+
+But the user wants each task to include acceptance criteria and test expectations. So I need to flesh out each subtask.
+
+Let me structure it clearly:
+
+```
+# Implementation Plan: User Auth, API Key Rotation, Audit Logging & Admin Dashboards
+
+## P0 - Critical Path (Must Have)
+
+### Task P0-1: Authentication Framework Setup
+| Aspect | Details |
+|--------|---------|
+| **Task** | Set up Pydantic models for users, tokens, auth requests; configure bcrypt/argon2 password hashing; install and configure JWT library (python-jose). |
+| **Acceptance Criteria** | - User registration endpoint returns 201 with ID and token on success < 30s; - Login returns 200 with access token and refresh token; - Invalid credentials return 401; - Token expiration after 60 min; - Password hashing is cryptographically secure. |
+| **Test Expectations** | - Unit tests for password hashing correctness (hash vs verify cycle); - Integration test: registration flow; - Integration test: login flow with invalid credentials; - End-to-end test: token validation on protected route. |
+
+### Task P0-2: User Registration & Login Endpoints
+| Aspect | Details |
+|--------|---------|
+| **Task** | Implement `/api/v1/users/register` and `/api/v1/users/login`; validate email uniqueness; hash passwords; issue JWT tokens with user ID, role, expiration; return token in Authorization header. |
+| **Acceptance Criteria** | - Register: unique email required, password strength min 8 chars,

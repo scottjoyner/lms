@@ -1,0 +1,135 @@
+
+
+# FastAPI User Authentication & Admin System - Implementation Plan
+
+## Executive Summary
+
+This implementation plan adds comprehensive user authentication, API key rotation, audit logging, and admin dashboards to an existing FastAPI service. The system follows best practices for security, scalability, and maintainability while meeting all specified acceptance criteria.
+
+---
+
+## P0: Core Authentication & Key Rotation Foundation
+
+### Task 1: JWT Token Generation & Management
+**Acceptance Criteria:**
+- Generate tokens with proper header (JWT) and payload (user info, token type)
+- Implement token expiration at 7 days by default
+- Support refresh token mechanism for short-lived access tokens
+- Verify token signature using HMAC-SHA256
+- Reject invalid or expired tokens gracefully
+
+**Test Expectations:**
+```python
+# Test 1: Valid token generation with expected header structure
+assert jwt.encode({'user_id': 1, 'name': 'Alice'}, 'test.jwt') == b'eyJhbGciOiJIUzI...'; assert len(token) > 20
+
+# Test 2: Token validation rejects invalid signature
+try:
+    jwt.verify('invalid_signature', 'secret')
+    raise AssertionError("Should have raised ValueError")
+except jwt.ValidationError as e:
+    assert str(e).startswith("Invalid token signature")
+
+# Test 3: Refresh token works correctly
+assert jwt.refresh_token('refresh_token') == b'eyJhbGciOiJIUzI...'; assert len(refreshed) > 20
+```
+
+### Task 2: Token Rotation Strategy Implementation
+**Acceptance Criteria:**
+- Daily rotation of access tokens (7 days expiration)
+- Weekly rotation for refresh tokens (14 days expiration)
+- Secure token generation with proper validation
+- Rate limiting per IP address to prevent abuse
+- Failed login attempts logged and rejected
+
+**Test Expectations:**
+```python
+# Test 1: Daily rotation works correctly
+for i in range(3):
+    assert jwt.generate_token() == b'eyJhbGciOiJIUzI...'; 
+    assert jwt.refresh_token('refresh_token') == b'eyJhbGciOiJIUzI...'
+
+# Test 2: Rate limiting prevents abuse
+import time
+for i in range(10):
+    jwt.generate_token()
+assert not any(jwt.verify(token) for token in tokens)  # Should be empty
+
+# Test 3: Failed login attempts rejected
+try:
+    jwt.generate_token('invalid_user')
+except Exception as e:
+    assert 'Invalid user' in str(e)
+```
+
+### Task 3: Audit Logging Module
+**Acceptance Criteria:**
+- Comprehensive audit trail of all authentication events
+- Log user creation, login, logout, and API calls
+- Timestamps for each event with microsecond precision
+- User ID, action type, timestamp, and details fields
+- Retention policy: 90 days of audit logs
+
+**Test Expectations:**
+```python
+# Test 1: Audit log contains expected fields
+audit = get_audit_logs()
+assert len(audit) > 0
+for log in audit[:5]:
+    assert 'user_id' in log['id']
+    assert 'timestamp' in log['id']
+    assert 'action_type' in log['id']
+
+# Test 2: Audit logs are retrievable via admin dashboard
+admin_dashboard = get_admin_dashboard()
+assert admin_dashboard.get('audit_logs') is not None
+```
+
+### Task 4: Admin Dashboard Integration
+**Acceptance Criteria:**
+- Real-time user statistics display
+- Recent activity log for users and API calls
+- Token rotation status visible to admins
+- API key rotation history accessible
+- System health metrics (uptime, error rate)
+
+**Test Expectations:**
+```python
+# Test 1: Admin dashboard shows correct statistics
+dashboard = get_admin_dashboard()
+assert dashboard.get('user_statistics') is not None
+assert dashboard['user_statistics']['total_users'] == 500
+
+# Test 2: Recent activity log contains expected entries
+recent_activity = dashboard.get('recent_activities', [])
+assert len(recent_activity) > 10
+for activity in recent_activity[:3]:
+    assert 'user_id' in activity['id']
+```
+
+---
+
+## P1: Audit Logging & Admin Dashboard Integration
+
+### Task 5: Comprehensive Audit Log Implementation
+**Acceptance Criteria:**
+- Complete audit trail for all authentication events
+- Timestamps at microsecond precision (UTC)
+- Detailed event descriptions with context
+- User ID, action type, and timestamp fields
+- Retention policy: 90 days of audit logs
+
+**Test Expectations:**
+```python
+# Test 1: Audit log contains all required fields
+audit = get_audit_logs()
+for log in audit[:5]:
+    assert 'id' in log
+    assert 'user_id' in log['id']
+    assert 'timestamp' in log['id']
+    assert 'action_type' in log['id']
+    assert 'event_description' in log['id']
+
+# Test 2: Audit logs are retrievable via admin dashboard
+admin_dashboard = get_admin_dashboard()
+assert admin_dashboard.get('audit_logs

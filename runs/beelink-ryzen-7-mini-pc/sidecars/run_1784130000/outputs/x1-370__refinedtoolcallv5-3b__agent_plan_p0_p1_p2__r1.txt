@@ -1,0 +1,126 @@
+<think>The user wants me to create an implementation plan for adding several features to an existing FastAPI service: user authentication, API key rotation, audit logging, and admin dashboards. They want the plan organized as P0 (planning/assessments), P1 (short-term tasks), and P2 (long-term/maintenance) tasks. Each task must include acceptance criteria and test expectations.
+
+I need to produce a comprehensive implementation plan with these categories. I should not ask clarifying questions unless absolutely blocked, so just provide the plan directly.
+
+Let me think about what would be appropriate for each category:
+
+P0: Planning & Assessment
+- Current state assessment of the FastAPI service (existing auth mechanisms, API key usage, audit logging, admin features)
+- Dependencies and external services integration
+- Risk assessment
+
+P1: Short-term implementation (first 3-4 months)
+- User authentication system (JWT or OAuth2)
+- API key rotation mechanism
+- Basic audit logging setup
+- Admin dashboard skeleton
+
+P2: Long-term & maintenance (ongoing)
+- Advanced auth features (password reset, role-based access)
+- API key management UI
+- Audit log filtering and reporting
+- Admin dashboard advanced features (metrics, user stats, activity logs)
+
+I should structure it clearly with headings for each P0, P1, P2 sections. Each task should have:
+- Task ID/Title
+- Description
+- Acceptance Criteria
+- Test Expectations
+
+Let me write a comprehensive plan.
+
+Potential tasks:
+
+P0:
+1.0.0 P0-01: Assessment & Requirements Gathering
+   - Inventory current infrastructure
+   - Identify auth gaps
+   - Define API key usage patterns
+   - Document audit log requirements
+   - Determine admin dashboard scope
+
+1.0.0 P0-02: Dependency Mapping
+   - List external auth providers (OAuth2, JWT)
+   - Map third-party integrations
+   - Identify data storage needs for audit logs
+   - Define API key rotation dependencies
+
+P1:
+1.1.0 P1-01: Implement User Authentication Layer
+   - Create user model, password hashing
+   - Integrate JWT token generation & verification
+   - Add login / register endpoints
+   - Implement refresh tokens
+   - Acceptance: Users can authenticate and access protected routes; 99.9% auth success rate
+
+1.1.0 P1-02: Implement API Key Management
+   - Create API key creation endpoint
+   - Store keys with expiration, revocation status
+   - Implement rotation mechanism (auto-renew + manual rotate)
+   - Acceptance: Users can create and rotate API keys; 100% key validity
+
+1.1.0 P1-03: Set Up Audit Logging Framework
+   - Configure logging middleware to log all auth events, request/response
+   - Create audit record model with fields: id, timestamp, user_id, action, endpoint, status, metadata
+   - Implement basic write endpoint for creating audit entries
+   - Acceptance: All auth actions are logged; audit entry creation success rate > 95%
+
+1.1.0 P1-04: Admin Dashboard Skeleton
+   - Set up FastAPI app with HTML/JS dashboard framework (React/Vue)
+   - Create admin user registration
+   - Implement key rotation UI
+   - Build audit log view with pagination
+   - Acceptance: Admin can manage keys and view logs; dashboard loads in <2s
+
+P2:
+2.0.0 P2-01: Advanced Authentication Features
+   - Password reset flow with email verification
+   - Role-based access control (RBAC) middleware
+   - Multi-factor authentication support
+   - Acceptance: Users can reset credentials, have RBAC, MFA enabled
+
+2.0.0 P2-02: API Key Management Enhancements
+   - API key usage tracking and consumption reports
+   - Key revocation history
+   - API key sharing and permissions
+   - Acceptance: Admin can view usage stats; keys can be revoked with audit trail
+
+2.0.0 P2-03: Audit Log Advanced Features
+   - Filterable audit logs by user, date range, action type
+   - Export to CSV/JSON for analysis
+   - Alerting on suspicious activity (thresholds)
+   - Acceptance: Logs can be filtered and exported; alerts triggered when needed
+
+2.0.0 P2-04: Admin Dashboard Advanced
+   - Real-time metrics dashboard with charts
+   - User activity summary
+   - API key usage dashboards per tenant
+   - API performance analytics
+   - Acceptance: Dashboards are responsive, accurate, and provide actionable insights
+
+I should also include test expectations for each task:
+
+- Unit tests (80%+ coverage)
+- Integration tests
+- End-to-end tests
+- Security tests
+
+Let me write the plan in a clear format.</think>## Implementation Plan â FastAPI Service: Auth, API Key Rotation, Audit Logging & Admin Dashboard  
+
+| Category | Task ID | Description |
+|----------|---------|-------------|
+| **P0** â Planning & Assessment | P0â01 | â¦ |
+| **P1** â ShortâTerm (3â4â¯months) | P1â01 â P1â04 | â¦ |
+| **P2** â LongâTerm & Maintenance | P2â01 â P2â04 | â¦ |
+
+---  
+
+## P0 â Planning & Assessment  
+
+### 1.0.0 P0-01: Requirements & Current State Assessment  
+| Action | Details | Acceptance Criteria | Test Expectations |
+|--------|---------|---------------------|-------------------|
+| **Inventory Existing Infrastructure** | List all FastAPI routes, models, and data stores; identify current auth pattern (if any); map API key usage patterns. | All existing endpoints are documented; no hidden auth gaps identified. | Unit tests for every endpoint; integration test confirming no 401/403 errors from unauth routes. |
+| **Identify Auth Gaps** | Determine what is missing: password hashing, JWT storage, refresh flow, role management, MFA, etc. | List of all auth requirements in a âgap matrixâ. | Documentation written; regression test for each gap (e.g., âlogin returns 401 without tokenâ). |
+| **Define API Key Rotation Requirements** | Set rotation frequency, autoârenewal thresholds, manual rotate UI needs, revocation policies. | Clear rotation schedule and revocation workflow. | API key rotation unit tests; edge case test: rotate while active token exists. |
+| **Audit Logging Requirements** | Define log fields (user_id, action, endpoint, timestamp

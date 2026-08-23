@@ -1,0 +1,15 @@
+Hereâs a safe, step-by-step approach to clean up Docker and temporary files while reviewing permissions. All commands are non-destructive by default unless explicitly confirmed.
+
+---
+
+### 1. **Review Current Docker Resources**
+Before removing anything, list what exists:
+```bash
+# List all containers (including stopped ones)
+docker ps -a
+
+# List all images (including dangling/unused ones)
+docker images --filter "dangling=true"
+
+# List volumes (unused or orphaned)
+docker volume ls -f "d

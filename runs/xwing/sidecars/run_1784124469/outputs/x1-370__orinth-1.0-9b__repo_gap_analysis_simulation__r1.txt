@@ -1,0 +1,56 @@
+# Implementation Cycle Plan â FastAPI + React Dashboard
+
+## P0 â Critical (Immediate)
+
+| # | Item | Category | Risk |
+|---|------|----------|------|
+| 1 | **Remove or harden direct shell command endpoint** | Security | Unauthenticated code execution = full server compromise. Must be disabled, gated behind auth + RBAC, or replaced with a safe API abstraction. |
+| 2 | **Implement authentication & authorization** | Security | No auth means any client can read/write/delete all data. Minimum: session-based JWT or token-based auth on every mutating endpoint. |
+| 3 | **Fix weak error handling** | Logic / Security | Generic `500` responses leak stack traces, DB paths, and internal state to clients. Replace with structured error classes + safe HTTP responses. |
+
+## P1.1 â High Priority (Near-term)
+
+| # | Item | Category |
+|---|------|----------|
+| 4 | **Database migrations** (`alembic` or `sqlalchemy-migrate`) | Logic | No schema versioning = unrepeatable deploys and silent data corruption on schema changes. |
+| 5 | **Dockerfile with healthcheck** | DevOps | Without a HEALTHCHECK, orchestrators can't detect dead containers; restart policies become unreliable. |
+| 6 | **Input validation & sanitization** (Pydantic models on all endpoints) | Security / Logic | Prevents injection attacks and ensures schema compliance at the API boundary. |
+
+## P1.2 â High Priority (Near-term)
+
+| # | Item | Category |
+|---|------|----------|
+| 7 | **CI/CD pipeline** (GitHub Actions or equivalent) | DevOps | Lint, type-check, run tests, build Docker image, deploy to staging. No CI = no automated quality gate. |
+| 8 | **Basic test coverage** (>60% on backend logic) | Quality | Unit tests for services + integration tests for API endpoints. Zero tests = zero regression safety net. |
+
+## P2 â Medium / Future Work
+
+| # | Item | Category |
+|---|------|----------|
+| 9 | **Comprehensive test suite** (mocked external deps, edge cases) | Quality |
+| 10 | **Structured logging & monitoring** (Sentry or similar) | Observability |
+| 11 | **Rate limiting on public endpoints** | Security |
+| 12 | **React dashboard: API client typing + E2E tests** | Frontend quality |
+
+---
+
+## Security Issues Summary
+
+- ð´ **Direct shell command endpoint** â unauthenticated code execution risk. Treat as critical vulnerability until mitigated.
+- ð´ **No authentication** â all data exposed to any client.
+- ð  **Weak error handling** â potential information disclosure via stack traces or internal paths in responses.
+- ð¡ **No input validation** â vulnerable to injection, malformed payloads, and schema drift.
+
+## Logic Gaps Summary
+
+- No schema versioning â silent data corruption on deploys.
+- No test coverage â regressions go undetected until production.
+- No CI â no automated quality gate for code changes.
+- No healthcheck â dead containers not detected or restarted.
+
+## Test Deliverables
+
+1. **Unit tests** â service layer logic, Pydantic model validation, error class behavior.
+2. **Integration tests** â full API request/response cycles with mocked DB (SQLite in-memory).
+3. **Security test cases** â unauthenticated access attempts on protected endpoints; shell command endpoint bypass attempts.
+4. **CI pipeline** â runs linting (`ruff`/`flake8`), type checking (`mypy`), tests, and builds Docker image on every push to `main`.

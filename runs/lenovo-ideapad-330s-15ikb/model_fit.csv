@@ -1,0 +1,8 @@
+model_key,estimated_params_b,estimated_quant,estimated_bits_per_param,estimated_model_memory_gib,system_ram_gib,available_ram_gib,largest_nvidia_vram_gib,fit_grade,fit_notes
+google/gemma-4-e2b,,unknown_assume_q4,4.5,,91.94,55.55,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch,8.0,unknown_assume_q4,4.5,5.03,91.94,55.55,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+liquid/lfm2.5-1.2b,1.2,unknown_assume_q4,4.5,0.75,91.94,55.55,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,0.8,unknown_assume_q4,4.5,0.5,91.94,55.55,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+qwopus3.5-4b-coder-mtp,4.0,unknown_assume_q4,4.5,2.51,91.94,55.55,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.
+text-embedding-nomic-embed-text-v1.5,,unknown_assume_q4,4.5,,91.94,55.55,,unknown,Could not estimate model size from name. Run benchmark load checks and monitor LM Studio memory.
+vibethinker-3b-heretic-i1,3.0,unknown_assume_q4,4.5,1.89,91.94,55.55,,good,Estimated model memory fits comfortably in currently available RAM/VRAM.

@@ -1,0 +1,21 @@
+{
+  "run_id": "fleet-bench-20260821b-corrected",
+  "created_at_utc": "2026-08-22T04:29:20.210849+00:00",
+  "endpoints": [
+    "http://100.108.99.47:1234/v1",
+    "http://100.81.57.77:1234/v1",
+    "http://192.168.1.178:1234/v1",
+    "http://100.69.158.114:1234/v1",
+    "http://192.168.1.81:1234/v1"
+  ],
+  "inventory_csv": "runs/fleet-bench-20260821b/fleet-bench-20260821b-corrected/lmstudio_inventory.csv",
+  "suite_file": "/home/scott/git/lms/benchmarks/agent_skill_suite.v1.json",
+  "models": [],
+  "exclude_models": [
+    "text-embedding-nomic-embed-text-v1.5"
+  ],
+  "max_models": 3,
+  "repeats": 1,
+  "timeout": 900,
+  "max_context_tokens": 8192
+}

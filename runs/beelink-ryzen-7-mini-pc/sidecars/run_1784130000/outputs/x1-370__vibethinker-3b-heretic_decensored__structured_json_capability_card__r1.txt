@@ -1,0 +1,27 @@
+<think>The user wants a JSON object with specific keys: "task_fit", "confidence", "limitations", "recommended_max_context_tokens". The values:
+
+- task_fit must be an array of strings.
+- confidence must be a number from 0 to 1.
+- limitations must be an array of strings.
+- recommended_max_context_tokens must be an integer.
+
+They want strict JSON only, no markdown. So output plain JSON text.
+
+We need to decide what the content is. The user didn't specify a particular task; we can produce generic values. Probably they'd like us to output something like:
+
+{
+  "task_fit": ["accurate predictions", "relevant answers", "clear explanations"],
+  "confidence": 0.95,
+  "limitations": ["finite knowledge cutoff", "no real-time data"],
+  "recommended_max_context_tokens": 150
+}
+
+But we need to ensure it's valid JSON, no extra keys.
+
+We must not include any markdown formatting like code fences or quotes around the whole thing? The instruction: "Return a JSON object with keys... Do not use markdown." Means just output raw JSON. So something like:
+
+{
+  "task_fit": [
+    "accurate predictions",
+    "relevant answers",
+    "clear

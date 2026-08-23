@@ -1,0 +1,47 @@
+## Root Cause
+
+`TypeError: 'NoneType' object is not subscriptable` means one of these is `None`:
+- `payload` itself (e.g., empty response body)
+- `payload['user']` (key absent or value null)
+
+The script assumes the structure exists without checking.
+
+## Safe Fix
+
+Validate before subscripting:
+
+```python
+if payload and 'user' in payload and payload['user']:
+    user_id = payload['user']['id']
+else:
+    raise ValueError("Missing user data in payload")
+```
+
+Or use `.get()` with a default:
+
+```python
+user_data = payload.get('user') if payload else None
+if not user_data:
+    raise ValueError("Missing user data in payload")
+user_id = user_data['id']
+```
+
+## Regression Tests
+
+**Test 1 â `payload` is `None`:**
+```python
+def test_none_payload():
+    payload = None
+    # Should raise, not subscript
+    with pytest.raises(ValueError):
+        process_user(payload)
+```
+
+**Test 2 â `'user'` key missing:**
+```python
+def test_missing_user_key():
+    payload = {'token': 'abc123'}
+    # Should raise, not subscript
+    with pytest.raises(ValueError):
+        process_user(payload)
+```

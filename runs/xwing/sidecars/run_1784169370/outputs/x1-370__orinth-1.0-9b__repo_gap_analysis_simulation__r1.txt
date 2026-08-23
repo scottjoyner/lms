@@ -1,0 +1,80 @@
+# Repository Review & Implementation Cycle Plan
+
+## ð´ P0 â Critical (Block Deployment)
+
+| # | Item | Category | Risk |
+|---|------|----------|------|
+| 1 | **Remove/Secure direct shell command endpoint** | Security | RCE vulnerability if exposed to network |
+| 2 | **Implement authentication & authorization** | Security | Unauthenticated access to all endpoints |
+| 3 | **Fix weak error handling (leak stack traces, DB paths)** | Security | Information disclosure |
+| 4 | **Add Docker HEALTHCHECK directive** | Reliability | No container restart on failure |
+
+### P0 Security Issues
+- Shell endpoint allows arbitrary OS commands â requires immediate removal or strict allowlist + network isolation
+- No auth means any client can read/write data, execute admin actions
+- Error responses may expose SQLite paths, internal IPs, or stack traces to attackers
+
+---
+
+## ð  P1.1 â High Priority (Stable Foundation)
+
+| # | Item | Category |
+|---|------|----------|
+| 1 | **Add Alembic migrations** for SQLite schema changes | Data integrity |
+| 2 | **Implement JWT-based auth** with role-based access control | Security |
+| 3 | **Build CI pipeline** (lint, test, build) on GitHub Actions | Quality |
+| 4 | **Standardize error handling**: HTTP status codes, sanitized messages, structured logging | Reliability |
+| 5 | **Add API security headers** (`CORS`, `X-Content-Type-Options`, rate limiting) | Security |
+
+### P1.1 Test Deliverables
+- [ ] Migration test suite (schema up/down/backward compatibility)
+- [ ] Auth unit tests (token generation, expiry, role checks)
+- [ ] CI pipeline: lint + build passes on every PR
+
+---
+
+## ð¡ P1.2 â High Priority (Production Readiness)
+
+| # | Item | Category |
+|---|------|----------|
+| 1 | **Add comprehensive test coverage** (>70%) for backend logic | Quality |
+| 2 | **Implement structured logging + monitoring** (e.g., Sentry or Prometheus) | Observability |
+| 3 | **React dashboard: input validation, loading states, error boundaries** | UX |
+| 4 | **Docker multi-stage build with non-root user** | Security |
+
+### P1.2 Test Deliverables
+- [ ] Integration tests for all API endpoints (happy + edge cases)
+- [ ] E2E dashboard smoke test via Playwright or Cypress
+- [ ] Load test baseline for critical paths
+
+---
+
+## ð¢ P2 â Medium Priority (Improvements)
+
+| # | Item | Category |
+|---|------|----------|
+| 1 | **Add API documentation** (OpenAPI/Swagger with auth guards) | Developer experience |
+| 2 | **Performance optimization**: query indexing, connection pooling, pagination | Performance |
+| 3 | **Backup strategy for SQLite data** | Data safety |
+| 4 | **Environment-based config** (`.env` + validation via `pydantic-settings`) | Maintainability |
+
+---
+
+## ð Implementation Sequence
+
+```
+P0 â P1.1 â P1.2 â P2
+â       â       â      â
+âââââââââ´ââââââââ´âââââââ
+     Secure first, then build quality, then polish
+```
+
+**Estimated effort**: P0 (1â2 days) â P1.1 (3â5 days) â P1.2 (5â7 days) â P2 (ongoing)
+
+---
+
+## â ï¸ Immediate Action Items
+
+1. **Today**: Audit shell endpoint â remove or restrict to localhost-only with explicit allowlist
+2. **This week**: Add auth + error handling before any public-facing deployment
+3. **Before next sprint**: Establish CI pipeline and migration strategy

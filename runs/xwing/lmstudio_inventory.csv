@@ -1,0 +1,7 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,2,orinth-1.0-9b
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,3,text-embedding-nomic-embed-text-v1.5
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,4,vibethinker-3b-hermes
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,5,ornith-1.0-35b
+xwing,192.168.1.241,1,http://xwing.tailcb8954.ts.net:1234/v1,1,6,qwen3.6-14b-a3b-vibeforged-v2

@@ -1,0 +1,3 @@
+The control code is **ORION-7429** and the exact evidence quote is:
+
+"Project note: the benchmark runner records endpoint latency, output structure, model reliability, and routing evidence for local agent workflows. Segment 73."

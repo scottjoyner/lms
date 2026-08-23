@@ -1,0 +1,3 @@
+<think>The user wants me to reply with exactly "LMS_HEALTH_OK". This is a straightforward instruction.
+
+I should respond with that exact string, no extra text

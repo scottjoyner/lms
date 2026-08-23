@@ -1,0 +1,9 @@
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+## Architecture Decisions
+
+| Feature | Approach | Rationale |
+|---------|----------|-----------|
+| Authentication | OAuth2 with JWT (access + refresh tokens) | Industry standard, supports rotation natively |
+| API Keys | HMAC-signed headers with TTL metadata | Compatible with existing header-based auth patterns |
+| Audit Logging | Structured JSON logs to file + optional S3/ELK sink | FastAPI's `logging

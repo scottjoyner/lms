@@ -1,0 +1,150 @@
+
+
+# Implementation Plan for FastAPI Service Enhancement
+
+## Overview
+This plan adds comprehensive authentication, API key rotation, audit logging, and admin dashboard features to an existing FastAPI service. Each component follows security best practices with proper testing coverage.
+
+---
+
+## P0 - Core Authentication System
+
+### Task 1: User Registration & Login Module
+
+#### Acceptance Criteria:
+- User registration creates a unique user record in the database
+- Password hashing using bcrypt (or similar) is implemented
+- Login attempts are rejected with appropriate error messages
+- Successful login returns authenticated user token
+- Token expires after 1 hour and can be refreshed via refresh token mechanism
+- Session timeout is configurable via environment variable
+- User profile includes name, email, avatar URL (if available)
+
+#### Test Expectations:
+```python
+# Expected behavior for registration:
+def test_user_registration():
+    # Create user with valid credentials
+    assert db.user_exists()  # Should return True
+    
+    # Register new user
+    user = User.create(name="Test User", email="test@example.com")
+    assert user.email == "test@example.com"
+    
+    # Verify token is generated and accessible
+    assert user.get_token() is not None
+    
+    # Test login with valid credentials
+    assert db.user_exists()  # Should return True
+    
+    # Test login failure (wrong password)
+    assert db.user_exists()  # Should return False
+    assert error_response.status_code == 401
+    
+    # Test token refresh
+    old_token = user.get_token()
+    new_token = user.refresh_token(old_token)
+    assert new_token is not None and user.get_token() == new_token
+
+# Expected behavior for login:
+def test_login():
+    # Login with valid credentials
+    assert db.user_exists()  # Should return True
+    
+    # Login with wrong password should fail
+    assert db.user_exists()  # Should return False
+    assert error_response.status_code == 401
+```
+
+---
+
+## P1 - API Key Rotation Module
+
+### Task 2: Secure API Key Generation & Vault System
+
+#### Acceptance Criteria:
+- New API keys are generated with random, secure format (e.g., `sk_live_abc123xyz789`)
+- Old API keys are securely stored in a vault/database
+- Rotation triggers when key expires or after 7 days of inactivity
+- Failed rotation attempts are logged and rejected with retry logic
+- Rate limiting prevents brute-force rotation attacks (max 5 attempts per minute)
+- New API keys include a "next_rotation" timestamp for tracking
+
+#### Test Expectations:
+```python
+# Expected behavior for new key generation:
+def test_new_api_key_generation():
+    # Generate valid new API key
+    new_key = generate_secure_api_key()
+    
+    assert new_key.startswith("sk_live_")  # Should start with secure prefix
+    
+    # Verify the key is unique and not reused
+    assert db.api_keys.get(new_key) is None
+    
+    # Test rotation trigger (simulated - in production, this would be a real event)
+
+# Expected behavior for failed rotation:
+def test_failed_rotation():
+    # Simulate key expiring or exceeding retention period
+    old_key = generate_old_api_key()
+    
+    assert db.api_keys.get(old_key) is not None  # Should exist
+    
+    # Attempt to rotate - should be rejected with retry logic
+    new_key = generate_new_api_key()
+    
+    # Verify the failed attempt was logged (audit trail exists)
+    assert audit_log.exists(old_key)  # Should have rotation attempt entry
+
+# Expected behavior for rate limiting:
+def test_rate_limiting():
+    # Simulate multiple rapid login attempts
+    for i in range(10):
+        user = User.create(name=f"User {i}")
+        
+        # Simulate failed login (should be rejected)
+        assert db.user_exists()  # Should return False
+        
+        # Simulate successful login with new token
+        new_token = user.get_token()
+        assert db.user_exists()  # Should return True
+    
+    # Verify no duplicate tokens are created
+    for i in range(10):
+        assert db.user_tokens.get(new_token) is None
+```
+
+---
+
+## P2 - Audit Logging & Admin Dashboard
+
+### Task 3: Comprehensive Audit Log System
+
+#### Acceptance Criteria:
+- All user actions are logged with timestamp, IP address (if available), and user ID
+- API key rotation events are fully auditable
+- Failed authentication attempts are recorded
+- User activity is tracked across all endpoints
+- Admin dashboard provides real-time access to audit data
+- Audit logs can be exported/downloaded as CSV/JSON
+
+#### Test Expectations:
+```python
+# Expected behavior for audit logging:
+def test_audit_logging():
+    # Simulate user login action
+    user = User.create(name="Test User")
+    
+    # Log the login attempt
+    audit_log.add(
+        entry=audit_entry(
+            timestamp=datetime.now(),
+            user_id=user.id,
+            action_type="login",
+            ip_address="192.168.1.100" if hasattr(user, 'ip') else "N/A",
+            details=f"{user.name} logged in"
+        )
+    )
+    
+    # Verify audit entry

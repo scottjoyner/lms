@@ -1,0 +1,71 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown. So just plain text code.
+
+Let's think about the function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    
+    # Validate length and optional leading 1
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+That's the core.
+
+Now test block:
+
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+    assert normalize_phone_number('1234567890') == '1234567890'
+    assert normalize_phone_number('1-234-567-890') == '1234567890'
+    # 11-digit with leading 1
+    assert normalize_phone_number('11234567890') == '1234567890'
+    # Invalid: too many digits without leading 1
+    assert normalize_phone_number('12345678901') == '12345678901'  # Actually this is 11 digits but no leading 1, so should raise ValueError. Wait we need to test that.
+Actually let's think: For invalid cases we must raise ValueError.
+
+Test for raising:
+
+    assert isinstance(normalize_phone_number('12345'), Exception)  # too few digits
+    assert isinstance(normalize_phone_number('123-456-7890-x', 'str'), Exception)
+    assert isinstance(normalize_phone_number('', 'str'), Exception)
+
+But we need at least five asserts. Let's design:
+
+Valid tests:
+1. With hyphens: '123-456-7890' -> '1234567890'
+2. With parentheses: '(123) 456-7890' -> '1234567890'
+3. With spaces: '123 456 7890' -> '1234567890'
+4. With dots: '123.456.7890' -> '1234567890'
+5. With leading 1 country code: '1-123-456-7890' or '11234567890' -> '1234567890'
+
+Invalid tests:
+6. Too few digits: '12345' -> raises
+7. Too many digits without leading 1: '12345678901' -> raises
+
+We need at least five asserts; we can have both valid and invalid.
+
+Let's write:
+
+if __name__ == '__main__':
+    # Valid US numbers (10 digits)
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('123.456.7890') == '1234567890'
+   

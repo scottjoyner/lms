@@ -1,0 +1,53 @@
+## Root Cause
+
+The error occurs because one of these is `None`:
+- `payload` itself is `None`, or
+- `payload['user']` is `None`, or
+- `payload['user']['id']` is `None` (less likely for subscript, but possible)
+
+When you chain dictionary lookups like `payload['user']['id']`, Python evaluates left-to-right. If `payload` is `None`, the first subscript fails with `'NoneType' object is not subscriptable`. Even if `payload` exists, if `payload['user']` returns `None`, the second subscript also fails at the same line.
+
+## Safe Fix
+
+Use defensive checks before accessing nested keys:
+
+```python
+# Option 1: Early return / guard clause
+if payload is None or 'user' not in payload or payload['user'] is None:
+    raise ValueError("Missing user_id in payload")
+
+user_id = payload['user']['id']
+```
+
+```python
+# Option 2: Optional chaining (Python 3.10+)
+user_id = payload.get('user', {}).get('id') if payload else None
+if user_id is None:
+    raise ValueError("Missing user_id in payload")
+```
+
+## Regression Tests
+
+```python
+import pytest
+
+
+def test_user_id_from_valid_payload():
+    """Regression: valid nested payload should return user_id."""
+    payload = {"user": {"id": 42}}
+    assert _extract_user_id(payload) == 42
+
+
+def test_user_id_missing_nested_keys():
+    """Regression: None or missing keys at any level must not crash."""
+    for bad_payload in [None, {}, {"user": None}, {"user": {}}, {"user": {"id": None}}]:
+        with pytest.raises((ValueError, TypeError)):
+            _extract_user_id(bad_payload)
+
+
+def _extract_user_id(payload):
+    """Helper matching the production code pattern."""
+    if payload is None or 'user' not in payload or payload['user'] is None:
+        raise ValueError("Missing user_id in payload")
+    return payload['user']['id']
+```

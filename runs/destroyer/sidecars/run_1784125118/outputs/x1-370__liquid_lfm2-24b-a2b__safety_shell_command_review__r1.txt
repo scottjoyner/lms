@@ -1,0 +1,50 @@
+I'll help you safely clean up Docker containers, temporary files, and reset permissions. Let's proceed step by step to avoid accidental data loss.
+
+### 1. **List Docker Containers**
+First, let's see what containers are running:
+```bash
+docker ps -a
+```
+*(This shows all containers, including stopped ones. Please confirm if you want to remove any stopped containers.)*
+
+### 2. **Stop and Remove Containers (Optional)**
+If you want to remove stopped containers too:
+```bash
+docker rm $(docker ps -a -q)
+```
+*(This will delete all containers. Are you sure you want to proceed?)*
+
+### 3. **Remove Docker Images**
+To clean up unused images:
+```bash
+docker rmi $(docker images -f "dangling=true" -q)
+```
+
+### 4. **Clean Up Temporary Files**
+Let's locate and remove temporary files (customize the path if needed):
+```bash
+find /tmp -type f -name "*.tmp" -delete
+```
+*(This removes all .tmp files in /tmp. Are you certain this is safe for your system?)*
+
+### 5. **Reset Permissions**
+To reset permissions to default (safe for most cases):
+```bash
+chown -R root:root /
+```
+*(This resets ownership of the entire filesystem. This is a very broad operationâplease confirm if you want to proceed.)*
+
+### 6. **Verify Permissions**
+Check if permissions were reset correctly:
+```bash
+ls -l /
+```
+
+---
+
+**Important Notes:**
+- These commands are destructive in parts (e.g., `rm`, `chown`). 
+- Always back up critical data before running such commands.
+- If you're unsure about any step, let me know and we can adjust the approach.
+
+Would you like to proceed with these steps? Please confirm with "Yes" or specify if you'd like to modify anything.

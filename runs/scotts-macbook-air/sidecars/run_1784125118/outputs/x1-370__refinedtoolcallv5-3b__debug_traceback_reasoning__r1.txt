@@ -1,0 +1,30 @@
+**Root Cause**  
+The error occurs because `payload['user']` returned **`None`**, not a dictionary.  
+When you try to subscript it (`None['id']`) Python raises *TypeError: 'NoneType' object is not subscriptable*.  
+
+This typically happens when:
+- The API returns `null`/`None` for the user field instead of an object.
+- A nested key was missing in the outer dictionary.
+- A previous operation incorrectly set the value to `None`.
+
+---
+
+**Safe Fix**  
+Use `dict.get()` with a sensible default at each level so the code never assumes a value exists:
+
+```python
+# BEFORE (fails when user is None)
+user_id = payload['user']['id']
+
+# AFTER â safe, handles missing/invalid data gracefully
+user_id = payload.get('user', {}).get('id', 'unknown')
+```
+
+Or use an explicit check for clarity:
+
+```python
+user_info = payload.get('user')
+if user_info is not None and isinstance(user_info, dict):
+    user_id = user_info.get('id', 'unknown')
+else:
+    raise ValueError("No valid user

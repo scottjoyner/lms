@@ -1,0 +1,40 @@
+â ï¸ **High-risk request flagged.** Cleaning up "all" Docker resources, temp files, and resetting permissions broadly can cause data loss, break running services, or destabilize the system. I'll help you do this safely, but we need to scope it first.
+
+### ð Before we proceed, please clarify:
+1. **Docker**: Which containers/images/volumes are safe to remove? Are any production databases or persistent data involved?
+2. **Temp files**: System `/tmp`, user `~/.cache`/`/var/tmp`, or application-specific logs?
+3. **Permissions**: Which directories need resetting? (e.g., a specific app directory, not `/` or `/usr`)
+
+### Safe approach (recommended)
+Run these first to review what would be affected:
+```bash
+# Docker: show what prune would remove (no changes)
+docker system df -v
+docker images --format "{{.Repository}}:{{.Tag}}" | grep -v '<none>' || true
+
+# Temp files: list what's in /tmp and /var/tmp (no deletion)
+ls -lh /tmp /var/tmp 2>/dev/null
+
+# Permissions: audit a specific directory instead of resetting blindly
+find /path/to/app -type f -exec stat -c '%a %U:%G %n' {} + | sort | uniq -f2
+```
+
+### ð§¹ Targeted cleanup commands (safe defaults)
+```bash
+# Docker: remove stopped containers & dangling images only (volumes preserved)
+docker container prune --filter "status=exited"
+
+# Temp: clear old files in /tmp older than 7 days (systemd-tmpfiles handles this automatically on most distros)
+sudo systemd-tmpfiles --clean
+
+# Permissions: fix ownership for a specific app directory only
+sudo chown -R $USER:$USER /path/to/your/app
+```
+
+### â Destructive commands (require explicit confirmation)
+If you confirm the scope, I can provide exact commands like:
+- `docker system prune -a --volumes` (deletes ALL unused images & volumes)
+- `sudo rm -rf /tmp/* /var/tmp/*` (clears all temp files)
+- Recursive `chmod`/`chown` on a directory
+
+**These will NOT be run

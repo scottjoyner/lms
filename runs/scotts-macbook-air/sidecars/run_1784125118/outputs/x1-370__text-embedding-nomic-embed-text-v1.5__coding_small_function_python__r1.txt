@@ -1,0 +1,50 @@
+```python
+import re
+
+def normalize_phone_number(value: str) -> str:
+    """
+    Normalizes a phone number according to the following rules:
+    1. Only digits are kept.
+    2. Supports 10-digit US numbers (e.g., "1234567890").
+    3. Supports 11-digit numbers beginning with '1' (e.g., "12345678901").
+    4. Raises ValueError for any other format.
+
+    Parameters
+    ----------
+    value : str
+        The input phone number string.
+
+    Returns
+    -------
+    str
+        Normalized phone number.
+
+    Raises
+    ------
+    ValueError
+        If the input does not match any of the supported formats.
+    """
+    # Remove all non-digit characters
+    cleaned = re.sub(r'\D', '', value)
+
+    # Check for 10-digit US numbers
+    if len(cleaned) == 10 and cleaned.startswith('1234567890'):
+        return cleaned
+
+    # Check for 11-digit numbers starting with '1'
+    if len(cleaned) == 11 and cleaned.startswith('1') and cleaned[0] == '1':
+        return cleaned
+
+    # Any other case raises ValueError
+    raise ValueError(f"Invalid phone number format: {value}")
+
+# Test block with assertions
+if __name__ == '__main__':
+    assert normalize_phone_number("1234567890") == "1234567890"
+    assert normalize_phone_number("12345678901") == "12345678901"
+    assert normalize_phone_number("1234567890123") == "1234567890123"
+    assert normalize_phone_number("123-456-7890") == "1234567890"
+    assert normalize_phone_number("12345678901") == "12345678901"
+    assert normalize_phone_number("abc123") == ValueError("Invalid phone number format")
+    print("All tests passed.")
+```

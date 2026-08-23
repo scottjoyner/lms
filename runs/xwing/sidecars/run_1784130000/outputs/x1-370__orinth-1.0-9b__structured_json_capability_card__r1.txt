@@ -1,0 +1,16 @@
+
+
+```json
+{
+  "task_fit": [
+    "General knowledge questions",
+    "Creative writing assistance",
+    "Code generation and debugging",
+    "Data analysis and summarization",
+    "Logical reasoning problems"
+  ],
+  "confidence": 0.85,
+  "limitations": [
+    "Cannot access real-time information beyond training data cutoff",
+    "May produce inaccurate results on highly specialized domains without additional context",
+    "Limited ability

@@ -1,0 +1,18 @@
+**Root Cause**  
+`payload['user']['id']` tries to subscript a **NoneType** object because `payload['user']` is `None`. This happens when:
+
+1. The `'user'` key does not exist in `payload`.  
+2. The value for `'user'` is not a dictionary (e.g., itâs `None`, a string, or another nonâdict type).  
+
+The script assumes every response contains a nested `{\"user\": {\"id\": â¦}}` structure before trying to index it.
+
+---
+
+**Safe Fix**  
+Use `.get()` with an explicit default so the code never attempts to subscript a `None`:
+
+```python
+# Safe â works even if 'user' is missing or not a dict
+user_id = payload.get('user', {}).get('id')
+
+# Alternatively, check existence first (more explicit)

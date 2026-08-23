@@ -1,0 +1,6 @@
+<analysis>
+Looking at this question, I need to identify:
+1. The control code from the provided context
+2. The exact sentence that proves/identifies it
+
+Examining the context, I found several "Project note" sections repeated multiple times. These are metadata

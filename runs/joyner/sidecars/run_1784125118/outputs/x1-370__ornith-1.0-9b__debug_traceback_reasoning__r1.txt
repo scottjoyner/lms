@@ -1,0 +1,38 @@
+## Root Cause
+
+`payload['user']['id']` fails because one of these is `None`:
+- `payload` itself (e.g., response body was empty)
+- `payload['user']` (key exists but value is `null`)
+- The result of a prior operation that returned `None` and got reassigned
+
+## Safe Fix
+
+Use `.get()` with defaults to short-circuit before subscripting:
+
+```python
+# Line 42 â safe navigation
+user_id = payload.get('user', {}).get('id') if payload else None
+```
+
+Or, for explicit early exit:
+
+```python
+if not payload or 'user' not in payload or not payload['user']:
+    return  # handle missing user gracefully
+user_id = payload['user']['id']
+```
+
+## Regression Tests
+
+```python
+import pytest
+
+def test_user_id_missing_payload():
+    """payload is None â should not raise TypeError"""
+    assert get_user_id(None) is None
+
+def test_user_key_absent_in_payload():
+    """'user' key missing â should return default, not subscript None"""
+    payload = {'token': 'abc'}
+    assert get_user_id(payload) is None
+```

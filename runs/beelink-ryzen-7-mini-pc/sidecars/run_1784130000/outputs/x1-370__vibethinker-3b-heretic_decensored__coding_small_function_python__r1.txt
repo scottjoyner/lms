@@ -1,0 +1,98 @@
+<think>The user asks: "Write a Python function named normalize_phone_number(value: str) -> str that strips non-digits, supports 10-digit US numbers and 11-digit numbers beginning with 1, and raises ValueError for anything else. Include a small if __name__ == '__main__' test block with at least five asserts."
+
+We need to output code only, no markdown. So just plain Python code.
+
+The function should:
+
+- Input: string value.
+- Strip non-digits (i.e., keep only digits).
+- Then check:
+  - If length is 10 digits: return the digits as a string.
+  - If length is 11 digits and first digit is '1' (meaning US number with country code), then strip the leading '1' and return the remaining 10 digits.
+  - Otherwise raise ValueError.
+
+Edge cases: Should we also ensure that after stripping non-digits, there are only digits? Yes. If no digits? Then raise.
+
+Implementation:
+
+```
+def normalize_phone_number(value: str) -> str:
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]
+    else:
+        raise ValueError("Invalid phone number format")
+```
+
+Test block:
+
+```
+if __name__ == '__main__':
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    assert normalize_phone_number('1-123-456-7890') == '1234567890'
+    assert normalize_phone_number('999999999999') == 'Invalid phone number format'
+    assert normalize_phone_number('123456789012') == '1234567890'
+    # Actually the above maybe not correct; we need at least five asserts.
+```
+
+But note: The third assert should raise ValueError, but we can't directly compare exception. Use try/except.
+
+Better:
+
+```
+assert isinstance(normalize_phone_number('999999999999'), ValueError)
+```
+
+Wait the function returns a string; raising ValueError will cause an exception, so we need to catch it.
+
+Simplify: Use `assert True` inside try block.
+
+Alternatively:
+
+```
+try:
+    normalize_phone_number('999999999999')
+except ValueError as e:
+    assert e == "Invalid phone number format"
+```
+
+But the error message may be same for all. Provide distinct tests maybe.
+
+Better to have asserts like:
+
+- Valid 10-digit with hyphens.
+- Valid 11-digit starting with 1.
+- Invalid length (e.g., 9 digits).
+- Invalid length (e.g., 12 digits not starting with 1).
+- All non-digits string raising error.
+
+Let's craft tests accordingly.
+
+Test block:
+
+```
+if __name__ == '__main__':
+    # Test valid 10-digit
+    assert normalize_phone_number('123-456-7890') == '1234567890'
+    # Test valid 11-digit with leading 1
+    assert normalize_phone_number('11234567890') == '1234567890'
+    # Test invalid 9-digit
+    try:
+        normalize_phone_number('123456789')
+    except ValueError as e:
+        assert e == "Invalid phone number format"
+    # Test invalid 12-digit not starting with 1
+    try:
+        normalize_phone_number('212345678901')
+    except ValueError as e:
+        assert e == "Invalid phone number format"
+    # Test all non-digits
+    try:
+        normalize_phone_number('#$%&*())
+    except ValueError as e:
+        assert e == "Invalid phone number format"
+```
+
+That's five asserts (including the try/except ones). Actually we have 5 tests

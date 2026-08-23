@@ -1,0 +1,51 @@
+<think>We need to write Python code implementing normalize_phone_number function.
+
+Requirements:
+
+- Input: str value
+- Output: normalized phone number as string of digits (presumably just the digits)
+- Strips non-digits from input.
+- Supports 10-digit US numbers and 11-digit numbers beginning with 1 (the latter is presumably with country code).
+- Raises ValueError for anything else.
+
+Also include a small if __name__ == '__main__' test block with at least five asserts.
+
+We need to output only code, no markdown formatting. So just plain text containing the Python code.
+
+Let's design function:
+
+def normalize_phone_number(value: str) -> str:
+    # Strip non-digits
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    # If empty or contains non-digit characters after stripping (should be only digits)
+    # Actually we already have only digits; but need to check length and pattern.
+    # Accept 10-digit numbers: len(digits) == 10
+    # Accept 11-digit numbers beginning with '1': len(digits) == 11 and digits[0] == '1'
+    # Return the cleaned digits (either case)
+    if len(digits) == 10:
+        return digits
+    elif len(digits) == 11 and digits[0] == '1':
+        return digits[1:]  # strip country code, keep 10-digit local number
+    else:
+        raise ValueError(f"Invalid phone number: {value!r}")
+
+Edge cases:
+
+- Input with spaces, dashes, parentheses, brackets, etc. Should be stripped.
+- Empty string -> ValueError
+- Non-digit only string (e.g., "1234567890") is fine; but if it's empty or not matching patterns raise.
+
+Testing block: at least five asserts:
+
+assert normalize_phone_number("123-456-7890") == "1234567890"
+assert normalize_phone_number(\"(123) 456-7890\") == \"1234567890\"\nassert normalize_phone_number(\"+1 (800) 555-1234\") == \"8005551234\"   # country code 1 removed\nassert normalize_phone_number(\"555-1234\") == ValueError  # should raise? Actually it's only 7 digits; invalid -> ValueError
+But we need to assert that it raises. Use try/except:
+
+try:\n    normalize_phone_number(\"555-1234\")\nexcept ValueError as e:\n    assert \"Invalid phone number\" in str(e), \"Should raise for short number\"\n\nAlso test 10-digit with no formatting: assert normalize_phone_number(\"1234567890\") == \"1234567890\"\nTest 11-digit starting with 1: assert normalize_phone_number(\"11234567890\") == \"1234567890\"\nTest invalid length: assert normalize_phone_number(\"1234567\") == ValueError\nTest empty string: assert normalize_phone_number(\"\") == ValueError\nTest non-digit characters only: assert normalize_phone_number(\"abc\") == ValueError\nTest already digits but wrong length: assert normalize_phone_number(\"12345678901\") == ValueError  # 11 digits without leading 1
+
+We need at least five asserts. Let's do:
+
+- "123-456-7890" -> "1234567890"
+- "(123) 456-7890" -> "1234567890"
+- "+1 (800) 555-1234" -> "8005551234"
+- \"1234567890\" -> \"1234567890\"\n- \"11234567890\" -> \"123

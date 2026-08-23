@@ -1,0 +1,9 @@
+{
+  "task_fit": ["Deep learning model architecture", "Natural language processing techniques", "Machine learning algorithms"],
+  "confidence": 0.85,
+  "limitations": [
+    "Limited to specific dataset type",
+    "May struggle with edge cases in production"
+  ],
+  "recommended_max_context_tokens": 2048
+}

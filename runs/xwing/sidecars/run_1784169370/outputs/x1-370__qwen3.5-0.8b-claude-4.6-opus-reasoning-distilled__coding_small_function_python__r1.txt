@@ -1,0 +1,36 @@
+def normalize_phone_number(value: str) -> str:
+    """
+    Normalize a phone number by stripping non-digits and validating its format.
+    
+    Args:
+        value: The phone number string to process
+        
+    Returns:
+        Normalized phone number as a string of digits, or ValueError if invalid
+        
+    Raises:
+        ValueError: If the input is not a valid phone number format
+    """
+    # Strip non-digits (keep only digits)
+    cleaned = value.replace('-', '').replace(' ', '')
+    
+    if not cleaned:
+        raise ValueError("Phone number cannot be empty")
+    
+    # Check if it's a 10-digit US number
+    if len(cleaned) == 10 and cleaned.isdigit():
+        return cleaned
+    
+    # Check if it's a 11-digit number beginning with 1
+    elif len(cleaned) == 11 and cleaned[0] == '1' and cleaned.isdigit():
+        return cleaned
+    
+    raise ValueError("Invalid phone number format")
+
+
+if __name__ == "__main__":
+    # Test cases
+    assert normalize_phone_number("555-1234") == "5551234"  # 10-digit US
+    assert normalize_phone_number("1-800-555-1234") == "18005551234"  # 11-digit starting with 1
+    assert normalize_phone_number("1234567890") == "1234567890"  # Valid 10-digit US
+    assert normalize_phone_number("1-2-3-4-5-6-7-8-9-0") == "123456789

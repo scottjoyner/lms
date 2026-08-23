@@ -1,0 +1,66 @@
+This repository summary indicates a prototype stage with significant architectural, security, and quality deficiencies. The immediate focus must be on establishing a secure, reliable, and maintainable foundation before adding features.
+
+Here is the concise implementation cycle plan:
+
+---
+
+## Implementation Cycle Plan
+
+### P0: Critical Security & Stability (Must Fix Immediately)
+*Focus: Eliminate immediate risks and ensure basic operational stability.*
+
+1.  **Implement Authentication & Authorization:** Introduce a robust authentication system (e.g., JWT/OAuth2) for securing the API endpoints.
+2.  **Implement Database Migrations:** Set up Alembic or similar tool to manage SQLite schema changes reliably.
+3.  **Improve Error Handling:** Implement centralized, standardized error handling in FastAPI (custom exceptions, proper HTTP status codes) and ensure detailed logging.
+4.  **Add Docker Healthcheck:** Implement a `/health` endpoint for Docker orchestration reliability.
+
+### P1.1: Core Quality & Maintainability (High Priority Refactoring)
+*Focus: Establish testing infrastructure and secure the API structure.*
+
+1.  **Implement Unit/Integration Tests:** Write tests for critical business logic, database interactions, and API endpoints using `pytest`.
+2.  **Refactor Endpoint Design:** Replace direct shell command endpoints with proper, validated FastAPI routes (e.g., Pydantic models validation).
+3.  **Data Validation Enforcement:** Ensure all input data is strictly validated using Pydantic models across the entire application layer.
+
+### P1.2: Infrastructure & Deployment Hardening (Production Readiness)
+*Focus: Automate the build, deployment, and operational environment.*
+
+1.  **Implement CI/CD Pipeline:** Set up GitHub Actions or GitLab CI to automate testing, linting, and building upon code changes.
+2.  **Containerize Application:** Create optimized Dockerfiles for both the FastAPI backend and the React frontend.
+3.  **Secure Database Access:** Review SQLite usage; if scaling is anticipated, plan migration to a more robust solution (e.g., PostgreSQL).
+
+### P2: Feature Expansion & Polish (Future Enhancements)
+*Focus: Adding advanced features and long-term architectural improvements.*
+
+1.  **Advanced Logging:** Implement structured logging (e.g., using `logging` module with JSON format) for easier monitoring.
+2.  **Frontend State Management:** Implement a proper state management solution in React (e.g., Redux, Zustand) for complex dashboard interactions.
+3.  **Rate Limiting:** Implement rate limiting on sensitive endpoints to mitigate brute-force attacks.
+
+---
+
+## Gap Analysis Summary
+
+### ð¡ï¸ Security Gaps Identified
+
+| Gap | Risk Level | Mitigation Strategy |
+| :--- | :--- | :--- |
+| **No Authentication/Authorization** | Critical | P0: Implement JWT/OAuth2 flow and role-based access control (RBAC). |
+| **Direct Shell Endpoint** | High | P1.1: Refactor endpoints to use internal business logic; eliminate direct shell execution entirely or sandbox it heavily. |
+| **Weak Error Handling** | Medium | P0: Implement custom exception handlers to prevent leaking stack traces and ensure consistent HTTP responses. |
+| **No CI/CD** | High | P1.2: Automate security scanning, testing, and deployment to catch regressions early. |
+
+### ð§  Logic & Architectural Gaps Identified
+
+| Gap | Impact | Mitigation Strategy |
+| :--- | :--- | :--- |
+| **No Migrations** | High (Data Corruption) | P0: Implement database migrations immediately to ensure schema evolution is tracked and reversible. |
+| **Weak Error Handling** | Medium | P0: Standardize error responses across the API for predictable client behavior. |
+| **Tight Coupling** | Medium | P1.1: Separate business logic from API routes; introduce service layers. |
+
+### Test Deliverables
+
+The following deliverables must be created to ensure code quality and prevent regressions:
+
+1.  **Unit Tests (P1.1):** Tests for all core business logic functions, data processing utilities, and Pydantic schema validation.
+2.  **Integration Tests (P1.1):** Tests verifying the full stack interaction: API request $\rightarrow$ Database operation $\rightarrow$ Response.
+3.  **API Contract Tests (P1.1):** Tests ensuring that all endpoints return correct status codes, required fields, and error messages under various conditions.
+4.  **Healthcheck Test

@@ -1,0 +1,118 @@
+## Implementation Plan: FastAPI Authentication & Admin System
+
+### Task 1: User Authentication System
+
+#### Task P0: Core Authentication Module
+
+**Acceptance Criteria:**
+1. JWT token generation and validation works correctly with proper header signing
+2. Registration endpoint accepts valid user data (username, email, password)
+3. Login endpoint returns authenticated tokens with appropriate roles
+4. Password reset functionality is functional with email verification
+5. Rate limiting prevents abuse on protected endpoints
+6. Role-based access control enforces admin vs regular user permissions
+
+**Test Expectations:**
+```python
+# Test 1: Token generation and validation
+assert jwt.encode({"user_id": 1, "role": "admin"}, "test.jwt") == b"eyJ..."
+assert jwt.decode(b"eyJ...", {"user_id": 1}) == {"user_id": 1, "role": "admin"}
+
+# Test 2: Registration with valid credentials
+response = post("/api/auth/register", data={"username": "testuser", "email": "test@example.com"})
+assert response.status_code == 201
+assert response.json()["data"]["token"] is not None
+
+# Test 3: Login returns tokens
+login_response = post("/api/auth/login", data={"username": "testuser", "password": "password"})
+assert login_response.status_code == 200
+assert login_response.json()["data"]["token"] is not None
+```
+
+**Implementation Details:**
+- Use `httpx` for HTTP client with rate limiting middleware
+- Implement JWT token lifecycle management (generation, validation, expiration)
+- Create role-based endpoint routes: `/api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `/api/auth/reset-password`
+- Add middleware for rate limiting and role checking
+
+---
+
+### Task 2: API Key Rotation System
+
+#### Task P1: Automatic Token Rotation Mechanism
+
+**Acceptance Criteria:**
+1. Automatic rotation of expired tokens without manual intervention
+2. Manual key replacement via admin panel with confirmation dialog
+3. Track token expiry dates and rotation history
+4. Graceful handling of invalid keys (retry logic, fallback to old token)
+5. Real-time notification for failed login attempts
+
+**Test Expectations:**
+```python
+# Test 1: Automatic token rotation on expiration
+import time
+token = jwt.encode({"user_id": 1}, "test.jwt", expires_in=3600)
+time.sleep(2)
+assert jwt.decode(token, {"user_id": 1}) == {"user_id": 1}
+
+# Test 2: Manual key replacement via admin panel
+admin_response = post("/api/admin/keys/renew")
+assert admin_response.status_code == 200
+assert "key_renewed" in admin_response.json()["data"]
+
+# Test 3: Invalid key handling with fallback
+try:
+    jwt.decode("invalid_token", {"user_id": 1})
+except jwt.ExpiredSignatureError as e:
+    assert str(e) == "Token has expired"
+    
+    # Should fall back to old token if available
+    old_token = jwt.decode(b"eyJ...", {"user_id": 1})
+    assert old_token["user_id"] == 1
+
+# Test 4: Failed login notification
+response = post("/api/auth/login", data={"username": "testuser", "password": ""})
+assert response.status_code == 500
+assert "error" in response.json()["data"]["message"]
+```
+
+**Implementation Details:**
+- Implement token expiration at configurable interval (e.g., every 3600 seconds)
+- Create `keys` endpoint for manual key management via admin panel
+- Add retry logic with exponential backoff for failed login attempts
+- Maintain a history of all token rotations and failures
+- Provide visual status indicators in dashboard showing "Active" vs "Inactive" keys
+
+---
+
+### Task 3: Comprehensive Audit Logging System
+
+#### Task P2: Audit Trail Implementation
+
+**Acceptance Criteria:**
+1. All user actions are logged with timestamp, user ID, and detailed description
+2. Log retention policy enforced (e.g., 7 days)
+3. Detailed audit logs include user profile information
+4. Export functionality for historical data
+5. Audit log can be queried by time range or user
+
+**Test Expectations:**
+```python
+# Test 1: Complete audit record creation
+audit_record = {
+    "timestamp": datetime.now().isoformat(),
+    "user_id": 1,
+    "action": "register",
+    "description": "User registered with username 'testuser'",
+    "source": "api"
+}
+
+# Verify all fields are present and correctly formatted
+assert audit_record["timestamp"] == datetime.now().isoformat()
+assert audit_record["user_id"] == 1
+assert audit_record["action"] == "register"
+
+# Test 2: Multiple log entries for same action
+log_entries = []
+for

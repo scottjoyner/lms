@@ -1,0 +1,129 @@
+
+
+# Implementation Plan: FastAPI Authentication & Admin System
+
+## Overview
+
+This plan implements a comprehensive authentication and administrative system for an existing FastAPI service using JWT tokens, API key rotation, audit logging, and role-based admin dashboards.
+
+---
+
+## P0 Tasks (High Priority)
+
+### Task 1: User Authentication System with JWT Tokens
+**Priority:** P0 - Critical for core functionality
+
+#### Implementation Steps:
+1. **Database Models**: Create `User` model with email, password_hash, name, and optional roles
+2. **JWT Token Generation**: Implement token generation logic in `auth_service.py`
+3. **Token Storage**: Store tokens in Redis (for simplicity) or database
+4. **Token Validation**: Implement token verification logic
+5. **Password Hashing**: Use bcrypt for password storage
+
+#### Acceptance Criteria:
+- User can create accounts with email and password
+- JWT tokens are generated correctly with expiration time
+- Token validation returns 401 if invalid or expired
+- Passwords are hashed using bcrypt
+- Users can log in successfully
+- Error messages are user-friendly
+
+#### Test Expectations:
+```python
+# Expected test results:
+â POST /api/auth/register - Returns 201 with token and user data
+â GET /api/auth/me - Returns JWT token (401 if not logged in)
+â POST /api/auth/login - Returns 401 if credentials invalid or expired
+â POST /api/auth/logout - Clears session tokens
+â POST /api/auth/password-reset - Returns email verification link
+â Token validation returns 403 for forged tokens
+```
+
+---
+
+### Task 2: API Key Rotation Mechanism
+**Priority:** P0 - Critical for security
+
+#### Implementation Steps:
+1. **API Key Management**: Create `keys_service.py` to manage rotation logic
+2. **Rotation Triggering**: Implement trigger mechanism (e.g., daily, after failed login)
+3. **Key Storage**: Store API keys in database or Redis
+4. **Expiration**: Set expiration time for rotated keys
+5. **Validation**: Verify current key matches stored key
+
+#### Acceptance Criteria:
+- New API keys are created with unique identifier and timestamp
+- Rotated keys expire after 7 days (adjust as needed)
+- Current API key is validated against stored key
+- Failed login attempts trigger automatic rotation
+- Existing API keys remain valid until expiration
+- Error messages indicate successful or failed rotation
+
+#### Test Expectations:
+```python
+# Expected test results:
+â POST /api/keys/create - Returns 201 with new token and expiry time
+â GET /api/keys/current - Returns current key (403 if not authorized)
+â POST /api/keys/rotate - Updates stored key to current one
+â Failed login attempts trigger rotation within 5 minutes
+â Existing API keys remain valid until their expiration date
+```
+
+---
+
+### Task 3: Admin Dashboard for User Management and Settings
+**Priority:** P0 - Critical for administrative functionality
+
+#### Implementation Steps:
+1. **Dashboard Architecture**: Create `admin_dashboard.py` with REST endpoints
+2. **User CRUD Operations**: Implement user list, create, read, update, delete
+3. **Role-Based Access Control (RBAC)**: Define roles and permissions
+4. **Settings Management**: Manage authentication settings
+5. **Real-time Notifications**: Use WebSockets for live updates
+
+#### Acceptance Criteria:
+- Admin can view all users with role-based visibility
+- Users can create, read, update, delete their own accounts
+- Users can change password (with confirmation)
+- Users can deactivate or re-enable accounts
+- API keys can be rotated by admin
+- Dashboard displays real-time user list and activity
+
+#### Test Expectations:
+```python
+# Expected test results:
+â GET /api/admin/users - Returns paginated users with role filtering
+â POST /api/admin/user/create - Creates new user with validation
+â PUT /api/admin/user/:id - Updates user details (password, name)
+â DELETE /api/admin/user/:id - Deletes user account
+â POST /api/admin/role - Creates or updates admin role
+â GET /api/admin/settings - Returns current authentication settings
+â Real-time notifications sent to authenticated users on dashboard changes
+```
+
+---
+
+## P1 Tasks (Medium Priority)
+
+### Task 4: Audit Logging Functionality
+**Priority:** P1 - Security and compliance
+
+#### Implementation Steps:
+1. **Audit Log Model**: Create `audit_log.py` with structured logging
+2. **Log Table Design**: Implement table structure for audit records
+3. **Event Types**: Define types of events (login, logout, key rotation, etc.)
+4. **Logging Service**: Implement log generation and storage
+5. **Integration**: Connect to database or external service
+
+#### Acceptance Criteria:
+- All authentication events are logged with timestamp
+- Log entries include user ID, action, event type, details
+- Logs can be retrieved by time period (optional)
+- Audit logs are persisted securely
+- No sensitive data is exposed in audit logs
+
+#### Test Expectations:
+```python
+# Expected test results:
+â GET /api/audit - Returns paginated audit records with filters
+â POST /api/audit/create - Creates new audit entry

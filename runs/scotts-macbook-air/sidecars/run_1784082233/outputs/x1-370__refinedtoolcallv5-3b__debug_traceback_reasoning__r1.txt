@@ -1,0 +1,2 @@
+**Root Cause**  
+`payload['user']['id']` raises `TypeError: 'NoneType' object is not subscriptable` because Python tries to treat the value of `payload['user']` as an index into another mapping, but that value is **None** (or doesn't exist

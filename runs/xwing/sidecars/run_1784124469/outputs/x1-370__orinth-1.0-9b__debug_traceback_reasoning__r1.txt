@@ -1,0 +1,41 @@
+## Root Cause
+
+`payload` is `None`, so accessing `payload['user']['id']` fails because you can't subscript a `NoneType`. This typically happens when:
+
+- The API response was empty or failed (e.g., 401/500) and the client returned `None`
+- A middleware/validation step didn't populate `payload` before this line runs
+- An upstream service returned no data, and the parser defaulted to `None` instead of raising
+
+## Safe Fix
+
+```python
+# Option 1: Early guard with explicit None check
+if payload is None or 'user' not in payload:
+    raise ValueError("Missing user_id in response")
+user_id = payload['user']['id']
+
+# Option 2: Defensive access (returns sentinel on failure)
+def get_user_id(payload):
+    if not isinstance(payload, dict) or 'user' not in payload:
+        return None
+    return payload['user'].get('id')
+```
+
+## Regression Tests
+
+```python
+import pytest
+
+class TestPayloadAccess:
+    def test_none_payload_raises(self):
+        """Regression: ensures None payload is caught before subscript."""
+        with pytest.raises(ValueError, match="Missing user_id"):
+            if payload is None or 'user' not in payload:
+                raise ValueError("Missing user_id in response")
+
+    def test_missing_user_key_raises(self):
+        """Regression: ensures absent 'user' key is caught before nested subscript."""
+        with pytest.raises(ValueError, match="Missing user_id"):
+            if payload is None or 'user' not in payload:
+                raise ValueError("Missing user_id in response")
+```

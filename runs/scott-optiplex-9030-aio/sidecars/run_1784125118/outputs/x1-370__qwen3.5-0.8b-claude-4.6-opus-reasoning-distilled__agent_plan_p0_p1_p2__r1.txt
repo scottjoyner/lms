@@ -1,0 +1,172 @@
+
+
+# Implementation Plan for Authentication, API Key Rotation, Audit Logging, and Admin Dashboards
+
+## Overview
+This plan implements a secure authentication system with JWT tokens, token rotation mechanism, comprehensive audit logging, and an admin dashboard using FastAPI's built-in capabilities.
+
+---
+
+## P0: Core Authentication System & Token Management
+
+### Task 1: Implement JWT-Based User Authentication
+
+#### Acceptance Criteria:
+- Users can be created via POST `/api/auth/register` with required fields (username, email, password)
+- Login endpoint returns valid tokens and refresh token on successful authentication
+- Refresh token is stored securely in session storage
+- Invalid login attempts trigger appropriate error responses
+- Token expiration is enforced within 1 hour for standard users
+
+#### Test Expectations:
+```python
+# Expected behavior after implementation:
+POST /api/auth/register -> {
+    "code": 401,
+    "message": "Invalid credentials",
+    "error": {"status": 401}
+}
+
+POST /api/auth/login -> {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "123"
+}
+```
+
+---
+
+### Task 2: Implement Token Rotation Mechanism
+
+#### Acceptance Criteria:
+- API keys can be rotated via `/api/api-keys/rotate` endpoint
+- New token is generated with same expiration time and scope
+- Old tokens are invalidated (stored in session)
+- Failed attempts to rotate old tokens trigger alert notifications
+- Rotation fails gracefully if no valid rotation key exists
+
+#### Test Expectations:
+```python
+# Expected behavior after implementation:
+POST /api/api-keys/rotate -> {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "456"
+}
+
+GET /api/api-keys/status -> {
+    "active_tokens": [
+        {"token": "eyJhbGciOiJIUzI1NiIs...", "expires_at": 1732980000},
+        ...
+    ],
+    "total_active": 5,
+    "failed_attempts": 2
+}
+
+POST /api/api-keys/rotate -> {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "789"
+}
+```
+
+---
+
+### Task 3: Implement Audit Logging System
+
+#### Acceptance Criteria:
+- All user actions are logged with timestamp, user ID, and action type
+- API key rotation events are recorded
+- Admin dashboard can view audit logs for all users
+- Failed login attempts are tracked separately from successful logins
+- Audit logs are persisted to database
+
+#### Test Expectations:
+```python
+# Expected behavior after implementation:
+POST /api/auth/login -> {
+    "token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "123"
+}
+
+GET /api/audit/logs -> {
+    "total_logs": 5,
+    "recent_logs": [
+        {"timestamp": "...", "user_id": "123", "action": "login", "details": {...}},
+        ...
+    ]
+}
+```
+
+---
+
+### Task 4: Implement Admin Dashboard
+
+#### Acceptance Criteria:
+- Admin dashboard accessible via `/api/admin/dashboard` endpoint
+- Role-based access control (admin, editor, viewer)
+- View all user activity history
+- View API key rotation logs
+- Export audit reports to PDF/CSV format
+- Real-time token status monitoring
+
+#### Test Expectations:
+```python
+# Expected behavior after implementation:
+GET /api/admin/dashboard -> {
+    "dashboard": {
+        "total_users": 15,
+        "active_tokens": 8,
+        "failed_logins_today": 3,
+        "recent_activity": [
+            {"user_id": "123", "action": "login", "timestamp": "..."},
+            ...
+        ]
+    }
+}
+
+POST /api/admin/dashboard/export -> {
+    "format": "csv",
+    "columns": ["user_id", "username", "last_login", "token_status"],
+    "data": [...]
+}
+```
+
+---
+
+## P1: Integration & Security Enhancements
+
+### Task 5: Implement Secure Token Storage
+
+#### Acceptance Criteria:
+- Session tokens stored in secure storage (Redis, PostgreSQL, or database)
+- Refresh token is separate from session token for security
+- Both tokens can be retrieved via `/api/auth/refresh` endpoint
+- Invalidating a refresh token requires valid session token
+- Token expiration is configurable per user
+
+#### Test Expectations:
+```python
+# Expected behavior after implementation:
+GET /api/auth/session -> {
+    "session_token": "eyJhbGciOiJIUzI1NiIs...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "user_id": "456"
+}
+
+POST /api/auth/refresh -> {
+    "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+
+GET /api/api-keys/status -> {
+    "active_tokens": [
+        {"token": "eyJhbGciOiJIUzI1NiIs...", "expires_at": 1732980000},
+        ...
+    ],
+    "total_active": 5,
+    "failed_attempts": 2
+}
+```
+
+---
+
+### Task 6: Implement Rate Limiting for Authentication
+

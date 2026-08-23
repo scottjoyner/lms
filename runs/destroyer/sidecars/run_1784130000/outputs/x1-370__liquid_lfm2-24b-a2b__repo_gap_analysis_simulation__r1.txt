@@ -1,0 +1,46 @@
+### Implementation Cycle Plan
+
+#### **P0 (Immediate Critical Fixes)**
+- **Security**:  
+  - Implement authentication/authorization (e.g., JWT/OAuth2 for user roles).  
+  - Add input validation/sanitization to prevent SQL injection, XSS, and command injection.  
+  - Secure SQLite permissions (e.g., restrict file access, avoid world-writable paths).  
+- **Logic Gaps**:  
+  - Replace direct shell command endpoint with a secure API layer (e.g., authenticated endpoints for admin actions).  
+  - Fix weak error handling: centralize error responses, log errors securely, and avoid exposing stack traces.  
+- **Infrastructure**:  
+  - Add Docker healthcheck for the FastAPI service (e.g., `/health` endpoint with status checks).  
+
+#### **P1.1 (Core Feature Enhancements)**  
+- **Database**:  
+  - Introduce database migrations (e.g., Alembic for SQLite) to manage schema changes safely.  
+- **Testing**:  
+  - Write unit tests for FastAPI endpoints (e.g., pytest, mock DB interactions).  
+  - Add integration tests for React dashboard API calls (mock backend responses).  
+
+#### **P1.2 (Operational & Reliability Improvements)**  
+- **CI/CD**:  
+  - Set up CI pipeline (GitHub Actions/GitLab CI) to automate testing, linting, and deployment.  
+- **Observability**:  
+  - Add logging (e.g., structured logs with `logging` module) and monitoring for API errors.  
+
+#### **P2 (Long-Term Optimization)**  
+- **Scalability**:  
+  - Migrate SQLite to PostgreSQL for production-grade reliability.  
+  - Containerize the app with Docker (multi-stage builds, minimal base images).  
+- **Security Hardening**:  
+  - Implement rate limiting, CORS policies, and HTTPS enforcement.  
+  - Audit dependencies for vulnerabilities (e.g., `safety`, `npm audit`).  
+
+---
+
+### **Key Gaps & Deliverables**  
+| **Category**       | **Issue**                                                                 | **Deliverable**                          |  
+|---------------------|---------------------------------------------------------------------------|------------------------------------------|  
+| **Security**        | No auth, weak error handling, SQL injection risk.                         | Auth module, input validation, error middleware. |  
+| **Logic**           | Direct shell commands expose system; no schema migrations.                | Secure API layer, Alembic migrations.     |  
+| **Testing**         | No tests for backend/frontend or CI pipeline.                            | Unit/integration test suites (pytest, Jest). |  
+| **CI/CD**           | No automated testing/deployment workflows.                                | CI config files (`.github/workflows/`, `.gitlab-ci.yml`). |  
+| **Observability**   | Missing logs, monitoring, and health checks.                              | Centralized logging + Docker healthcheck.  |  
+
+**Priority**: Address P0 immediately to mitigate critical risks (auth, security, reliability), then progress through P1.1/P1.2 for core functionality, followed by P2 for scalability.

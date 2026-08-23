@@ -1,0 +1,61 @@
+Here's a safe, step-by-step approach to cleaning up Docker and temp files while protecting your system:
+
+## ð Step 1: Review Before Cleaning (Safe)
+Run these first to see what will be affected:
+```bash
+# Check running/stopped containers
+docker ps -a
+
+# Check unused images and volumes
+docker images --filter "dangling=true"
+docker volume ls --filter "dangling=true"
+
+# List temp files by size
+ls -lhS /tmp | head -20
+du -sh $TMPDIR 2>/dev/null || du -sh /tmp
+```
+
+## ð§¹ Step 2: Docker Cleanup (Requires Confirmation)
+**â ï¸ Destructive action below. Confirm before running:**
+```bash
+# Safe default: removes stopped containers, unused networks, dangling images, build cache
+docker system prune
+
+# Only run if you explicitly want to remove ALL unused images and volumes:
+# docker system prune -a --volumes
+```
+**Confirmation prompt:**  
+`Type "CONFIRM DOCKER PRUNE" to proceed. This will delete stopped containers and unused resources.`
+
+## ðï¸ Step 3: Temp Files Cleanup (Requires Confirmation)
+**â ï¸ Destructive action below. Confirm before running:**
+```bash
+# Remove files older than 7 days from /tmp safely
+find /tmp -type f -mtime +7 -delete
+
+# Or remove everything in $TMPDIR if you're sure:
+# rm -rf "$TMPDIR"/*
+```
+**Confirmation prompt:**  
+`Type "CONFIRM TEMP CLEANUP" to proceed. This will delete old temp files.`
+
+## ð Step 4: Permission Reset (Clarification Needed)
+Resetting system-wide permissions can break services. Please specify:
+- Which directories need permission fixes? (e.g., `/var/lib/docker`, `~/.docker`)
+- What user/group should own them?
+- Are you seeing specific permission errors?
+
+**Safe targeted example:**
+```bash
+# Fix Docker socket ownership if needed
+sudo chown root:$USER /var/run/docker.sock 2>/dev/null || true
+```
+
+## Recommended Safe Workflow
+1. Run Step 1 review commands first
+2. Back up important data/configs: `docker save $(docker images -q) > backup.tar`
+3. Confirm Docker prune explicitly
+4. Confirm temp cleanup explicitly  
+5. Provide specific permission targets for Step 4
+
+**Would you like me to help you run the review commands first, or do you have specific directories/permissions that need attention?**

@@ -1,0 +1,76 @@
+
+**Root Cause**  
+The error occurs because `payload['user']` is **None** (or the key `'user'` does not exist) when Python tries to subscript it. The line  
+
+```python
+user_id = payload['user']['id']
+```  
+
+expects a dictionary, but receives `None`, raising:
+
+```
+TypeError: 'NoneType' object is not subscriptable
+```
+
+Typical scenarios:
+* The incoming JSON payload has `"user": null`.
+* The topâlevel key `'user'` is missing.
+* An upstream service returns an empty dict and the code assumes it contains a `'user'` entry.
+
+---
+
+**Safe Fix**  
+
+```python
+def extract_user_id(payload):
+    """
+    Safely extracts user.id from a payload, handling None or missing keys.
+    Raises ValueError with a clear message if the data is unusable.
+    """
+    # 1ï¸â£ Guard against a null topâlevel 'user' key
+    user = payload.get('user')
+    if user is None:
+        raise ValueError("Missing required field: 'user' in payload")
+
+    # 2ï¸â£ Guard against an empty dict or missing inner 'id'
+    user_id = user.get('id')
+    if user_id is None:
+        raise ValueError(
+            "User object lacks required field: 'id'; received {!r}".format(user)
+        )
+    return user_id
+```
+
+*Uses `dict.get()` with explicit checks instead of direct subscripting, preventing the TypeError.*  
+
+---
+
+**Regression Tests**
+
+```python
+import pytest
+
+# Sample payloads used throughout the test suite
+VALID_PAYLOAD = {
+    "user": {"id": 42, "name": "Alice"},
+    "user": {"id": None},          # id is null â should raise ValueError
+    "user": {},                   # user key missing â should raise ValueError
+}
+
+def extract_user_id(payload):
+    """Safe extraction function (same as above)."""
+    user = payload.get('user')
+    if user is None:
+        raise ValueError("Missing required field: 'user' in payload")
+    return user.get('id')
+
+# ----------------------------------------------------------------------
+# Test 1 â happy path
+def test_user_id_present():
+    """Ensure normal case works."""
+    assert extract_user_id(VALID_PAYLOAD) == 42
+
+# ----------------------------------------------------------------------
+# Test 2 â null id inside a valid user object
+def test_user_id_null():
+    """

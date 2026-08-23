@@ -1,0 +1,14 @@
+<think>The user wants me to produce strict JSON only, no markdown formatting. They want a JSON object with specific keys:
+
+- task_fit: an array of strings
+- confidence: a number from 0 to 1
+- limitations: an array of strings
+- recommended_max_context_tokens: an integer
+
+No extra keys.
+
+We need to think about what the "task" is. The user hasn't specified any particular context; they just gave instructions for how to format output. Usually, we might respond with something generic or ask clarifying question? But given that they want a JSON object now and no other text, I should produce some plausible values.
+
+Given there's no specific task described beyond the formatting instruction, perhaps it's best to provide a reasonable default set of values: e.g., confidence 0.85; limitations array with maybe two items like "Context window may be insufficient for very long documents" and "Some advanced features may not be fully supported". recommended_max_context_tokens could be something typical like 4096 or 8192.
+
+But we need to think about the context: The user is asking me to produce a JSON object with those keys. There's no specific content for task_fit, limitations etc. So I should probably

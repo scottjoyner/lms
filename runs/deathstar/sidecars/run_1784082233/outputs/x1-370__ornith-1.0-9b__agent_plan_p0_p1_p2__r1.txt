@@ -1,0 +1,53 @@
+# Implementation Plan: Security & Observability Enhancements for FastAPI Service
+
+## Architecture Context
+
+- **Framework**: FastAPI 0.104+ with uvicorn/gunicorn
+- **Database**: PostgreSQL (existing)
+- **Auth Strategy**: JWT + API keys (dual-mode)
+- **Deployment**: Containerized (Docker/K8s)
+- **Existing Patterns**: Pydantic models, dependency injection, async handlers
+
+---
+
+## P0 â Critical Path (Must Ship Before v2.0)
+
+### P0-1: User Authentication System
+
+**Scope**: JWT-based auth with refresh tokens, password hashing, login/register/logout flows
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **P0-1.1** Register endpoint (`POST /auth/register`) | - Creates user with bcrypt-hashed password<br>- Generates unique email token for verification<br>- Returns 201 on success, 409 if email exists | - `register()` returns `{"access_token": "...", "refresh_token": "..."}`<br>- Duplicate registration returns HTTP 409<br>- Unverified user cannot access protected endpoints (HTTP 403) |
+| **P0-1.2** Login endpoint (`POST /auth/login`) | - Validates credentials, issues JWT + refresh token pair<br>- Refresh token has 7-day TTL; access token 15-min TTL<br>- Supports optional `remember_me` flag for extended session | - Valid login returns both tokens in response body<br>- Invalid password returns HTTP 401 with generic message<br>- Expired refresh token cannot obtain new access token (HTTP 403) |
+| **P0-1.3** Token validation middleware | - Validates JWT signature, expiry, and issuer claims<br>- Rejects tampered or expired tokens before route handlers execute<br>- Logs invalid attempts to audit trail | - Valid token passes through middleware without delay (<5ms)<br>- Expired token returns HTTP 401<br>- Tampered payload (modified sub claim) is rejected |
+| **P0-1.4** Password reset flow | - Email-based reset with time-limited token (30-min TTL)<br>- Forces password change on next login after reset<br>- Rate-limit: max 5 attempts per hour per email | - Reset link expires after 30 minutes<br>- Attacker cannot brute-force via repeated requests (HTTP 429 after limit) |
+
+**Test Stack**: `pytest-asyncio`, `httpx` for auth tests, `faker` for data generation
+
+---
+
+### P0-2: API Key Rotation & Management
+
+**Scope**: Generate, rotate, and revoke API keys with automatic rotation scheduling
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **P0-2.1** API key generation (`POST /api-keys`) | - Generates 32-byte random key stored in DB<br>- Associates key with user and optional scopes (read/write/admin)<br>- Returns `{"key": "sk_live_...", "expires_at": "..."}` | - Generated key is unique across all users<br>- Key can be used to authenticate requests (`Authorization: Bearer sk_live_...`)<br>- Expired keys return HTTP 401 |
+| **P0-2.2** Automatic rotation scheduler | - Cron job rotates API keys every 90 days (configurable)<br>- Old key is disabled; new key issued to same user<br>- Rotation event logged in audit trail with old/new key IDs | - Key older than `rotation_days` triggers automatic rotation<br>- During rotation, old key returns HTTP 401, new key works<br>- No service disruption during rotation (graceful migration) |
+| **P0-2.3** Key revocation (`POST /api-keys/{key_id}/revoke`) | - Immediately invalidates specified API key<br>- Returns `{"revoked": true}`<br>- Revoked keys cannot be used for any request | - Revoked key returns HTTP 401 immediately<br>- Other active keys remain functional<br>- Revocation is idempotent (multiple calls return same result) |
+| **P0-2.4** Key listing (`GET /api-keys`) | - Returns paginated list of user's API keys with status<br>- Includes `created_at`, `last_used_at`, `expires_at` fields | - Response includes `{"items": [...], "total": N, "page": 1}`<br>- Deleted/revoked keys excluded from listing<br>- Pagination works correctly at boundaries (empty pages) |
+
+**Test Stack**: `pytest-cron` for scheduler tests, `moto[core]` for mock AWS if using S3 key storage
+
+---
+
+### P0-3: Audit Logging Infrastructure
+
+**Scope**: Structured audit trail capturing all auth events, API calls, and admin actions
+
+| Task | Acceptance Criteria | Test Expectations |
+|------|---------------------|-------------------|
+| **P0-3.1** Audit event schema & storage | - Events stored in dedicated `audit_log` table with: `event_type`, `user_id`, `ip_address`, `user_agent`, `timestamp`, `metadata`<br>- Partitioned by month for efficient querying<br>- Minimum retention: 2 years (configurable) | - Event insert completes within 50ms under normal load<br>- Table supports range queries on timestamp (e.g., "last 7 days")<br>- Retention policy auto-deletes events older than configured period |
+| **P0-3.2** Middleware audit capture | - All HTTP requests logged: method, path, status code, response time<br>- Authenticated requests include user identity and API key ID<br>- Failed auth attempts logged with reason (invalid token, expired, etc.) | - Every request generates an audit event (verified via test assertions)<br>- Response time logged within Â±10ms of actual handler execution<br>- 4xx/5xx responses flagged as `event_type: "error"` |
+| **P0-3.3** Sensitive
