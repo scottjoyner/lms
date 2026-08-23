@@ -1,0 +1,6 @@
+{"node":"lenovo","model":"liquid/lfm2.5-1.2b","start":"2026-08-23T18:23:37-04:00"}
+{"conc": 1, "requests": 1, "wall_s": 50.36, "total_completion_tokens": 256, "aggregate_tps": 5.1, "per_stream_tps": [5.1], "lat_min_s": 50.36, "lat_max_s": 50.36, "node": "lenovo", "model": "liquid/lfm2.5-1.2b"}
+{"conc": 2, "requests": 2, "wall_s": 61.93, "total_completion_tokens": 512, "aggregate_tps": 8.3, "per_stream_tps": [4.1, 4.1], "lat_min_s": 61.74, "lat_max_s": 61.93, "node": "lenovo", "model": "liquid/lfm2.5-1.2b"}
+{"conc": 4, "requests": 4, "wall_s": 121.03, "total_completion_tokens": 1024, "aggregate_tps": 8.5, "per_stream_tps": [2.1, 4.2, 4.2, 2.1], "lat_min_s": 60.53, "lat_max_s": 121.03, "node": "lenovo", "model": "liquid/lfm2.5-1.2b"}
+{"conc": 8, "requests": 8, "wall_s": 241.66, "total_completion_tokens": 2048, "aggregate_tps": 8.5, "per_stream_tps": [2.1, 1.1, 1.1, 1.4, 4.2, 4.2, 1.4, 2.1], "lat_min_s": 60.93, "lat_max_s": 241.65, "node": "lenovo", "model": "liquid/lfm2.5-1.2b"}
+{"node":"lenovo","done":true,"end":"2026-08-23T18:31:36-04:00"}

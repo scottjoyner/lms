@@ -1,0 +1,24 @@
+{"node":"xwing","model":"ternary-bonsai-27b@?","start":"2026-08-23T18:23:37-04:00"}
+{"node":"xwing","conc":1,"error":"failed"}
+{"node":"xwing","conc":2,"error":"failed"}
+{"node":"xwing","conc":4,"error":"failed"}
+{"node":"xwing","conc":8,"error":"failed"}
+{"node":"xwing","done":true,"end":"2026-08-23T18:27:29-04:00"}
+{"node":"xwing","model":"prism-ml/bonsai-27b","start":"2026-08-23T18:37:19-04:00"}
+{"conc": 1, "requests": 1, "wall_s": 106.45, "total_completion_tokens": 256, "aggregate_tps": 2.4, "per_stream_tps": [2.4], "lat_min_s": 106.44, "lat_max_s": 106.44, "node": "xwing", "model": "prism-ml/bonsai-27b"}
+{"node":"xwing","conc":2,"error":"failed"}
+{"node":"xwing","conc":4,"error":"failed"}
+{"node":"xwing","conc":8,"error":"failed"}
+{"node":"xwing","done":true,"end":"2026-08-23T18:40:16-04:00"}
+{"node":"xwing","model":"prism-ml/bonsai-27b","start":"2026-08-23T18:41:52-04:00"}
+{"node":"xwing","conc":1,"error":"failed"}
+{"node":"xwing","conc":2,"error":"failed"}
+{"node":"xwing","conc":4,"error":"failed"}
+{"node":"xwing","conc":8,"error":"failed"}
+{"node":"xwing","done":true,"end":"2026-08-23T18:41:57-04:00"}
+{"node":"xwing","model":"prism-ml/bonsai-27b","start":"2026-08-23T18:43:21-04:00"}
+{"node":"xwing","conc":1,"error":"failed"}
+{"node":"xwing","conc":2,"error":"failed"}
+{"node":"xwing","conc":4,"error":"failed"}
+{"node":"xwing","conc":8,"error":"failed"}
+{"node":"xwing","done":true,"end":"2026-08-23T18:45:21-04:00"}

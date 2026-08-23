@@ -1,0 +1,7 @@
+{"node":"macbook-air","model":"qwen3.5-0.8b-mlx","start":"2026-08-23T18:23:37-04:00"}
+{"conc": 1, "requests": 1, "wall_s": 29.97, "total_completion_tokens": 255, "aggregate_tps": 8.5, "per_stream_tps": [8.5], "lat_min_s": 29.97, "lat_max_s": 29.97, "node": "macbook-air", "model": "qwen3.5-0.8b-mlx"}
+{"conc": 2, "requests": 2, "wall_s": 36.18, "total_completion_tokens": 510, "aggregate_tps": 14.1, "per_stream_tps": [7.0, 7.1], "lat_min_s": 36.11, "lat_max_s": 36.18, "node": "macbook-air", "model": "qwen3.5-0.8b-mlx"}
+{"conc": 4, "requests": 4, "wall_s": 39.5, "total_completion_tokens": 1020, "aggregate_tps": 25.8, "per_stream_tps": [6.5, 16.2, 16.2, 9.9], "lat_min_s": 15.73, "lat_max_s": 39.5, "node": "macbook-air", "model": "qwen3.5-0.8b-mlx"}
+{"conc": 8, "requests": 8, "wall_s": 59.97, "total_completion_tokens": 2040, "aggregate_tps": 34.0, "per_stream_tps": [4.3, 17.1, 4.3, 10.5, 17.1, 9.5, 9.5, 10.5], "lat_min_s": 14.87, "lat_max_s": 59.96, "node": "macbook-air", "model": "qwen3.5-0.8b-mlx"}
+{"node":"macbook-air","done":true,"end":"2026-08-23T18:26:27-04:00"}
+{"conc": 16, "requests": 16, "wall_s": 88.47, "total_completion_tokens": 4080, "aggregate_tps": 46.1, "per_stream_tps": [14.5, 14.4, 3.9, 7.4, 6.2, 6.0, 6.0, 8.3, 4.8, 5.5, 8.7, 2.9, 4.7, 8.3, 4.7, 2.9], "lat_min_s": 17.64, "lat_max_s": 88.46}

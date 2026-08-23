@@ -1,0 +1,6 @@
+{"node":"optiplex","model":"qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled","start":"2026-08-23T18:23:37-04:00"}
+{"conc": 1, "requests": 1, "wall_s": 23.96, "total_completion_tokens": 256, "aggregate_tps": 10.7, "per_stream_tps": [10.7], "lat_min_s": 23.96, "lat_max_s": 23.96, "node": "optiplex", "model": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"}
+{"conc": 2, "requests": 2, "wall_s": 38.72, "total_completion_tokens": 512, "aggregate_tps": 13.2, "per_stream_tps": [6.6, 6.6], "lat_min_s": 38.62, "lat_max_s": 38.72, "node": "optiplex", "model": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"}
+{"conc": 4, "requests": 4, "wall_s": 68.99, "total_completion_tokens": 1024, "aggregate_tps": 14.8, "per_stream_tps": [3.7, 3.7, 3.7, 3.7], "lat_min_s": 68.38, "lat_max_s": 68.99, "node": "optiplex", "model": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"}
+{"conc": 8, "requests": 8, "wall_s": 136.53, "total_completion_tokens": 2048, "aggregate_tps": 15.0, "per_stream_tps": [1.9, 3.8, 1.9, 3.7, 3.7, 1.9, 1.9, 3.7], "lat_min_s": 68.24, "lat_max_s": 136.53, "node": "optiplex", "model": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"}
+{"node":"optiplex","done":true,"end":"2026-08-23T18:28:09-04:00"}
