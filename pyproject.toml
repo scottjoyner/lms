@@ -63,6 +63,9 @@ py-modules = [
   "lms_eval",
 ]
 
+[tool.setuptools.package-dir]
+"" = "src"
+
 [tool.setuptools.package-data]
 "lms_agent_bench" = ["benchmarks/*.json", "schemas/*.json"]
 
