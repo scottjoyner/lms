@@ -1,0 +1,370 @@
+
+=== [xwing] benchmark start (http://xwing.tailcb8954.ts.net:1234/v1) ===
+
+=== [joyner] benchmark start (http://joyner.tailcb8954.ts.net:1234/v1) ===
+
+=== [deathstar] benchmark start (http://100.78.106.121:1234/v1) ===
+
+=== [beelink-ryzen-7-mini-pc] benchmark start (http://100.85.72.121:1234/v1) ===
+
+=== [lenovo-ideapad-330s-15ikb] benchmark start (http://scott-lenovo-ideapad-330Wrote results to /home/scott/git/lms/runs/xwing/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/xwing/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/xwing/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/xwing/sidecars/run_1784124469
+Creating LMS run: /home/scott/git/lms/runs/xwing
+Inventory rows: 6
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/xwing --timeout 900 --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --probe-base-url http://xwing.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/xwing --sidecar-dir /home/scott/git/lms/runs/xwing/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/xwing/capability_matrix.csv
+wrote /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/xwing/agent_recommendations.md
+_profile.json
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/machine_synopsis.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_profile.json
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_synopsis.md
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_profile.json
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_synopsis.md
+Wrote results to /home/scott/git/lms/runs/scotts-macbook-air/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/scotts-macbook-air/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/scotts-macbook-air/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/scotts-macbook-air/sidecars/run_1784125118
+Creating LMS run: /home/scott/git/lms/runs/scotts-macbook-air
+Inventory rows: 4
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/scotts-macbook-air --timeout 900 --inventory-csv /home/scott/git/lms/runs/scotts-macbook-air/lmstudio_inventory.csv --probe-base-url http://scotts-macbook-air.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/scotts-macbook-air/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/scotts-macbook-air --sidecar-dir /home/scott/git/lms/runs/scotts-macbook-air/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/scotts-macbook-air/capability_matrix.csv
+wrote /home/scott/git/lms/runs/scotts-macbook-air/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/scotts-macbook-air/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/model_fit.csv
+wrote /home/scott/git/lms/runs/scotts-macbook-air/model_fit.md
+[scotts-macbook-air] model_fit rc=0
+  stamped host_name=scotts-macbook-air in capability_matrix.csv
+  stamped host_name=scotts-macbook-air in run_summary.csv
+  stamped host_name=scotts-macbook-air in task_summary.csv
+  stamped host_name=scotts-macbook-air in run_results.csv
+  stamped host_name=scotts-macbook-air in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/scott-optiplex-9030-aio/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/scott-optiplex-9030-aio/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/scott-optiplex-9030-aio/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/scott-optiplex-9030-aio/sidecars/run_1784125118
+Creating LMS run: /home/scott/git/lms/runs/scott-optiplex-9030-aio
+Inventory rows: 11
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/scott-optiplex-9030-aio --timeout 900 --inventory-csv /home/scott/git/lms/runs/scott-optiplex-9030-aio/lmstudio_inventory.csv --probe-base-url http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/scott-optiplex-9030-aio/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/scott-optiplex-9030-aio --sidecar-dir /home/scott/git/lms/runs/scott-optiplex-9030-aio/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/capability_matrix.csv
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/scott-optiplex-9030-aio/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/model_fit.csv
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/model_fit.md
+[scott-optiplex-9030-aio] model_fit rc=0
+  stamped host_name=scott-optiplex-9030-aio in capability_matrix.csv
+  stamped host_name=scott-optiplex-9030-aio in run_summary.csv
+  stamped host_name=scott-optiplex-9030-aio in task_summary.csv
+  stamped host_name=scott-optiplex-9030-aio in run_results.csv
+  stamped host_name=scott-optiplex-9030-aio in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/x1-370/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/x1-370/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/x1-370/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/x1-370/sidecars/run_1784125118
+Creating LMS run: /home/scott/git/lms/runs/x1-370
+Inventory rows: 22
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/x1-370 --timeout 900 --inventory-csv /home/scott/git/lms/runs/x1-370/lmstudio_inventory.csv --probe-base-url http://127.0.0.1:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/x1-370/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/x1-370 --sidecar-dir /home/scott/git/lms/runs/x1-370/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/x1-370/capability_matrix.csv
+wrote /home/scott/git/lms/runs/x1-370/agent_recommendations.md
+wrote /home/scott/git/lms/runs/x1-370/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/x1-370/agent_recommendations.md
+wrote /home/scott/git/lms/runs/x1-370/model_fit.csv
+wrote /home/scott/git/lms/runs/x1-370/model_fit.md
+[x1-370] model_fit rc=0
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/deathstar/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/deathstar/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/deathstar/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/deathstar/sidecars/run_1784125118
+Creating LMS run: /home/scott/git/lms/runs/deathstar
+Inventory rows: 20
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/deathstar --timeout 900 --inventory-csv /home/scott/git/lms/runs/deathstar/lmstudio_inventory.csv --probe-base-url http://100.78.106.121:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/deathstar/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/deathstar --sidecar-dir /home/scott/git/lms/runs/deathstar/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/deathstar/capability_matrix.csv
+wrote /home/scott/git/lms/runs/deathstar/agent_recommendations.md
+wrote /home/scott/git/lms/runs/deathstar/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/deathstar/agent_recommendations.md
+wrote /home/scott/git/lms/runs/deathstar/model_fit.csv
+wrote /home/scott/git/lms/runs/deathstar/model_fit.md
+[deathstar] model_fit rc=0
+  stamped host_name=deathstar in capability_matrix.csv
+  stamped host_name=deathstar in run_summary.csv
+  stamped host_name=deathstar in task_summary.csv
+  stamped host_name=deathstar in run_results.csv
+  stamped host_name=deathstar in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/xwing/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/xwing/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/xwing/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/xwing/sidecars/run_1784125118
+Creating LMS run: /home/scott/git/lms/runs/xwing
+Inventory rows: 6
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/xwing --timeout 900 --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --probe-base-url http://xwing.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/xwing --sidecar-dir /home/scott/git/lms/runs/xwing/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/xwing/capability_matrix.csv
+wrote /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/model_fit.csv
+wrote /home/scott/git/lms/runs/xwing/model_fit.md
+[xwing] model_fit rc=0
+  stamped host_name=xwing in capability_matrix.csv
+  stamped host_name=xwing in run_summary.csv
+  stamped host_name=xwing in task_summary.csv
+  stamped host_name=xwing in run_results.csv
+  stamped host_name=xwing in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py", line 780, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py", line 698, in main
+    output_path.write_text(met.output_text, encoding="utf-8")
+  File "/usr/lib/python3.12/pathlib.py", line 1049, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+OSError: [Errno 28] No space left on device
+Creating LMS run: /home/scott/git/lms/runs/destroyer
+Inventory rows: 11
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/destroyer --timeout 900 --inventory-csv /home/scott/git/lms/runs/destroyer/lmstudio_inventory.csv --probe-base-url http://destroyer.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/destroyer/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/destroyer --sidecar-dir /home/scott/git/lms/runs/destroyer/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+OSError: [Errno 28] No space left on device
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/scott/git/lms/lms_cli.py", line 782, in <module>
+    raise SystemExit([Wed Jul 15 03:39:59 PM UTC 2026] starting crash-doc pass (concurrency 9)
+[scott-optiplex-9030-aio] skip: endpoint unreachable
+
+=== [xwing] benchmark start (http://xwing.tailcb8954.ts.net:1234/v1) ===
+
+=== [joyner] benchmark start (http://joyner.tailcb8954.ts.net:1234/v1) ===
+
+=== [deathstar] benchmark start (http://100.78.106.121:1234/v1) ===
+
+=== [beelink-ryzen-7-mini-pc] benchmark start (http://100.85.72.121:1234/v1) ===
+
+=== [lenovo-ideapad-330s-15ikb] benchmark start (http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1) ===
+
+=== [scotts-macbook-air] benchmark start (http://scotts-macbook-air.tailcb8954.ts.net:1234/v1) ===
+
+=== [destroyer] benchmark start (http://destroyer.tailcb8954.ts.net:1234/v1) ===
+
+=== [x1-370] benchmark start (http://127.0.0.1:1234/v1) ===
+wrote /home/scott/git/lms/runs/joyner/machine_profile.json
+wrote /home/scott/git/lms/runs/joyner/machine_synopsis.md
+wrote /home/scott/git/lms/runs/xwing/machine_profile.json
+wrote /home/scott/git/lms/runs/xwing/machine_synopsis.md
+wrote /home/scott/git/lms/runs/destroyer/machine_profile.json
+wrote /home/scott/git/lms/runs/destroyer/machine_synopsis.md
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_profile.json
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_synopsis.md
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/machine_profile.json
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/machine_synopsis.md
+wrote /home/scott/git/lms/runs/deathstar/machine_profile.json
+wrote /home/scott/git/lms/runs/deathstar/machine_synopsis.md
+wrote /home/scott/git/lms/runs/x1-370/machine_profile.json
+wrote /home/scott/git/lms/runs/x1-370/machine_synopsis.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_profile.json
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_synopsis.md
+Wrote results to /home/scott/git/lms/runs/xwing/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/xwing/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/xwing/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/xwing/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/xwing
+Inventory rows: 6
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/xwing --timeout 900 --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --probe-base-url http://xwing.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/xwing --sidecar-dir /home/scott/git/lms/runs/xwing/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/xwing/capability_matrix.csv
+wrote /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/model_fit.csv
+wrote /home/scott/git/lms/runs/xwing/model_fit.md
+[xwing] model_fit rc=0
+  stamped host_name=xwing in capability_matrix.csv
+  stamped host_name=xwing in run_summary.csv
+  stamped host_name=xwing in task_summary.csv
+  stamped host_name=xwing in run_results.csv
+  stamped host_name=xwing in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/x1-370/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/x1-370/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/x1-370/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/x1-370/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/x1-370
+Inventory rows: 22
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/x1-370 --timeout 900 --inventory-csv /home/scott/git/lms/runs/x1-370/lmstudio_inventory.csv --probe-base-url http://127.0.0.1:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/x1-370/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/x1-370 --sidecar-dir /home/scott/git/lms/runs/x1-370/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/x1-370/capability_matrix.csv
+wrote /home/scott/git/lms/runs/x1-370/agent_recommendations.md
+wrote /home/scott/git/lms/runs/x1-370/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/x1-370/agent_recommendations.md
+wrote /home/scott/git/lms/runs/x1-370/model_fit.csv
+wrote /home/scott/git/lms/runs/x1-370/model_fit.md
+[x1-370] model_fit rc=0
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/scotts-macbook-air/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/scotts-macbook-air/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/scotts-macbook-air/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/scotts-macbook-air/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/scotts-macbook-air
+Inventory rows: 4
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/scotts-macbook-air --timeout 900 --inventory-csv /home/scott/git/lms/runs/scotts-macbook-air/lmstudio_inventory.csv --probe-base-url http://scotts-macbook-air.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/scotts-macbook-air/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/scotts-macbook-air --sidecar-dir /home/scott/git/lms/runs/scotts-macbook-air/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/scotts-macbook-air/capability_matrix.csv
+wrote /home/scott/git/lms/runs/scotts-macbook-air/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/scotts-macbook-air/agent_recommendations.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/model_fit.csv
+wrote /home/scott/git/lms/runs/scotts-macbook-air/model_fit.md
+[scotts-macbook-air] model_fit rc=0
+  stamped host_name=scotts-macbook-air in capability_matrix.csv
+  stamped host_name=scotts-macbook-air in run_summary.csv
+  stamped host_name=scotts-macbook-air in task_summary.csv
+  stamped host_name=scotts-macbook-air in run_results.csv
+  stamped host_name=scotts-macbook-air in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/deathstar/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/deathstar/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/deathstar/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/deathstar/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/deathstar
+Inventory rows: 20
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/deathstar --timeout 900 --inventory-csv /home/scott/git/lms/runs/deathstar/lmstudio_inventory.csv --probe-base-url http://100.78.106.121:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/deathstar/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/deathstar --sidecar-dir /home/scott/git/lms/runs/deathstar/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/deathstar/capability_matrix.csv
+wrote /home/scott/git/lms/runs/deathstar/agent_recommendations.md
+wrote /home/scott/git/lms/runs/deathstar/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/deathstar/agent_recommendations.md
+wrote /home/scott/git/lms/runs/deathstar/model_fit.csv
+wrote /home/scott/git/lms/runs/deathstar/model_fit.md
+[deathstar] model_fit rc=0
+  stamped host_name=deathstar in capability_matrix.csv
+  stamped host_name=deathstar in run_summary.csv
+  stamped host_name=deathstar in task_summary.csv
+  stamped host_name=deathstar in run_results.csv
+  stamped host_name=deathstar in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/joyner/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/joyner/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/joyner/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/joyner/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/joyner
+Inventory rows: 4
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/joyner --timeout 900 --inventory-csv /home/scott/git/lms/runs/joyner/lmstudio_inventory.csv --probe-base-url http://joyner.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/joyner/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/joyner --sidecar-dir /home/scott/git/lms/runs/joyner/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/joyner/capability_matrix.csv
+wrote /home/scott/git/lms/runs/joyner/agent_recommendations.md
+wrote /home/scott/git/lms/runs/joyner/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/joyner/agent_recommendations.md
+wrote /home/scott/git/lms/runs/joyner/model_fit.csv
+wrote /home/scott/git/lms/runs/joyner/model_fit.md
+[joyner] model_fit rc=0
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/destroyer/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/destroyer/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/destroyer/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/destroyer/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/destroyer
+Inventory rows: 11
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/destroyer --timeout 900 --inventory-csv /home/scott/git/lms/runs/destroyer/lmstudio_inventory.csv --probe-base-url http://destroyer.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/destroyer/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/destroyer --sidecar-dir /home/scott/git/lms/runs/destroyer/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/destroyer/capability_matrix.csv
+wrote /home/scott/git/lms/runs/destroyer/agent_recommendations.md
+wrote /home/scott/git/lms/runs/destroyer/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/destroyer/agent_recommendations.md
+wrote /home/scott/git/lms/runs/destroyer/model_fit.csv
+wrote /home/scott/git/lms/runs/destroyer/model_fit.md
+[destroyer] model_fit rc=0
+  stamped host_name=destroyer in capability_matrix.csv
+  stamped host_name=destroyer in run_summary.csv
+  stamped host_name=destroyer in task_summary.csv
+  stamped host_name=destroyer in run_results.csv
+  stamped host_name=destroyer in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc
+Inventory rows: 9
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc --timeout 900 --inventory-csv /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/lmstudio_inventory.csv --probe-base-url http://100.85.72.121:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc --sidecar-dir /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/capability_matrix.csv
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/agent_recommendations.md
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/agent_recommendations.md
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/model_fit.csv
+wrote /home/scott/git/lms/runs/beelink-ryzen-7-mini-pc/model_fit.md
+[beelink-ryzen-7-mini-pc] model_fit rc=0
+  stamped host_name=beelink-ryzen-7-mini-pc in capability_matrix.csv
+  stamped host_name=beelink-ryzen-7-mini-pc in run_summary.csv
+  stamped host_name=beelink-ryzen-7-mini-pc in task_summary.csv
+  stamped host_name=beelink-ryzen-7-mini-pc in run_results.csv
+  stamped host_name=beelink-ryzen-7-mini-pc in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+Wrote results to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/sidecars/run_1784130000
+Creating LMS run: /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb
+Inventory rows: 7
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb --timeout 900 --inventory-csv /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/lmstudio_inventory.csv --probe-base-url http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb --sidecar-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/capability_matrix.csv
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/agent_recommendations.md
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/agent_recommendations.md
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/model_fit.csv
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/model_fit.md
+[lenovo-ideapad-330s-15ikb] model_fit rc=0
+  stamped host_name=lenovo-ideapad-330s-15ikb in capability_matrix.csv
+  stamped host_name=lenovo-ideapad-330s-15ikb in run_summary.csv
+  stamped host_name=lenovo-ideapad-330s-15ikb in task_summary.csv
+  stamped host_name=lenovo-ideapad-330s-15ikb in run_results.csv
+  stamped host_name=lenovo-ideapad-330s-15ikb in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+
+PASS complete: 8/9 nodes benchmarked.

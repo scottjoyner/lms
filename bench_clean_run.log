@@ -1,0 +1,46 @@
+=== fleet bench: stage 1/2 single-stream ===
+[beelink-ryzen-7-mini-pc] skip: endpoint unreachable
+[joyner] skip: endpoint unreachable
+
+=== [xwing] benchmark start (http://xwing.tailcb8954.ts.net:1234/v1) ===
+
+=== [destroyer] benchmark start (http://destroyer.tailcb8954.ts.net:1234/v1) ===
+
+=== [deathstar] benchmark start (http://100.78.106.121:1234/v1) ===
+
+=== [scotts-macbook-air] benchmark start (http://scotts-macbook-air.tailcb8954.ts.net:1234/v1) ===
+wrote /home/scott/git/lms/runs/deathstar/machine_profile.json
+wrote /home/scott/git/lms/runs/deathstar/machine_synopsis.md
+wrote /home/scott/git/lms/runs/destroyer/machine_profile.json
+wrote /home/scott/git/lms/runs/destroyer/machine_synopsis.md
+wrote /home/scott/git/lms/runs/xwing/machine_profile.json
+wrote /home/scott/git/lms/runs/xwing/machine_synopsis.md
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_profile.json
+wrote /home/scott/git/lms/runs/scotts-macbook-air/machine_synopsis.md
+Wrote results to /home/scott/git/lms/runs/xwing/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/xwing/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/xwing/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/xwing/sidecars/run_1784169370
+Creating LMS run: /home/scott/git/lms/runs/xwing
+Inventory rows: 6
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/xwing --timeout 900 --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --probe-base-url http://xwing.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/xwing/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/xwing --sidecar-dir /home/scott/git/lms/runs/xwing/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/xwing/capability_matrix.csv
+wrote /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/xwing/agent_recommendations.md
+wrote /home/scott/git/lms/runs/xwing/model_fit.csv
+wrote /home/scott/git/lms/runs/xwing/model_fit.md
+[xwing] model_fit rc=0
+  stamped host_name=xwing in capability_matrix.csv
+  stamped host_name=xwing in run_summary.csv
+  stamped host_name=xwing in task_summary.csv
+  stamped host_name=xwing in run_results.csv
+  stamped host_name=xwing in lmstudio_inventory.csv
+  capability_matrix.csv: OK
+  run_summary.csv: OK
+  model_fit.csv: OK
+
+=== [scott-optiplex-9030-aio] benchmark start (http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1) ===
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/machine_profile.json
+wrote /home/scott/git/lms/runs/scott-optiplex-9030-aio/machine_synopsis.md

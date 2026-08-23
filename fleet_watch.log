@@ -1,0 +1,8 @@
+Wrote /home/scott/git/lms/fleet_state.json | 9 nodes, 6 live, 52 models indexed.
+Wrote /home/scott/git/lms/routing_rules.json | 9 node rules, 52 model routes.
+Wrote /home/scott/git/lms/fleet_loadout.json | 5 nodes, demand=balanced
+[watch] refreshed; next in 900s
+Wrote /home/scott/git/lms/fleet_state.json | 9 nodes, 6 live, 52 models indexed.
+Wrote /home/scott/git/lms/routing_rules.json | 9 node rules, 52 model routes.
+Wrote /home/scott/git/lms/fleet_loadout.json | 6 nodes, demand=balanced
+[watch] refreshed; next in 900s

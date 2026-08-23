@@ -1,0 +1,16 @@
+
+=== [lenovo-ideapad-330s-15ikb] benchmark start (http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1) ===
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_profile.json
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/machine_synopsis.md
+Wrote results to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/run_results.csv
+Wrote summary to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/run_summary.csv
+Wrote task summary to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/task_summary.csv
+Wrote sidecars to /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/sidecars/run_1784131118
+Creating LMS run: /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb
+Inventory rows: 7
+$ /usr/bin/python3 /home/scott/git/lms/lms_machine_profile.py --output-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb --timeout 900 --inventory-csv /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/lmstudio_inventory.csv --probe-base-url http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1
+$ /usr/bin/python3 /home/scott/git/lms/benchmark_lmstudio_cross_machine_models.py --inventory-csv /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/lmstudio_inventory.csv --cases-file /home/scott/git/lms/benchmarks/agent_skill_suite.v1.json --output-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb --sidecar-dir /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/sidecars --timeout 900 --repeats 1 --max-context-tokens 4096
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/capability_matrix.csv
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/agent_recommendations.md
+wrote /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/routing_rules.yaml
+Done. Read /home/scott/git/lms/runs/lenovo-ideapad-330s-15ikb/agent_recommendations.md

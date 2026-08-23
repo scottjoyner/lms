@@ -1,0 +1,11 @@
+[Wed Jul 15 09:56:01 PM UTC 2026] crash-doc pass finished (rc=0) -> launching concurrency probe
+
+=== [xwing] 6 loaded models, concurrency_cap=2 ===
+  text-embedding-nomic-embed-text-v1.5: SINGLE STALL (STALL:HTTPError:HTTP Error 400: Bad Request) -> skip concurrency
+  vibethinker-3b-hermes: single tps=27.8 | conc2 stream_tps=34.2 (hit -23%) total=502.0 (+1706%) -> OK
+  orinth-1.0-9b: SINGLE STALL (STALL:no_first_token) -> skip concurrency
+  ornith-1.0-35b: SINGLE STALL (STALL:no_first_token) -> skip concurrency
+  qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled: SINGLE STALL (STALL:TimeoutError:timed out) -> skip concurrency
+  qwen3.6-14b-a3b-vibeforged-v2: SINGLE STALL (STALL:TimeoutError:timed out) -> skip concurrency
+
+=== [joyner] 4 loaded models, concurrency_cap=2 ===

@@ -1,0 +1,426 @@
+{
+  "generated_at": "2026-07-16T03:08:25.176368+00:00",
+  "default_concurrency": 1,
+  "nodes": [
+    {
+      "name": "scott-optiplex-9030-aio",
+      "url": "http://scott-optiplex-9030-aio.tailcb8954.ts.net:1234/v1",
+      "live": true,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 7.7,
+      "vram_gib": null,
+      "serves": [
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"
+      ],
+      "prefer_for": []
+    },
+    {
+      "name": "destroyer",
+      "url": "http://destroyer.tailcb8954.ts.net:1234/v1",
+      "live": true,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 31.0,
+      "vram_gib": null,
+      "serves": [
+        "liquid/lfm2-24b-a2b",
+        "lfm2.5-8b-a1b",
+        "lfm2.5-1.2b-instruct"
+      ],
+      "prefer_for": []
+    },
+    {
+      "name": "scotts-macbook-air",
+      "url": "http://scotts-macbook-air.tailcb8954.ts.net:1234/v1",
+      "live": true,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 8.0,
+      "vram_gib": 8.0,
+      "serves": [
+        "liquid/lfm2.5-1.2b",
+        "refinedtoolcallv5-3b",
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"
+      ],
+      "prefer_for": [
+        "liquid/lfm2.5-1.2b",
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"
+      ]
+    },
+    {
+      "name": "x1-370",
+      "url": "http://127.0.0.1:1234/v1",
+      "live": true,
+      "stale": true,
+      "max_concurrency": 1,
+      "ram_gib": 91.9,
+      "vram_gib": null,
+      "serves": [
+        "minicpm5-1b-agentic-tooluse",
+        "refinedtoolcallv5-3b",
+        "qwen3.5-9b-claude-4.6-highiq-instruct-heretic-uncensored"
+      ],
+      "prefer_for": [
+        "refinedtoolcallv5-3b"
+      ]
+    },
+    {
+      "name": "deathstar",
+      "url": "http://100.78.106.121:1234/v1",
+      "live": true,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 24.0,
+      "vram_gib": 8.0,
+      "serves": [
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+        "refinedtoolcallv5-3b",
+        "vibethinker-3b-i1",
+        "qwen3.5-9b-neo-heretic-i1",
+        "lfm2-1.2b-tool"
+      ],
+      "prefer_for": [
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+        "refinedtoolcallv5-3b",
+        "vibethinker-3b-i1",
+        "lfm2-1.2b-tool"
+      ]
+    },
+    {
+      "name": "beelink-ryzen-7-mini-pc",
+      "url": "http://100.85.72.121:1234/v1",
+      "live": false,
+      "stale": true,
+      "max_concurrency": 1,
+      "ram_gib": 16.0,
+      "vram_gib": null,
+      "serves": [
+        "refinedtoolcallv5-3b",
+        "orinth-1.0-9b",
+        "liquid/lfm2.5-1.2b",
+        "qwen3.6-28b-reap20-a3b",
+        "vibethinker-3b-heretic_decensored",
+        "google/gemma-4-12b-qat",
+        "vibethinker-3b-hermes"
+      ],
+      "prefer_for": [
+        "liquid/lfm2.5-1.2b"
+      ]
+    },
+    {
+      "name": "joyner",
+      "url": "http://joyner.tailcb8954.ts.net:1234/v1",
+      "live": false,
+      "stale": true,
+      "max_concurrency": 1,
+      "ram_gib": 16.0,
+      "vram_gib": 5.0,
+      "serves": [
+        "refinedtoolcallv5-3b"
+      ],
+      "prefer_for": []
+    },
+    {
+      "name": "lenovo-ideapad-330s-15ikb",
+      "url": "http://scott-lenovo-ideapad-330s-15ikb.tailcb8954.ts.net:1234/v1",
+      "live": true,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 11.6,
+      "vram_gib": null,
+      "serves": [
+        "vibethinker-3b-heretic-i1",
+        "google/gemma-4-e2b",
+        "qwopus3.5-4b-coder-mtp",
+        "lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch",
+        "liquid/lfm2.5-1.2b"
+      ],
+      "prefer_for": []
+    },
+    {
+      "name": "xwing",
+      "url": "http://xwing.tailcb8954.ts.net:1234/v1",
+      "live": false,
+      "stale": false,
+      "max_concurrency": 1,
+      "ram_gib": 23.2,
+      "vram_gib": null,
+      "serves": [
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+        "orinth-1.0-9b",
+        "vibethinker-3b-hermes"
+      ],
+      "prefer_for": [
+        "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+        "vibethinker-3b-hermes"
+      ]
+    }
+  ],
+  "routing": {
+    "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled": {
+      "node": "xwing",
+      "tps_med": 63.24,
+      "max_concurrency": 1,
+      "fallbacks": [
+        "scott-optiplex-9030-aio",
+        "scotts-macbook-air",
+        "deathstar"
+      ]
+    },
+    "refinedtoolcallv5-3b": {
+      "node": "deathstar",
+      "tps_med": 39.76,
+      "max_concurrency": 1,
+      "fallbacks": [
+        "scotts-macbook-air",
+        "x1-370",
+        "beelink-ryzen-7-mini-pc",
+        "joyner"
+      ]
+    },
+    "vibethinker-3b-i1": {
+      "node": "deathstar",
+      "tps_med": 16.55,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.5-2b-claude-4.6-opus-reasoning-distilled": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "lfm2.5-8b-a1b": {
+      "node": "destroyer",
+      "tps_med": 1.58,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.5-4b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-2b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "ibm/granite-4-h-tiny": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "liquid/lfm2.5-1.2b": {
+      "node": "scotts-macbook-air",
+      "tps_med": 56.65,
+      "max_concurrency": 1,
+      "fallbacks": [
+        "beelink-ryzen-7-mini-pc",
+        "lenovo-ideapad-330s-15ikb"
+      ]
+    },
+    "google/gemma-3-1b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "liquid/lfm2-24b-a2b": {
+      "node": "destroyer",
+      "tps_med": 4.72,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "mradermacher/vibethinker-3b-hermes": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "refinedneuro/vibethinker-3b-hermes": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex-mtp": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.6-35b-a3b-claude-4.7-opus-reasoning-distilled-apex": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "google/gemma-4-12b-qat": {
+      "node": "beelink-ryzen-7-mini-pc",
+      "tps_med": 0.93,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "lfm2.5-1.2b-instruct": {
+      "node": "destroyer",
+      "tps_med": 8.06,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "openai/gpt-oss-20b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "minicpm5-1b-agentic-tooluse": {
+      "node": "x1-370",
+      "tps_med": 5.16,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "vibethinker-3b-hermes": {
+      "node": "xwing",
+      "tps_med": 21.93,
+      "max_concurrency": 1,
+      "fallbacks": [
+        "beelink-ryzen-7-mini-pc"
+      ]
+    },
+    "orinth-1.0-9b": {
+      "node": "xwing",
+      "tps_med": 9.77,
+      "max_concurrency": 1,
+      "fallbacks": [
+        "beelink-ryzen-7-mini-pc"
+      ]
+    },
+    "ornith-1.0-35b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "north-mini-code-1.0": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "diffusiongemma-26b-a4b-it-strix-halo": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "mradermacher/vibethinker-3b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "prithivmlmods/vibethinker-3b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.6-35b-a3b-uncensored-hauhaucs-aggressive": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated-mtp": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-27b-uncensored-heretic-v2-native-mtp-preserved": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-14b-a3b-claude-4.6-opus-reasoning-distilled-reap": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-9b-claude-4.6-highiq-instruct-heretic-uncensored": {
+      "node": "x1-370",
+      "tps_med": 2.21,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "gemma-4-12b-it": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-27b-claude-4.6-opus-reasoning-distilled": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-35b-a3b-uncensored-hauhaucs-aggressive": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-0.8b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "gemma-4-31b-it": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "ornith-1.0-9b": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "gemma-4-e4b-uncensored-hauhaucs-aggressive": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.6-12b-iq-ultra-heretic-uncensored-thinking-v2-hightop": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "lfm2.5-8b-a1b-terminal-toolbench-full-sft-1epoch": {
+      "node": "lenovo-ideapad-330s-15ikb",
+      "tps_med": 0.47,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.5-9b-neo-heretic-i1": {
+      "node": "deathstar",
+      "tps_med": 1.37,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.5-4b-neo-heretic-i1": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "lfm2-1.2b-tool": {
+      "node": "deathstar",
+      "tps_med": 23.87,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.5-9b-neo": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-4b-claude-4.6-opus-reasoning-distilled-v2": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.5-4b-uncensored-hauhaucs-aggressive": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "qwen3.6-28b-reap20-a3b": {
+      "node": "beelink-ryzen-7-mini-pc",
+      "tps_med": 0.17,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "vibethinker-3b-heretic_decensored": {
+      "node": "beelink-ryzen-7-mini-pc",
+      "tps_med": 13.55,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwen3.6-14b-a3b-vibeforged-v2": {
+      "node": null,
+      "reason": "unavailable-everywhere"
+    },
+    "vibethinker-3b-heretic-i1": {
+      "node": "lenovo-ideapad-330s-15ikb",
+      "tps_med": 0.76,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "google/gemma-4-e2b": {
+      "node": "lenovo-ideapad-330s-15ikb",
+      "tps_med": 0.96,
+      "max_concurrency": 1,
+      "fallbacks": []
+    },
+    "qwopus3.5-4b-coder-mtp": {
+      "node": "lenovo-ideapad-330s-15ikb",
+      "tps_med": 0.36,
+      "max_concurrency": 1,
+      "fallbacks": []
+    }
+  }
+}
