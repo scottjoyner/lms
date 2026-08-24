@@ -1,3 +1,6 @@
 .venv/
 *.egg-info/
 __pycache__/
+
+# submodule working dir (gitlink lives on feature branch)
+lms/
