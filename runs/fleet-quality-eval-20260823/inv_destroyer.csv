@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+destroyer,100.81.57.77,1,http://100.81.57.77:1234/v1,1,1,liquid/lfm2-24b-a2b

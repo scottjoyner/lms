@@ -1,0 +1,2 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,2.682,28.469,6.501,1.00,0.30,0.6371,10

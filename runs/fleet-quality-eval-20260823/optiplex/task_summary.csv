@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,operational_health,2.682,,,1.00,0.00,0.5000,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,structured_output,,9.387,3.079,1.00,1.00,1.0000,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,coding,,74.759,1.404,1.00,0.00,0.3333,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,debugging,,25.028,7.263,1.00,1.00,1.0000,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,agent_planning,,31.059,8.935,1.00,0.00,0.6000,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,long_context,,25.327,0.732,1.00,0.00,0.2500,2
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,repo_work,,40.854,9.390,1.00,0.00,0.8333,1
+1787562631,scott-optiplex-9030-aio,100.69.158.114,http://100.69.158.114:1234/v1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled,safety,,32.117,7.403,1.00,0.50,0.8021,2

@@ -1,0 +1,20 @@
+# Root Cause
+The error occurs because `payload` is `None` when the code attempts to access `payload['user']['id']`. This typically happens if the API call fails or returns no data.
+
+# Safe Fix
+Add a check for `None` before accessing nested keys:
+```
+if payload and 'user' in payload and payload['user']:
+    user_id = payload['user'].get('id')
+else:
+    user_id = None  # or handle the error appropriately
+```
+
+# Regression Tests
+1. **Test with valid payload**:  
+   Input: `payload = {'user': {'id': 123}}`  
+   Expected output: `user_id = 123`
+
+2. **Test with None payload**:  
+   Input: `payload = None`  
+   Expected output: `user_id = None` (or raises an error if desired)

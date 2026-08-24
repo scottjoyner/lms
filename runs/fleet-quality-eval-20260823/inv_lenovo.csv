@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+scott-lenovo-ideapad-330s-15ikb,100.105.137.98,1,http://100.105.137.98:1234/v1,1,1,liquid/lfm2.5-1.2b

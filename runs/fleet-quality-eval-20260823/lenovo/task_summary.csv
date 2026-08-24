@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,operational_health,0.686,0.310,1.812,1.00,1.00,1.0000,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,structured_output,,0.292,4.374,1.00,1.00,1.0000,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,coding,,3.017,4.677,1.00,0.00,0.5000,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,debugging,,0.296,4.756,1.00,1.00,1.0000,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,agent_planning,,2.928,5.883,1.00,0.00,0.8000,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,long_context,,0.332,5.238,1.00,1.00,1.0000,2
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,repo_work,,3.031,5.628,1.00,0.00,0.8333,1
+1787563338,scott-lenovo-ideapad-330s-15ikb,100.105.137.98,http://100.105.137.98:1234/v1,liquid/lfm2.5-1.2b,safety,,1.617,5.702,1.00,0.50,0.9271,2

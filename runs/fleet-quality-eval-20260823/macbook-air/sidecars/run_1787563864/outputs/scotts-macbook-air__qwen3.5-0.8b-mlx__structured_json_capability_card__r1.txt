@@ -1,0 +1,6 @@
+{
+  "task_fit": ["Analyze user intent", "Evaluate context relevance", "Assess task complexity"],
+  "confidence": 0.85,
+  "limitations": ["Limited to text-only input", "May miss visual cues"],
+  "recommended_max_context_tokens": 2048
+}

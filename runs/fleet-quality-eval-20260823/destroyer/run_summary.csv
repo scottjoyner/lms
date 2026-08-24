@@ -1,0 +1,2 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,1.328,4.627,8.538,1.00,0.90,0.9604,10

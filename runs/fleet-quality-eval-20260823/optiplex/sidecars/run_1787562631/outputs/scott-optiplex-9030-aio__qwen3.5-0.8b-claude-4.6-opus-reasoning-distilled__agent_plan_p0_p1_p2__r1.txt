@@ -1,0 +1,119 @@
+# Implementation Plan: FastAPI Service Enhancement
+
+## Overview
+This plan adds comprehensive authentication, key rotation, audit logging, and admin dashboard capabilities to an existing FastAPI service. The approach follows a phased architecture with clear acceptance criteria and test expectations.
+
+---
+
+## P0: System Design & Architecture Planning
+
+### Task 1: Authentication System Design
+
+#### Acceptance Criteria:
+- [ ] JWT token generation works correctly for all authenticated requests
+- [ ] Token expiration is configurable (default: 5 minutes)
+- [ ] Refresh token mechanism with automatic refresh on expiry
+- [ ] Token validation returns appropriate error codes (401, 403, 409)
+- [ ] Token verification includes issuer validation and signature check
+- [ ] Token can be stored in both JWT format and JSON Web Format
+- [ ] Token rotation is enabled with configurable interval
+
+#### Test Expectations:
+```python
+# Expected behavior for token generation
+assert jwt.encode(user_id, SECRET_KEY, algorithm="HS256") == "eyJ..."
+assert jwt.verify(token, SECRET_KEY, algorithm="HS256") == user_id
+
+# Expected error handling
+assert jwt.get_error("invalid_token", code=401) == {"code": 401, "message": "Invalid token"}
+assert jwt.get_error("token_expired", code=409) == {"code": 409, "message": "Token has expired"}
+
+# Expected refresh behavior
+refreshed_token = jwt.refresh(jwt.token, SECRET_KEY)
+assert refreshed_token is not None and len(refreshed_token) > 0
+```
+
+---
+
+### Task 2: API Key Rotation Implementation
+
+#### Acceptance Criteria:
+- [ ] Manual API key rotation workflow exists (admin panel or web UI)
+- [ ] Automatic rotation enabled with configurable interval
+- [ ] Old keys are automatically rotated to new keys after expiration
+- [ ] New keys can be created for existing users without re-authentication
+- [ ] Rotation fails gracefully if user is not logged in
+- [ ] Rate limiting prevents abuse of key rotation
+
+#### Test Expectations:
+```python
+# Expected manual rotation workflow
+assert api_key_rotation(user_id, new_api_key) == True  # Should succeed
+assert api_key_rotation(user_id, old_api_key) == False  # Should fail for non-authenticated user
+
+# Expected automatic rotation
+assert api_key_rotation(user_id, "expired-key") == True  # Should rotate after expiry
+```
+
+---
+
+### Task 3: Audit Logging Strategy
+
+#### Acceptance Criteria:
+- [ ] Audit log table exists with proper schema (id, timestamp, user, action, details)
+- [ ] Log recording strategy supports both manual and automated logging
+- [ ] Audit logs can be queried by user, date range, or specific actions
+- [ ] Audit logs are persisted to database with proper timestamps
+- [ ] Audit log retention policy is configured (e.g., 90 days)
+- [ ] Audit logs support filtering by severity level
+
+#### Test Expectations:
+```python
+# Expected audit log creation
+assert audit_log.create(user_id, "login", "User logged in") == True
+assert audit_log.get_user("user123").count() > 0  # Should have entries for user123
+
+# Expected filtering capabilities
+audit_logs.filter_by(user="admin").should_contain("view_dashboard")
+audit_logs.filter_by(date_range="last_7_days").should_not_contain("login")
+```
+
+---
+
+### Task 4: Admin Dashboard Design
+
+#### Acceptance Criteria:
+- [ ] Admin dashboard loads successfully on startup
+- [ ] Dashboard displays user statistics (total users, active sessions)
+- [ ] Users can view their own activity history
+- [ ] Users can see recent login/logout events
+- [ ] Users can search and filter users by name or email
+- [ ] Users can create new users through admin panel
+- [ ] Admin dashboard shows system metrics (API call counts, error rates)
+- [ ] Dashboard is responsive on mobile devices
+- [ ] Error handling prevents crashes during dashboard load
+
+#### Test Expectations:
+```python
+# Expected dashboard functionality
+assert admin_dashboard.get_users() == ["user1", "user2"]  # Should return users
+assert admin_dashboard.get_active_sessions() > 0  # Should show active sessions
+assert search_admin_dashboard().should_contain("User")  # Should have search results
+
+# Expected error handling
+admin_dashboard.get_error("database_connection_failed").code == 500
+```
+
+---
+
+## P1: Implementation - Authentication & Key Rotation
+
+### Task 1: JWT Token Generation and Validation
+
+#### Acceptance Criteria:
+- [ ] JWT token generation uses HS256 algorithm with proper padding
+- [ ] Token includes expiration timestamp (ISO 8601 format)
+- [ ] Token can be verified using `jwt.verify()` method
+- [ ] Token validation returns appropriate error codes for invalid tokens, expired tokens, and unauthorized access
+- [ ] Token verification includes issuer validation (must match expected issuer)
+- [ ] Token can be stored in both JWT and JSON

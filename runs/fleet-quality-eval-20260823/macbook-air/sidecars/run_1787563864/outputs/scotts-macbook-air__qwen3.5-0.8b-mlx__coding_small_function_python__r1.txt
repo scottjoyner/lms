@@ -1,0 +1,29 @@
+def normalize_phone_number(value: str) -> str:
+    """
+    Normalize a phone number string by stripping non-digits, supporting 10-digit US numbers and 11-digit numbers beginning with '1'.
+    Raises ValueError for any other input.
+
+    Parameters:
+        value (str): The phone number string to normalize.
+
+    Returns:
+        str: A normalized phone number string with only digits.
+
+    Raises:
+        ValueError: If the input is not a valid phone number format (e.g., contains non-digits, invalid length).
+    """
+    if not isinstance(value, str):
+        raise TypeError("Input must be a string")
+
+    # Strip non-digits (keep only digits)
+    normalized = ''.join(c for c in value if c.isdigit())
+
+    # Check length constraints
+    if len(normalized) != 10 and len(normalized) != 11:
+        raise ValueError("Phone number must be exactly 10 or 11 digits")
+
+    # Check for leading '1' in a 11-digit number
+    if len(normalized) == 11 and normalized[0] != '1':
+        raise ValueError("Phone number must start with 1")
+
+    return normalized

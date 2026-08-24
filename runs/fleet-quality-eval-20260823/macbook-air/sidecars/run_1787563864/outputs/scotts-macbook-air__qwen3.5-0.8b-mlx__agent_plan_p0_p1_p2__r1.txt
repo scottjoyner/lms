@@ -1,0 +1,76 @@
+Here is a comprehensive implementation plan for integrating authentication, API key rotation, audit logging, and admin dashboards into an existing FastAPI service.
+
+### **Project Overview**
+This plan focuses on a "Zero-Downtime" migration approach. We will use **FastAPI** for the core logic, **PostgreSQL** for data persistence (with optional Redis for session caching), and a dedicated **Database Migration Script** to handle the schema changes without disrupting existing users.
+
+---
+
+### **P0: Core Infrastructure & Authentication Layer**
+*Objective: Establish the secure foundation, implement JWT-based authentication, and configure CORS for external API calls.*
+
+#### **Task 1: Authentication Service & JWT Implementation**
+*   **Goal:** Create a secure authentication service using FastAPI and `pyjwt` to handle user registration, login, and session management.
+*   **Acceptance Criteria:**
+    *   User registration returns a unique `user_id` and `token`.
+    *   Login endpoint validates credentials against the stored database.
+    *   Session tokens are generated and stored in a Redis-backed session store (or local DB if no Redis is available).
+    *   The `token` field in the response includes an expiration timestamp (e.g., 1 hour).
+    *   **Test Expectation:** A user logs in successfully, the session persists correctly, and the token is valid for 1 hour.
+*   **Test Expectation:** Running `pytest` on the authentication module with a mock user and token. The login endpoint should return a 201 Created status, the response body must contain `user_id`, and the token should be valid.
+
+#### **Task 2: API Key Rotation Service**
+*   **Goal:** Implement a service to rotate API keys for all active users and generate new ones upon expiration.
+*   **Acceptance Criteria:**
+    *   The service checks if a user is currently logged in.
+    *   If `True`, it generates a new API key and updates the user's session token to include the new key.
+    *   If `False`, it returns an error indicating no active session to rotate.
+    *   The new API key must be stored in the database with a unique identifier and an expiration date.
+    *   **Test Expectation:** A user logs in successfully, the API key rotation logic executes, and a new `api_key` is returned with an expiration date. The old key should be deleted from the database.
+*   **Test Expectation:** Running `pytest` on the rotation service with a mock user. The endpoint should return a 201 Created status, and the response body must contain `api_key` with an expiration date.
+
+#### **Task 3: CORS Configuration & Middleware**
+*   **Goal:** Configure FastAPI to allow external requests (e.g., from a frontend dashboard) and handle CORS headers.
+*   **Acceptance Criteria:**
+    *   The `cors` middleware is configured to allow all origins (e.g., `*`).
+    *   The `cors` middleware is configured to allow all origins (e.g., `*`).
+    *   The application starts without CORS errors.
+    *   **Test Expectation:** A request to `/api/v1/users` from an external IP should be accepted with a 200 OK response containing the `Access-Control-Allow-Origin` header.
+*   **Test Expectation:** Running `pytest` on the CORS middleware configuration with a mock origin. The application should start successfully without errors.
+
+---
+
+### **P1: Audit Logging & Data Integrity**
+*Objective: Ensure all data changes are traceable and prevent unauthorized modifications.*
+
+#### **Task 4: Audit Log Service**
+*   **Goal:** Create a service to record every significant change in the database (e.g., user login, API key rotation) and store it in a dedicated audit table.
+*   **Acceptance Criteria:**
+    *   The service logs every `INSERT`, `UPDATE`, and `DELETE` operation.
+    *   It captures the timestamp, user ID (if applicable), and action type.
+    *   The audit log is persisted to a separate database table (e.g., `audit_log`) with timestamps.
+    *   **Test Expectation:** A user logs in, the API key is rotated, and an audit entry is created. The `audit_log` table should contain a row with the correct timestamp, user ID, and action.
+*   **Test Expectation:** Running `pytest` on the audit log service with a mock user. The endpoint should return an empty list of entries, and the response body must contain `entries` with a length of 0.
+
+#### **Task 5: Database Migration Script**
+*   **Goal:** Create a script to safely update the existing database schema without breaking existing data.
+*   **Acceptance Criteria:**
+    *   The script checks for existing tables (`users`, `api_keys`, `audit_log`) and their columns.
+    *   It creates new tables (`users`, `api_keys`, `audit_log`) with the correct schema.
+    *   It performs a **drop-and-insert** migration to ensure no data is lost during the schema change.
+    *   It validates that all existing records in `users` and `api_keys` are preserved before migration.
+    *   **Test Expectation:** Running the script should complete without errors, and the `users` table should contain all existing user records.
+*   **Test Expectation:** Running the migration script with a mock database schema. The output should show successful creation of all tables and rows, confirming data integrity is maintained.
+
+---
+
+### **P2: Admin Dashboard & User Management**
+*Objective: Provide a centralized interface for administrators to manage users, API keys, and system status.*
+
+#### **Task 6: Admin Dashboard UI & Logic**
+*   **Goal:** Build a dashboard that allows admins to view user lists, manage API keys, and toggle system status.
+*   **Acceptance Criteria:**
+    *   The dashboard renders a list of users with their `user_id`, `email`, and `api_key`.
+    *   The dashboard allows admins to toggle the status of an API key (e.g., "Active" vs. "Inactive").
+    *   The dashboard displays a summary of active users and API keys.
+    *   **Test Expectation:** A request to `/admin/users` should return a list of users with the correct fields. The toggle functionality for an API key should update its status in the database and refresh the UI.
+*   **Test Expectation:** Running `pytest` on

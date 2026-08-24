@@ -1,0 +1,92 @@
+# Root Cause Analysis
+
+The error occurs because the code attempts to access `payload['user']['id']` without first verifying that `'user'` exists in the payload dictionary. This is a common pattern where:
+- The request body structure changed between versions
+- A key was accidentally omitted from the payload
+- There's a logic bug expecting this field but not receiving it
+
+## Safe Fix
+
+Replace `payload['user']['id']` with `.get('user', None)` to safely handle missing keys, or use `if 'user' in payload:` check first.
+
+```python
+# Before (unsafe)
+user_id = payload['user']['id']
+
+# After (safe)
+if 'user' in payload:
+    user_id = payload['user'].get('id')
+else:
+    user_id = None  # Handle missing field gracefully
+```
+
+## Regression Tests
+
+### Test 1: Normal Case - Expected to succeed
+```python
+import json
+from typing import Optional, Dict
+
+def test_normal_payload():
+    payload = {
+        "user": {"id": 123},
+        "other_field": "value"
+    }
+    
+    # This should work without error
+    user_id = payload['user']['id']
+    assert user_id == 123, f"Expected 123, got {user_id}"
+
+def test_missing_user():
+    payload = {
+        "other_field": "value"
+    }
+    
+    # This should raise TypeError as expected
+    try:
+        user_id = payload['user']['id']
+        assert False, "Should have raised TypeError for missing 'user'"
+    except TypeError as e:
+        assert str(e) == "'NoneType' object is not subscriptable"
+
+def test_nested_missing():
+    payload = {
+        "nested": {"value": 456}
+    }
+    
+    # This should raise TypeError because 'user' key doesn't exist
+    try:
+        user_id = payload['user']['id']
+        assert False, "Should have raised TypeError for missing 'user'"
+    except TypeError as e:
+        assert str(e) == "'NoneType' object is not subscriptable"
+
+# Run tests
+test_normal_payload()
+test_missing_user()
+test_nested_missing()
+```
+
+### Test 2: Edge Case - Different field name
+```python
+def test_different_field_name():
+    payload = {
+        "user": {"id": 789}
+    }
+    
+    # This should work with different key names
+    user_id = payload['user']['id']
+    assert user_id == 789
+
+# Run tests
+test_different_field_name()
+```
+
+### Test 3: Verify None handling works correctly
+```python
+def test_none_payload():
+    payload = {}
+    
+    # This should return None instead of raising TypeError
+    user_id = payload['user']['id']
+    assert user_id is None, f"Expected None for empty payload, got {

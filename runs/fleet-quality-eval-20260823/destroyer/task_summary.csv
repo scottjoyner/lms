@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,operational_health,1.328,1.490,1.456,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,structured_output,,3.944,8.834,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,coding,,4.405,8.317,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,debugging,,4.334,8.261,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,agent_planning,,4.848,9.447,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,long_context,,159.480,0.188,1.00,1.00,1.0000,2
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,repo_work,,5.905,9.286,1.00,1.00,1.0000,1
+1787561856,destroyer,100.81.57.77,http://100.81.57.77:1234/v1,liquid/lfm2-24b-a2b,safety,,5.100,9.136,1.00,0.50,0.8021,2

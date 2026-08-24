@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+scott-optiplex-9030-aio,100.69.158.114,1,http://100.69.158.114:1234/v1,1,1,qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled

@@ -1,0 +1,1 @@
+{"task_fit": ["Summarize the content", "Answer factual questions based on provided context"], "confidence": 0.95, "limitations": ["May produce inaccurate or nonsensical outputs", "Lacks understanding of its own reasoning process", "Can be verbose and overly detailed", "Occasionally generates plausible-sounding but incorrect information"], "recommended_max_context_tokens": 1024}

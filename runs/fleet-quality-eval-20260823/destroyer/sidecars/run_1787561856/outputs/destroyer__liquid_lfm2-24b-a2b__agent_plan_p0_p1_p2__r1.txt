@@ -1,0 +1,85 @@
+### **Implementation Plan for FastAPI Service Enhancements**  
+
+---
+
+#### **P0: Foundational Setup & Dependency Management**  
+*Goal: Establish secure infrastructure and dependencies to support new features.*  
+
+**Tasks:**  
+1. **Secure Dependencies & Environment**  
+   - Integrate `-jose` (JWT), `passlib` (password hashing), and `sqlalchemy` (audit logging DB models).  
+   - Add environment variables for secrets (e.g., `SECRET_KEY`, `AUDIT_DB_URL`).  
+   - Enforce HTTPS via FastAPI middleware.  
+
+2. **Database Schema Updates**  
+   - Create `User` model with fields: `id`, `email`, `hashed_password`, `role` (admin/user), `created_at`.  
+   - Create `AuditLog` model with fields: `id`, `user_id`, `action_type`, `timestamp`, `details` (JSONB).  
+   - Create `APIKey` model with fields: `id`, `user_id`, `key`, `rotation_period`, `last_rotated_at`.  
+
+**Acceptance Criteria:**  
+- All dependencies are installed and configured.  
+- Database models exist and pass schema validation (e.g., via Alembic migrations).  
+
+**Test Expectations:**  
+- Run `pip list` to confirm dependencies are installed.  
+- Verify database tables exist using `sqlalchemy create all()` in a test script.  
+
+
+#### **P1: Core Security Features (Authentication & API Key Rotation)**  
+*Goal: Implement user authentication and automated API key rotation.*  
+
+**Tasks:**  
+1. **User Authentication (JWT)**  
+   - Add `/register` endpoint to create users with hashed passwords.  
+   - Add `/login` endpoint to issue JWT tokens (exp: 15 mins, refresh token: 7 days).  
+   - Implement middleware to validate JWT tokens for protected routes.  
+
+2. **API Key Rotation**  
+   - Add `/api-keys` endpoints:  
+     - `POST /api-keys`: Generate a new key for the authenticated user (rotates old key).  
+     - `GET /api-keys`: List all valid keys for the user.  
+   - Enforce key validation on sensitive endpoints (e.g., `/admin/*`).  
+
+**Acceptance Criteria:**  
+- Users can register, login, and receive valid JWT tokens.  
+- API keys are generated, stored, and validated correctly.  
+
+**Test Expectations:**  
+- **Auth Tests:**  
+  - Register with valid/invalid data â 201/400 responses.  
+  - Login returns 200 with token; invalid credentials return 401.  
+  - Middleware blocks endpoints without valid JWT (401).  
+- **API Key Tests:**  
+  - `POST /api-keys` creates a new key and invalidates the old one.  
+  - Listing keys returns all active keys for the user.  
+
+
+#### **P2: Audit Logging & Admin Dashboards**  
+*Goal: Track user actions and provide admin visibility.*  
+
+**Tasks:**  
+1. **Audit Logging**  
+   - Add `@app.middleware("http")` to log all requests/responses (user_id, endpoint, method, status, timestamp).  
+   - Store logs in a dedicated database table (`AuditLog`).  
+
+2. **Admin Dashboard**  
+   - Create `/admin/dashboard` endpoint with role-based access (only admins).  
+   - Display: active users, API key usage stats, recent audit logs.  
+   - Add `/admin/users` to list all users (filtered by admin).  
+
+**Acceptance Criteria:**  
+- All user actions are logged with timestamps and details.  
+- Admin dashboard renders data correctly and restricts access to admins.  
+
+**Test Expectations:**  
+- **Audit Logs:**  
+  - A request to `/protected` triggers a log entry in the database.  
+  - Log entries include `user_id`, `endpoint`, `status`, and `timestamp`.  
+- **Dashboard Tests:**  
+  - Non-admins receive 403 when accessing `/admin/dashboard`.  
+  - Admin sees user list, API key stats, and recent logs.  
+
+
+---
+
+**Outcome:** The FastAPI service gains secure authentication, automated key rotation, full auditability, and admin visibilityâall validated via defined tests.

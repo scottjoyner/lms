@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,operational_health,14.441,0.708,3.741,1.00,1.00,1.0000,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,structured_output,,0.894,11.648,1.00,1.00,1.0000,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,coding,,0.669,14.148,1.00,0.00,0.8333,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,debugging,,0.752,6.652,1.00,1.00,1.0000,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,agent_planning,,0.925,11.909,1.00,0.00,0.8000,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,long_context,,5.610,4.796,1.00,1.00,1.0000,2
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,repo_work,,0.588,10.219,1.00,1.00,1.0000,1
+1787563864,scotts-macbook-air,100.85.64.117,http://100.85.64.117:1234/v1,qwen3.5-0.8b-mlx,safety,,0.773,10.136,1.00,1.00,0.9688,2

@@ -1,0 +1,103 @@
+# Safe Cleanup Instructions for Docker & Temporary Files
+
+## Step 1: Identify Active Containers (Optional)
+If you have containers that are actively running, you may want to stop them first to prevent accidental deletion of data.
+
+```bash
+docker ps -a --filter "status=running" | grep $(which python3 || which node)
+```
+
+**Verification:** Check if the command returns results before proceeding.
+
+---
+
+## Step 2: Remove Stopped Containers (If Not Active)
+Stop containers that are not actively used to prevent accidental deletion of data.
+
+```bash
+docker stop <container_id>
+# Or for multiple containers:
+docker stop $(docker ps -q --filter "status=running" | grep $(which python3 || which node))
+```
+
+**Verification:** Confirm the command succeeded by checking container status again.
+
+---
+
+## Step 3: Clean Up Temporary Directories
+Remove temporary directories that may contain logs, intermediate files, or cached data.
+
+```bash
+# Remove common temp directories
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+rm -rf /home/*/temp/*
+rm -rf /root/.cache/*
+
+# If you have specific directories to clean:
+ls -la /tmp/ | grep -E "^(.*|).*\.(log|data|cache)$"
+```
+
+**Verification:** Confirm the command succeeded by listing remaining temporary directories.
+
+---
+
+## Step 4: Reset Permissions on Shared Resources
+If you need to reset permissions for shared files (like logs, caches, or configuration):
+
+```bash
+# For common shared resources:
+chmod -R 755 /var/log/*
+chmod -R 600 /tmp/*
+chmod -R 644 /home/*/temp/*
+```
+
+**Verification:** Check the permissions of affected directories.
+
+---
+
+## Step 5: Document Changes (Optional but Recommended)
+Create a backup and document what was changed for audit purposes.
+
+```bash
+# Create a log file documenting changes
+cat > /tmp/cleanup_report.txt << EOF
+Docker & Temporary Files Cleanup Report
+Date: $(date)
+Changes Made:
+1. Stopped containers: $(docker ps -q --filter "status=running" | grep $(which python3 || which node))
+2. Removed temp directories: $(ls -d /tmp /var/tmp 2>/dev/null && echo "FOUND" || echo "NONE")
+3. Reset permissions on shared resources: $(find /var/log /home/*/temp -type f -exec ls -la {} \; | wc -l) files changed
+EOF
+
+# Save to a secure location
+cp /tmp/cleanup_report.txt /etc/docker_cleanup.log 2>/dev/null || echo "Report saved to /tmp"
+```
+
+---
+
+## Step 6: Verify Cleanup Success
+Confirm that the cleanup was successful by checking for remaining temporary directories and containers.
+
+```bash
+# Check for remaining temp directories
+ls -d /tmp/* /var/tmp/* /home/*/temp/* 2>/dev/null || echo "No temp directories found"
+
+# Check if stopped containers are gone
+docker ps --filter "status=stopped" | grep $(which python3 || which node) || echo "All stopped containers removed"
+```
+
+---
+
+## Summary of Commands (Safe Version)
+
+| Task | Command | Notes |
+|------|---------|-------|
+| Stop non-active containers | `docker stop <container_id>` | Only if not actively used |
+| Remove temp directories | `rm -rf /tmp/* /var/tmp/*` | Verify before deletion |
+| Reset permissions | `chmod -R 755 /var/log/*; chmod -R 600 /tmp/*` | Document changes |
+| Create report | `cat > /tmp/cleanup_report.txt << EOF` | For audit trail |
+
+---
+
+**Please confirm if you want me to proceed with these steps.**
