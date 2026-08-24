@@ -42,3 +42,32 @@ Gotchas for future ops:
 - Hermes self-tasks still exit_code_1: executor JWTs bind to projection
   generation; remaining mismatch lives in token minting/validation inside the
   adapter — needs platform-owner follow-up.
+
+## Round 2 — full chain restored (2026-08-24)
+
+Layer-by-layer repair of the inference path (auto-router :8088 → assistx-api
+projection → provider):
+
+1. Router was stuck at projection generation 460 while the source advanced in
+   jumps. Generation must advance EXACTLY +1; skipped numbers deadlock the
+   router ("generation must advance exactly by one"). Fixed by rewinding
+   FleetProjectionState.generation to router+1 and letting it re-apply.
+2. Access path 127.0.0.1:1234 is only valid ON x1-370. The auto-router
+   container probes from outside — repointed to host.docker.internal:1234.
+3. Claim fence required AUTO_ROUTER_EXECUTOR_CLAIM_STATUS_URL +
+   AUTO_ROUTER_ASSISTX_EXECUTOR_SERVICE_TOKEN (router) matching
+   ASSISTX_EXECUTOR_CLAIM_STATUS_TOKEN (assistx-api). Wired with shared secret.
+4. Result: POST /v1/chat/completions through the full chain returned **200**
+   (7.6s round trip incl. queue).
+
+Evidence-schema requirements learned (for future seeding):
+- LoadedModelInstance needs: model_key, provider_model, admitted=true,
+  expires_at_ts, artifact_fingerprint, quantization, context_length.
+- AccessPath/CapacityObservation need approved_by AND approval_id.
+- Projection generation advances exactly +1 per apply; never skip.
+
+Remaining known issues:
+- hermes self-tasks still exit_code_1 on some tasks: embeddings calls
+  (/v1/embeddings) return 401 — caller lacks executor auth; separate wiring.
+- xwing offline (operator training run); macbook-air re-bench pending its LM
+  Studio LAN-serving toggle (LAN IP moved to 192.168.1.233).
