@@ -22,3 +22,9 @@
 {"node":"xwing","conc":4,"error":"failed"}
 {"node":"xwing","conc":8,"error":"failed"}
 {"node":"xwing","done":true,"end":"2026-08-23T18:45:21-04:00"}
+{"node":"xwing","model":"nanbeige_nanbeige4.2-3b","start":"2026-08-23T20:47:14-04:00"}
+{"conc": 1, "requests": 1, "wall_s": 46.92, "total_completion_tokens": 256, "aggregate_tps": 5.5, "per_stream_tps": [5.5], "lat_min_s": 46.92, "lat_max_s": 46.92, "node": "xwing", "model": "nanbeige_nanbeige4.2-3b"}
+{"conc": 2, "requests": 2, "wall_s": 60.44, "total_completion_tokens": 512, "aggregate_tps": 8.5, "per_stream_tps": [4.2, 4.2], "lat_min_s": 60.43, "lat_max_s": 60.44, "node": "xwing", "model": "nanbeige_nanbeige4.2-3b"}
+{"conc": 4, "requests": 4, "wall_s": 67.72, "total_completion_tokens": 1024, "aggregate_tps": 15.1, "per_stream_tps": [3.8, 3.8, 3.8, 3.8], "lat_min_s": 67.7, "lat_max_s": 67.72, "node": "xwing", "model": "nanbeige_nanbeige4.2-3b"}
+{"node":"xwing","conc":8,"error":"failed"}
+{"node":"xwing","done":true,"end":"2026-08-23T20:51:16-04:00"}

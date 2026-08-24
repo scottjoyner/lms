@@ -5,3 +5,4 @@
 {"conc": 8, "requests": 8, "wall_s": 59.97, "total_completion_tokens": 2040, "aggregate_tps": 34.0, "per_stream_tps": [4.3, 17.1, 4.3, 10.5, 17.1, 9.5, 9.5, 10.5], "lat_min_s": 14.87, "lat_max_s": 59.96, "node": "macbook-air", "model": "qwen3.5-0.8b-mlx"}
 {"node":"macbook-air","done":true,"end":"2026-08-23T18:26:27-04:00"}
 {"conc": 16, "requests": 16, "wall_s": 88.47, "total_completion_tokens": 4080, "aggregate_tps": 46.1, "per_stream_tps": [14.5, 14.4, 3.9, 7.4, 6.2, 6.0, 6.0, 8.3, 4.8, 5.5, 8.7, 2.9, 4.7, 8.3, 4.7, 2.9], "lat_min_s": 17.64, "lat_max_s": 88.46}
+{"conc": 32, "requests": 32, "wall_s": 124.95, "total_completion_tokens": 8160, "aggregate_tps": 65.3, "per_stream_tps": [7.8, 13.2, 2.8, 2.9, 6.4, 5.7, 4.5, 3.8, 9.3, 6.5, 8.0, 3.4, 4.9, 4.9, 17.3, 3.7, 4.6, 3.2, 4.0, 17.2, 12.4, 3.2, 4.0, 3.4, 2.8, 2.9, 5.8, 9.3, 2.6, 2.0, 2.6, 2.1], "lat_min_s": 14.78, "lat_max_s": 124.93}

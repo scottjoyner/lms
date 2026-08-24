@@ -17,7 +17,7 @@ assistx docker stack on x1-370 was stopped for the duration
 | optiplex-9030-aio | CPU only, 7.7G | qwen3.5-0.8b-distilled | 10.7 | 14.8 | 15.0 | — | 15.0 |
 | lenovo-ideapad | CPU only, 11G | lfm2.5-1.2b | 5.1 | 8.5 | 8.5 | — | 8.5 |
 | destroyer | CPU only, 30G | lfm2-24b-a2b (MoE A2B) | 4.7 | 5.7 | 5.7 | — | 5.7 |
-| xwing | Radeon 8060S Strix Halo, 23G | — | BROKEN | — | — | — | — |
+| xwing | Radeon 8060S Strix Halo, 23G | nanbeige_nanbeige4.2-3b | 5.5 | 15.1 | fail | — | ~15 (contested) |
 
 All tps = aggregate completion tokens/sec.
 
@@ -33,20 +33,36 @@ All tps = aggregate completion tokens/sec.
 
 ## Broken / degraded
 
-- **xwing**: `ternary-bonsai-27b@?` wedged in PROCESSINGPROMPT (matches its
-  0.105 tps ok-rate in fleet-bench-20260821b). Server restart + rebinding to
-  0.0.0.0 restored reachability, but every model now returns
-  `"Engine protocol predict request failed: fetch failed"` — backend engine
-  extension appears corrupted. Needs hands-on investigation (likely reinstall
-  of the llama.cpp backend extension). Note: `lms server start` defaults to
-  127.0.0.1 bind — remote nodes must use `--bind 0.0.0.0`.
+- **xwing — root-caused and partially repaired 2026-08-23.** Failure chain:
+  1. LM Studio auto-selected backend `vulkan-avx2 2.29.1` (first seen in
+     journal that day); every llama-server spawn SIGABRTs before healthy on
+     the Radeon 8050S (gfx1151) → "Engine protocol runtime exited before
+     becoming healthy" / "fetch failed" for all models.
+  2. Box was simultaneously OOM-thrashing: default model contexts (262k) on
+     unified memory blew past 23 GiB RAM; kernel OOM-killed the daemon,
+     openclaw-gateway, hermes-gateway; 10–37 GB swap churn.
+     Kernel log: `Out of memory: Killed process ... (llama-server)`.
+  3. Fix applied: rolled
+     `~/.lmstudio/.internal/backend-preferences-v1.json` from vulkan-2.29.1
+     to **vulkan-avx2 2.28.2** (backup: `.bak-vulkan2291`; ROCm 2.28.2 also
+     aborts on gfx1151), restarted server with `--bind 0.0.0.0`, and loads
+     must use explicit small context (`-c 8192`).
+  - Result: serving again, but numbers are contested — other jobs (finetune
+    staging llama-servers, gateways) run on this box per operator.
+    nanbeige c1/c4 = 5.5/15.1 tps; conc 8 rejected.
+  - Follow-ups: keep backend pinned to vulkan 2.28.2 (do not auto-update),
+    set sane default contexts per model, consider trimming co-tenant jobs or
+    adding memory before trusting perf numbers.
 - Off-limits during this sweep per operator: joyner + beelink (recovery work),
   deathstar (RX 480 running recovery jobs).
 
 ## Follow-ups
 
-- [ ] Repair xwing backend engine, then bench its 8060S iGPU (expected strong)
-- [ ] macbook-air conc 32 probe
-- [ ] Apply tuned per-model config (FA on, KV q8_0, MTP off) to destroyer/xwing
-      model defaults after repair
+- [x] xwing backend repaired (vulkan 2.28.2 rollback); numbers contested by co-tenant jobs
+- [ ] macbook-air conc 32 probe — done: 65.3 tps @ c32, still scaling
+- [x] x1-370 parallel sweep: parallel 16 → **180.4 tps** ceiling (compute-bound);
+      persisted numParallelSessions 16; parallel 32 tested equal (~181)
+- [x] x1-370 tuned config re-verified after contention source removed
+- [ ] Apply tuned per-model config (FA on, KV q8_0, MTP off, sane contexts) to
+      destroyer/xwing model defaults
 - [ ] joyner SSH: tailnet ACL must allow user scott before it can be censused
