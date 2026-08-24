@@ -1,0 +1,29 @@
+Here's a safe, staged approach. The key principle: **review first, then clean up only what you've confirmed is safe**, because "clean everything" often destroys data that isn't actually recoverable (especially Docker volumes).
+
+## Step 1 â Review current state (all read-only, no changes)
+
+**Docker:**
+```bash
+docker ps -a                          # all containers, including stopped
+docker images                         # all images
+docker volumes                        # â ï¸ volumes hold real data
+docker network ls                     # networks
+docker system df                      # disk usage breakdown
+```
+
+**Temp files:**
+```bash
+ls -la /tmp                           # what's actually in /tmp
+du -sh /tmp/* 2>/dev/null             # size of each item
+find /tmp -type f -mtime +7           # files older than 7 days only
+```
+
+Run these and share the output. This tells us whether there are important stopped containers, named volumes with data, or active temp files in use before we touch anything.
+
+---
+
+## Step 2 â Docker cleanup (requires your explicit confirmation)
+
+These are ordered from least to most aggressive. **Tell me which level you want** and I'll run it:
+
+- **Level 1 (safe-ish):** remove only *stopped*

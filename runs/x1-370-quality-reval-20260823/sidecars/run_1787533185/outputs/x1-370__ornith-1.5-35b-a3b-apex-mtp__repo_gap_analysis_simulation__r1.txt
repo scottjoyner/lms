@@ -1,0 +1,43 @@
+# Implementation Cycle Plan
+
+## P0 â Critical (block release)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 1 | **Remove/lock down the direct shell command endpoint** | Security | Exposes arbitrary RCE on the host. Immediate exploit risk. Replace with a constrained, allow-listed action API or remove entirely. |
+| 2 | **Add authentication + authorization** | Security | No auth means unauthenticated access to *everything*, including dangerous endpoints. Enforce at route level before anything else ships. |
+
+## P1.1 â High (next cycle)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 3 | **Harden error handling** | Logic/Security | Replace generic exceptions with structured responses; avoid leaking stack traces, internals, or DB paths to clients. Add global exception handler + input validation. |
+| 4 | **Introduce database migrations** | Logic | SQLite schema drift without versioning risks data loss on deploy. Add Alembic/migration tooling and pin schema versions. |
+| 5 | **Add Docker healthcheck** | Ops | Container orchestrators can't detect a hung/crashed app. Add `/health` probe + `HEALTHCHECK` in the image. |
+
+## P1.2 â Medium-High (parallelize)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 6 | **Set up CI pipeline** | Delivery | Lint, type-check, and run tests on every PR. Gate merges on passing checks. |
+| 7 | **Establish baseline test suite** | Tests | Cover auth guards, shell-endpoint removal, and core CRUD paths. Target meaningful coverage of P0/P1 logic. |
+
+## P2 â Standard (backlog)
+
+| # | Item | Category | Notes |
+|---|------|----------|-------|
+| 8 | **Expand test coverage** | Tests | Add integration tests (APIâSQLite), React component/e2e tests, and edge-case/error-path cases. |
+| 9 | **Auth hardening / RBAC** | Security | Role-based access control, token expiry, password policy if applicable. |
+| 10 | **Documentation & runbooks** | Delivery | Setup, deployment, health endpoint, and incident response for the shell-endpoint removal. |
+
+---
+
+### Suggested sequencing
+- **Cycle A:** P0 (items 1â2) â security-critical, blocks any release.
+- **Cycle B:** P1.1 (items 3â5) + start P1.2 #6.
+- **Cycle C:** Finish P1.2 (#7), then begin P2 backlog as capacity allows.
+
+### Key logic gaps flagged for follow-up
+- No schema versioning â deploy-time data risk.
+- Weak error handling â information disclosure + poor observability.
+- Shell endpoint has no input validation, allow-listing, or sandboxing.

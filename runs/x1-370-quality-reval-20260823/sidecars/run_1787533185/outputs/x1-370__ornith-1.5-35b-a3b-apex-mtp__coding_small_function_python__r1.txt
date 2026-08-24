@@ -1,0 +1,45 @@
+```python
+def normalize_phone_number(value: str) -> str:
+    """Normalize a phone number to 10 digits.
+
+    Accepts US numbers in any common format: with or without a leading '1',
+    parentheses, spaces, dashes, dots, plus signs, etc. Returns exactly the
+    10 significant digits and raises ValueError for anything else.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"expected str, got {type(value).__name__}")
+
+    digits = "".join(ch for ch in value if ch.isdigit())
+
+    if len(digits) == 11 and digits[0] == "1":
+        digits = digits[1:]
+
+    if len(digits) != 10:
+        raise ValueError(
+            f"invalid phone number {value!r}: expected 10 or 11 (leading 1) digits"
+        )
+
+    return digits
+
+
+if __name__ == "__main__":
+    assert normalize_phone_number("(212) 555-0182") == "2125550182"
+    assert normalize_phone_number("1-800-555-0199") == "8005550199"
+    assert normalize_phone_number("+1 415.555.2671") == "4155552671"
+    assert normalize_phone_number("2125550182") == "2125550182"
+    assert normalize_phone_number("12125550182") == "2125550182"
+
+    try:
+        normalize_phone_number("123")
+        raise AssertionError("expected ValueError for short number")
+    except ValueError:
+        pass
+
+    try:
+        normalize_phone_number("21255501820")  # 11 digits, no leading 1
+        raise AssertionError("expected ValueError for bad 11-digit number")
+    except ValueError:
+        pass
+
+    print("all tests passed")
+```

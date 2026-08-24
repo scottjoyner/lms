@@ -71,11 +71,11 @@
         "long_context",
         "code_agent"
       ],
-      "measured_utc": "2026-08-23T00:00:00Z",
+      "measured_utc": "2026-08-23T22:20:00Z",
       "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
       "contested": false,
-      "overall_task_pass_rate": 0.9458,
-      "quality_source": "runs/fleet-bench-20260821b run_summary.csv eval_score_avg"
+      "overall_task_pass_rate": 0.7443,
+      "quality_source": "runs/x1-370-quality-reval-20260823 run_summary.csv (ornith tuned config, 2026-08-23)"
     },
     {
       "node_id": "xwing",

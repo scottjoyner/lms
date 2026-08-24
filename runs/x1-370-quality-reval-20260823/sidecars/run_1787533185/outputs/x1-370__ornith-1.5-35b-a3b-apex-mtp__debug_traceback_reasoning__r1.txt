@@ -1,0 +1,74 @@
+## Root Cause
+
+The error means you're trying to subscript (`[...]`) a `None` value. In `payload['user']['id']`, Python evaluates left-to-right:
+
+1. `payload['user']` is evaluated first.
+2. If that result is `None`, then the second operation becomes `None['id']`, which raises **`TypeError: 'NoneType' object is not subscriptable`**.
+
+So either:
+- `payload['user']` exists but its value is `None` (the key is present with a null value), or
+- `payload` itself is `None` (in which case the failure actually occurs at `payload['user']`, the first subscript).
+
+The most common cause in real payloads: the request arrived without a populated user object, so `'user'` maps to `null`.
+
+## Safe Fix
+
+Guard against missing keys and `None` values before descending. Use `.get()` with sensible defaults:
+
+```python
+def get_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+# Usage at line 42:
+user_id = get_user_id(payload)
+if user_id is None:
+    # handle missing/invalid user (log, raise a domain error, etc.)
+    ...
+```
+
+If you prefer inline without a helper:
+
+```python
+user_id = payload.get('user', {}).get('id') if isinstance(payload, dict) else None
+```
+
+## Regression Tests
+
+```python
+import unittest
+
+def get_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+
+class TestGetUserId(unittest.TestCase):
+
+    def test_valid_nested_payload(self):
+        self.assertEqual(get_user_id({'user': {'id': 42}}), 42)
+
+    def test_none_user_value_does_not_crash(self):
+        # The original crash scenario: 'user' present but null.
+        self.assertIsNone(get_user_id({'user': None}))
+
+    def test_missing_user_key(self):
+        self.assertIsNone(get_user_id({}))
+
+    def test_payload_is_none(self):
+        self.assertIsNone(get_user_id(None))
+
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+The first two tests are the key regression guards: one confirms happy-path extraction, and `test_none_user_value_does_not_crash` directly reproduces the original failure to ensure it stays fixed.
