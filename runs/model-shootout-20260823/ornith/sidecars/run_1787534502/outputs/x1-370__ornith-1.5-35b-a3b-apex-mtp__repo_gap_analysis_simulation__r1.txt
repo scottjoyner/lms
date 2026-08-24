@@ -1,0 +1,31 @@
+## Implementation Cycle Plan
+
+### P0 â Critical (block any release)
+
+**Security:**
+1. **Eliminate RCE via shell command endpoint.** This is arbitrary code execution on the host with no auth gate. Options, in order of preference: remove it entirely; if business-required, replace with a strict allowlist of commands executed without `shell=True`, fully parameterized, validated against a fixed argument schema, and run as a non-privileged user.
+2. **Add authentication & authorization.** No auth means unauthenticated access to all data endpoints *and* (currently) the shell. Implement token/session auth (OAuth2 + JWT or server sessions), password hashing (argon2/bcrypt), and role-based route protection. This is foundational â everything else assumes it exists.
+3. **Harden error handling.** Weak handlers risk leaking stack traces, DB schemas, secrets, and internal paths to clients. Add global exception handlers returning safe generic responses while logging details server-side; never surface SQL or file paths in API output.
+
+**Logic gap:** No auth + shell endpoint = no authorization boundary at all. Verify there's no implicit trust on request headers/params used for security decisions.
+
+---
+
+### P1.1 â High (next cycle)
+
+4. **Database migrations.** Introduce Alembic (or equivalent) for versioned schema management; capture current DB state as baseline. Prevents schema drift and enables safe deploys/reverts.
+5. **Docker healthcheck & container hardening.** Add `HEALTHCHECK` validating the API responds; run as non-root user; move secrets to env/secret manager, not baked into images.
+6. **Input validation & rate limiting.** Enforce Pydantic models on all payloads; add rate limiting on auth and public endpoints to mitigate abuse of exposed routes.
+
+---
+
+### P1.2 â Medium-High
+
+7. **CI pipeline.** GitHub Actions (or equivalent) running lint, type-check, test suite, and build validation on every PR before merge.
+8. **Test suite foundation.** Unit + integration tests for core endpoints, auth flows, the shell-command allowlist logic, and DB layer. Prioritize coverage of all P0/P1 paths.
+
+---
+
+### P2 â Lower / hardening
+
+9. **Expanded test coverage & e2e.** React dashboard component

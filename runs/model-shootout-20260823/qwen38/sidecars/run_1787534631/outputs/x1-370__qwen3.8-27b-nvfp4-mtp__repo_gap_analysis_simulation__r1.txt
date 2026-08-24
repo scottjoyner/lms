@@ -1,0 +1,9 @@
+## Implementation Cycle Plan
+
+### P0 â Immediate Security & Stability Blockers  
+**Goal: Remove exploitable risk and make the app safe to run.**
+
+| Area | Actions | Test / Deliverable Exit Criteria |
+|---|---|---|
+| **Security issues** | 1. Disable or remove the direct shell command endpoint immediately.<br>2. If it must remain, restrict it behind authentication + admin role + strict command allowlist; never use `shell=True` with user input.<br>3. Add authentication to all non-public endpoints (API key/JWT/OIDC).<br>4. Move secrets out of code into environment variables or a secret store.<br>5. Disable debug mode and suppress stack traces in production responses.<br>6. Add basic rate limiting on sensitive endpoints. | - No unauthenticated access to privileged endpoints.<br>- Shell endpoint returns 403/404 for unauthorized users.<br>- No secrets committed to repo.<br>- Error responses do not leak internals. |
+| **Logic gaps** | 1. Add a global exception handler returning generic `500` with request ID.<br>2. Add `/healthz` and `/readyz` endpoints, including SQLite connectivity check.<br>3. Validate all user input with Pydantic schemas.<br>4. Ensure database connections are opened/closed safely per request or via dependency injection.<

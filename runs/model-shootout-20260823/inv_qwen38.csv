@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+x1-370,127.0.0.1,1,http://127.0.0.1:1234/v1,1,1,qwen3.8-27b-nvfp4-mtp

@@ -1,0 +1,66 @@
+## Root Cause
+
+The error means an object being indexed with `[...]` is `None`. At line 42 you have **nested** subscripts:
+
+```python
+user_id = payload['user']['id']
+```
+
+Either of these is `None`:
+- `payload` itself is `None` (e.g., JSON parse failed, API returned `null`, or a function returned nothing), or
+- `payload['user']` exists but its value is `None`.
+
+Subscripting `None['id']` raises exactly this error. The code assumes the structure always exists without validating input.
+
+## Safe Fix
+
+Validate defensively using `.get()` with defaults, and check for `None` before descending:
+
+```python
+def extract_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+# Usage
+payload = get_payload()  # may be None
+user_id = extract_user_id(payload)
+if user_id is None:
+    raise ValueError("Missing or malformed user id in payload")
+```
+
+This avoids subscripting `None` and fails with a clear, handled condition instead.
+
+## Regression Tests
+
+```python
+import unittest
+
+
+def extract_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+
+class TestExtractUserId(unittest.TestCase):
+
+    def test_valid_nested_payload(self):
+        self.assertEqual(extract_user_id({'user': {'id': 42}}), 42)
+
+    def test_none_payload_does_not_raise(self):
+        # Regression: previously raised TypeError on None['user']
+        self.assertIsNone(extract_user_id(None))
+
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+Run with `python -m pytest test_file.py` or `python test_file.py`.

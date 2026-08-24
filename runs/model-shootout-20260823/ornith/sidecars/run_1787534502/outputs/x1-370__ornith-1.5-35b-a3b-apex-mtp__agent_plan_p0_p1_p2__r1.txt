@@ -1,0 +1,73 @@
+# Implementation Plan: Security & Admin Layer for FastAPI Service
+
+**Assumptions (defaults â adjust if your stack differs):** SQLAlchemy ORM + Alembic migrations, `bcrypt`/`passlib` for password hashing, PyJWT for tokens, PostgreSQL as the primary store, pytest with Starlette's `TestClient`. Persist all security state in the DB rather than in-memory to survive restarts and horizontal scaling.
+
+---
+
+## P0 â Foundation & Security-Critical Path
+
+These are prerequisites; nothing else is safe or useful without them.
+
+### Task 0.1 â User Authentication (password-based + JWT)
+
+**Objective:** Register/login users, issue short-lived access tokens, verify credentials on protected routes.
+
+**Key components:**
+- `User` model (`id`, `email` unique, `hashed_password`, `is_active`, `is_superuser`, `created_at`)
+- Password hashing via `bcrypt`; never store plaintext or log passwords
+- `/auth/register`, `/auth/login` returning a signed JWT access token (15-min expiry)
+- A dependency `get_current_user` that validates the `Authorization: Bearer` header and loads the user
+
+**Acceptance criteria:**
+- [ ] Passwords are hashed with bcrypt before persistence; verification rejects wrong passwords.
+- [ ] Login returns a valid, signed JWT only for correct credentials (HTTP 401 otherwise).
+- [ ] Requests without/with invalid tokens to protected endpoints return HTTP 401.
+- [ ] Expired tokens are rejected with HTTP 401 and a clear error body.
+- [ ] Duplicate email registration returns HTTP 409; validation rejects malformed emails.
+
+**Test expectations:**
+
+| Test | Expected result |
+|---|---|
+| Register valid user â login | 200/201, JWT returned, user persisted hashed |
+| Login wrong password | 401, no token leaked in response |
+| Access protected route w/o header | 401 |
+| Access with tampered/expired token | 401 |
+| Duplicate registration | 409 |
+| Malformed email on register | 422 (validation) |
+
+---
+
+### Task 0.2 â Audit Logging Infrastructure
+
+**Objective:** Immutable, append-only record of security-relevant events before they can be tampered with.
+
+**Key components:**
+- `AuditLog` model (`id`, `timestamp`, `actor_id`, `actor_type` [user/api_key/system], `action`, `resource`, `outcome` [success/failure], `ip_address`, `details` JSON)
+- Central logging function/dependency invoked by auth and mutation endpoints
+- Never log secrets, passwords, or full token values; redact PII per policy
+
+**Acceptance criteria:**
+- [ ] Every login success/failure writes an audit record.
+- [ ] Records are append-only (no update/delete of existing entries).
+- [ ] Failed auth attempts are logged with outcome=failure but without sensitive payloads.
+- [ ] Audit log queries support filtering by actor, action, time range, and outcome.
+
+**Test expectations:**
+
+| Test | Expected result |
+|---|---|
+| Successful login | `AuditLog` row created, outcome=success |
+| Failed login | `AuditLog` row created, outcome=failure, no password in details |
+| Attempt to delete audit row | rejected / not persisted (append-only enforced) |
+| Query by time range + actor | returns only matching rows |
+| Login with plaintext password in request body | password absent from stored `details` |
+
+---
+
+### Task 0.3 â API Key Management & Rotation
+
+**Objective:** Issue, rotate, and revoke service API keys independent of user sessions.
+
+**Key components:**
+- `ApiKey` model (`id`, `

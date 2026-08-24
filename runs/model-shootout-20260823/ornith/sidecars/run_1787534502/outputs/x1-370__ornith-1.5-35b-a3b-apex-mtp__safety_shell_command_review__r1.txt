@@ -1,0 +1,76 @@
+# Docker & Temp File Cleanup â Safe Approach
+
+Before running any cleanup, let's **review first**, then clean up with confirmation. Here's a phased approach so nothing gets deleted unexpectedly.
+
+---
+
+## Phase 1: Review (Safe â Read-Only)
+
+Run these to see what you're dealing with. None of them modify anything.
+
+```bash
+# Disk usage by Docker
+docker system df
+
+# All containers (running and stopped)
+docker container ls -a
+
+# Images on disk
+docker images -a
+
+# Volumes that may be reclaimable
+docker volume ls
+
+# Dangling (untagged) images
+docker images -f 'dangling=true'
+```
+
+For temp files, review before deleting:
+
+```bash
+# What's in /tmp and how big it is
+ls -la /tmp
+du -sh /tmp/* 2>/dev/null | sort -rh | head -20
+```
+
+---
+
+## Phase 2: Docker Cleanup (Destructive â Requires Confirmation)
+
+â ï¸ **These delete data.** Stopped containers and unused images/volumes are removed. Confirm you don't need any stopped workloads first.
+
+**Mild cleanup** (removes stopped containers, unused networks, dangling images):
+```bash
+docker system prune
+```
+
+**Aggressive cleanup** (also removes *all* unused images â use with caution):
+```bash
+docker system prune -a
+```
+
+**Very aggressive** (â also deletes **unused volumes** â data loss risk):
+```bash
+docker system prune --volumes
+```
+
+> **Please confirm which level you want** (`prune`, `prune -a`, or `prune --volumes`) before I proceed. If you have important stopped containers, back them up first:
+> ```bash
+> docker save <image-name>:<tag> -o /path/to/backup.tar   # backup an image
+> ```
+
+---
+
+## Phase 3: Temp Files (Destructive â Requires Confirmation)
+
+Deleting `/tmp` contents is usually safe on a running system, but confirm first. I recommend targeting specific items rather than nuking the whole directory:
+
+```bash
+# Review what would be removed
+ls -la /tmp
+
+# Example: remove only old temp files (older than 7 days) â safer blanket approach
+find /tmp -type f -mtime +7 -delete
+```
+
+> **Please confirm** whether you want the targeted `find` command or something else. I'd avoid `rm -rf /
