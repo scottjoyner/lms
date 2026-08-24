@@ -71,3 +71,25 @@ Remaining known issues:
   (/v1/embeddings) return 401 — caller lacks executor auth; separate wiring.
 - xwing offline (operator training run); macbook-air re-bench pending its LM
   Studio LAN-serving toggle (LAN IP moved to 192.168.1.233).
+
+## Round 3 — pipeline fully restored (2026-08-24)
+
+Final layers fixed:
+1. Router attempt timeout raised 45s→240s / deadline 300s (auto-router .env):
+   slow-node cold JIT loads were tripping circuit breakers with empty
+   httpx timeout errors ("unexpected provider error: ").
+2. optiplex qwen3.5-0.8b pinned resident (TTL 31536000) — no per-task cold loads.
+3. Executor token minting only allowed [task model] +
+   ASSISTX_EXECUTOR_DEFAULT_MODEL_ALIASES env (was unpopulated → scope 401s).
+   Set to the full serving catalog; api restarted.
+4. swarm_memory indexer authenticates to router embeddings via internal token.
+5. auto-router image rebuilt with executor scope-reject diagnostics
+   (`executor scope reject: requested=… allowed=…` in logs).
+6. hermes adapter logs stderr/stdout tails on non-zero exits.
+
+Verified: zero exit_code_1 over a 3.5-min self-task window; chat completions
+200 through router incl. 126s optiplex cold-load; embeddings 200; projection
+gen 468 fresh with 4 providers.
+
+Residual known-failures: tasks requesting ornith-1.0-35b (model files exist
+only on offline xwing) fail dispatch until xwing returns.
