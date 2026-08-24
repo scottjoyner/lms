@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:bb0e9611889b362e54210c8173a1b7d40e007f5bdde39d189a6f25a039b3935a",
+  "created_at_utc": "2026-08-24T10:26:31.621063+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:9f57543d29dba594234f1af15e33eafd4076b775a020b64778f921e2f3b25811",
+  "namespace": "lms-fleet-operator",
+  "run_id": "ornith-32k",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:819a5319cc54720f5b09f64b08f43e5b222f2747a99771a404e4222884e05f8d",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

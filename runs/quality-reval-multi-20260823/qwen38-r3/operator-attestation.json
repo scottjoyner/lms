@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:e141206559de6081fc010492a5d6ed4c0260d8e10ef7fa24cc502285f23cb534",
+  "created_at_utc": "2026-08-24T10:26:31.737510+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:b4194c59a5d8494c6c2743256aaf775df6a12cb77aa892a0273fc8658b5f2255",
+  "namespace": "lms-fleet-operator",
+  "run_id": "qwen38-r3",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:364ca91be1b9997a9fba8448477c4c1a05d2c37fbbf386d8e56222ee60b70804",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

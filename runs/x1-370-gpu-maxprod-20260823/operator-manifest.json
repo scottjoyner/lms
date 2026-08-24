@@ -1,0 +1,25 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "x1-370-gpu-maxprod-20260823",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "RESULTS.md",
+      "size_bytes": 3664,
+      "sha256": "sha256:44b9c612532c3c5afd1779fc17a795ff6821afe5812bcf419446d5647426b639"
+    },
+    {
+      "path": "gpu_bench.py",
+      "size_bytes": 2447,
+      "sha256": "sha256:ac0d1f0e72435031ffb1f5a741f2fe25b3a0d1cbe2969affd760846c4e60c9a0"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:5b883e8d7fae0fb5f71a635c9a5686e670ac10830266681607bdd3140cd62c30"
+}

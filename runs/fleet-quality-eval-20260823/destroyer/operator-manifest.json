@@ -1,0 +1,95 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "destroyer",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 36866,
+      "sha256": "sha256:ab59a919d57746693a108a8164846fd47ea0653c84ca44608931bb7e119eb372"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 8890,
+      "sha256": "sha256:1f07e0b9970c4ad40e90838cca7bafa6056bed74ce340e7e04458eaba0189eaa"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 232,
+      "sha256": "sha256:b29c115b80ad00ba94235d6ea5d055d52a3218037dd4979980fb5a18db79e561"
+    },
+    {
+      "path": "sidecars/run_1787561856/INDEX.md",
+      "size_bytes": 38200,
+      "sha256": "sha256:e5a6a92e0e2ca4f204efd2bff6fcd68f8e59f1855a915cddbb5e44882a8e6dcf"
+    },
+    {
+      "path": "sidecars/run_1787561856/MODEL__destroyer__liquid_lfm2-24b-a2b.md",
+      "size_bytes": 2250,
+      "sha256": "sha256:7ba47f074cd6bd49ca4e1601058633efe0d24d52f2b1447ff642eeb4029b630a"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__agent_plan_p0_p1_p2__r1.txt",
+      "size_bytes": 3680,
+      "sha256": "sha256:92156383bc9c42876ae0e2ae5a6d6a873ab7440d8f0936949043ffbefce574c5"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__coding_small_function_python__r1.txt",
+      "size_bytes": 709,
+      "sha256": "sha256:e45f3976a13896482bb723a651e1431ccc561d349dd4eed86679d1f7d070eae5"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 677,
+      "sha256": "sha256:b0eff415958e703042dac168f63bb3b089148760be07ad372a3f8068fca42ac4"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__health_minimal_chat__r1.txt",
+      "size_bytes": 13,
+      "sha256": "sha256:01e6a898a9aca1d7b753899c54ffad573dbcaa7975ab4d70ef021dd00cfdbb1c"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 105,
+      "sha256": "sha256:61929e93da73d9110824d233060e3a2724847ab843d8a765692a446c1740f18d"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 105,
+      "sha256": "sha256:61929e93da73d9110824d233060e3a2724847ab843d8a765692a446c1740f18d"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 3490,
+      "sha256": "sha256:7dbe77eddbdb66106ff981cb09c22b1e87e1e8f4b3fca19423d1aaa38f46977e"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 3969,
+      "sha256": "sha256:fd4abcfda1c8a8c921a3368841b9ea27fe79fa35c6d72482de70b69044f9b4ac"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__safety_shell_command_review__r1.txt",
+      "size_bytes": 1980,
+      "sha256": "sha256:01f5f9eb70a675dcccd36618ccb6887d03e47f002ade4d6ba8b3f64312726689"
+    },
+    {
+      "path": "sidecars/run_1787561856/outputs/destroyer__liquid_lfm2-24b-a2b__structured_json_capability_card__r1.txt",
+      "size_bytes": 380,
+      "sha256": "sha256:882b11f5e64a9de7387ca6da98ae875ccde9741a082d5693a7a30a99ed57e512"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1149,
+      "sha256": "sha256:a8a0a1c2cf18e7cd8c8837156ea02ffc8ac7fd3ee7955a4c1bcc46c64fb682ec"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:110f97c21f1f3e8ceede638c4acfb59af5fe801db785c794e601765ffece0e6e"
+}

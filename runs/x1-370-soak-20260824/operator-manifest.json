@@ -1,0 +1,30 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "x1-370-soak-20260824",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "errors.log",
+      "size_bytes": 0,
+      "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "soak_runs.jsonl",
+      "size_bytes": 10018,
+      "sha256": "sha256:3a2b10e377709868a80d00b628a5c57e178bbea2d55148d8e46d89b8fc1ff215"
+    },
+    {
+      "path": "thermal.log",
+      "size_bytes": 6866,
+      "sha256": "sha256:0f6c802dded8e96bc6baad1cbd8c7837ae6435000e68de48920a7f7c32d4438b"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:6e180642b9238939cb65d91f3651bc755f80dc3c78875b73f6ba1e929073f664"
+}

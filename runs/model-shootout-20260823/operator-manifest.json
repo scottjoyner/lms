@@ -1,0 +1,180 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "model-shootout-20260823",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "LAGUNA_S_FINDINGS.md",
+      "size_bytes": 1837,
+      "sha256": "sha256:31199805f16c91677636b6d8569f9d7b8588ff9969d81c608081f7564c461dff"
+    },
+    {
+      "path": "VERDICT.md",
+      "size_bytes": 3118,
+      "sha256": "sha256:15ad4cde6363d684be0ca57abac84011ccd11f96bca0427088ba1b661c9ed1ee"
+    },
+    {
+      "path": "fleet-maxprod-20260823.json",
+      "size_bytes": 2995,
+      "sha256": "sha256:a03328d53ded217ad6f89e5595da5234a430bc330be60a4612c68d5523f3ba03"
+    },
+    {
+      "path": "inv_ornith.csv",
+      "size_bytes": 144,
+      "sha256": "sha256:983f6c8b96ecdc8229bd50469c0d74997579399b2e5be0280543d737cfd0e209"
+    },
+    {
+      "path": "inv_qwen38.csv",
+      "size_bytes": 138,
+      "sha256": "sha256:cb908df8d700d6a98551c7fa768e7fceeb7f54d249543847ed0b3a1222ed3fa5"
+    },
+    {
+      "path": "longctx_bench.py",
+      "size_bytes": 3096,
+      "sha256": "sha256:3d0c8dce349f5c7251e14fdb366df412a7348d9ae9c12b570757313073fbb5ac"
+    },
+    {
+      "path": "ornith/config.json",
+      "size_bytes": 73662,
+      "sha256": "sha256:aac48b067a4bca13ce410ef3d16a39bcf00c45327fd77a8d2316a903d49e3461"
+    },
+    {
+      "path": "ornith/run_results.csv",
+      "size_bytes": 13511,
+      "sha256": "sha256:9e95375879c4cca093dfa9b1214209cb40169d2d9638fda63ec6d17574869e13"
+    },
+    {
+      "path": "ornith/run_summary.csv",
+      "size_bytes": 232,
+      "sha256": "sha256:f8dd6536014c3b708951f5afa464f3da5ba13d411611eb1b43a5d7bb0aa06794"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/INDEX.md",
+      "size_bytes": 75044,
+      "sha256": "sha256:69037f8bf633c11ea6d0517e205e7e6d1766ea667b9da7f1670ced7d9adf0caa"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/MODEL__x1-370__ornith-1.5-35b-a3b-apex-mtp.md",
+      "size_bytes": 2429,
+      "sha256": "sha256:91cfbc55afb5e8b0659ce4b0548d87b6b08bfb150a146ea2f567dcd116343161"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__agent_plan_p0_p1_p2__r1.txt",
+      "size_bytes": 3389,
+      "sha256": "sha256:f53408411374042a5b0411f2d8b139acac077e806613821c4bcb00008fc4ae77"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__coding_small_function_python__r1.txt",
+      "size_bytes": 1481,
+      "sha256": "sha256:aeabaa8318415fc2899cc3119f5c2715d5a88bc344fd0f4b3155e9c3a7c4e6ba"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 1747,
+      "sha256": "sha256:407230cc279e41044be1f6268352055b69285376af98a2e3c2aa5d875a497c23"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_8192tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 2228,
+      "sha256": "sha256:8d57cf60d8d679d1a63f52eed8969fc5333c0cc1fb12cc17ccbfcc693bd37bab"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 194,
+      "sha256": "sha256:be40a7e1211d92ddd428f0ac4c5adecd73ed1c82ea27559d789116a442422be2"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__safety_shell_command_review__r1.txt",
+      "size_bytes": 2096,
+      "sha256": "sha256:807d410538c13b0e03ef561623d4ccba911f077c2493e2fe32727b47483f1844"
+    },
+    {
+      "path": "ornith/sidecars/run_1787534502/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__structured_json_capability_card__r1.txt",
+      "size_bytes": 656,
+      "sha256": "sha256:2b2c44ee7d6e2b22914dad4aee96ce5a9d3b5e3d31943067c8c816291f33e5b1"
+    },
+    {
+      "path": "ornith/task_summary.csv",
+      "size_bytes": 1138,
+      "sha256": "sha256:0677c2ca82e1d3c7a859d49124767a8f4712b413def25a23b077ede7fe968632"
+    },
+    {
+      "path": "ornith_longctx.jsonl",
+      "size_bytes": 998,
+      "sha256": "sha256:6631b5d1570b9477bb111d7457d0ccd176f0d00d6f292ace66ed5834d2741dba"
+    },
+    {
+      "path": "qwen38/config.json",
+      "size_bytes": 73662,
+      "sha256": "sha256:192b7a3bf46e7cc2a55d94917341111371be1520c468e64fff4ae458a46714e1"
+    },
+    {
+      "path": "qwen38/run_results.csv",
+      "size_bytes": 13219,
+      "sha256": "sha256:ddb20f32edb1b03a5a05fb71d4c2483a4630009433531cadba1433cd20188d03"
+    },
+    {
+      "path": "qwen38/run_summary.csv",
+      "size_bytes": 226,
+      "sha256": "sha256:dfc049b7203a763798317ea60897d0ad9ed60d517f4daf15989cf105d885e469"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/INDEX.md",
+      "size_bytes": 74958,
+      "sha256": "sha256:679eb1ab6efbc3bf49f9eafb0be2487239a05d23324c0c81f7287f41b6be34c1"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/MODEL__x1-370__qwen3.8-27b-nvfp4-mtp.md",
+      "size_bytes": 1854,
+      "sha256": "sha256:a01d4e92ad9b19ecc5939d832dba448930359a50ce3b149733705d395bdc5fa4"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_8192tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "qwen38/sidecars/run_1787534631/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 1257,
+      "sha256": "sha256:528263ab6731823f0d04b304ad619592dd3e5dbb0b5eaa0faffb08b48a6594cc"
+    },
+    {
+      "path": "qwen38/task_summary.csv",
+      "size_bytes": 1033,
+      "sha256": "sha256:d11fc0d29b0fc0f919e28d99e5429f90aae3aa624be6129c8548c3753a7e29ff"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:989c69dfe656fe7e154ed1decdfa7e14bd893b471ef09ff5b1853a5fa2562e48"
+}

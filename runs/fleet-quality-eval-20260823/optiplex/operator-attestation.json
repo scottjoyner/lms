@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:e757ad3d32c1877f1d3b0f5dc592931b271e19082cc585f716e24d9c7e3d5ce4",
+  "created_at_utc": "2026-08-24T10:26:31.952202+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:db93c0d37747fe4d397f5116766d4e9cbd5cb8f98b913e75c2ccd45cb4f7b3d6",
+  "namespace": "lms-fleet-operator",
+  "run_id": "optiplex",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:b6dd76dab0f26f12e299c494a06a20f79e1efa43c6fdfa4c98a52eb74dc4a38e",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

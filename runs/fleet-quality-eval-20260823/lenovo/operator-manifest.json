@@ -1,0 +1,95 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "lenovo",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 36857,
+      "sha256": "sha256:30a02c664051ba59d6b7eb27a84ad0d1dbf79cfe1848b19bc5a0016ea76cf5f3"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 10655,
+      "sha256": "sha256:b709beb9cc1c15bf570543e0846c9a9cca8c9d4ea783eb35a35435543058b2a6"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 257,
+      "sha256": "sha256:9f2f519d07363938a3b9262a6ba26b666f52efcc61b0f8adefc106ad0d86ab32"
+    },
+    {
+      "path": "sidecars/run_1787563338/INDEX.md",
+      "size_bytes": 38385,
+      "sha256": "sha256:df43eebc5bbc57b25158c19b3763d7f94a764ebd8f8c5a5d93a70b139d1a0ffb"
+    },
+    {
+      "path": "sidecars/run_1787563338/MODEL__scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b.md",
+      "size_bytes": 2480,
+      "sha256": "sha256:9e5d33da0d7ed1946f980769d403548388bd7ef96a6bed314f8c234b0c9331d4"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__agent_plan_p0_p1_p2__r1.txt",
+      "size_bytes": 2862,
+      "sha256": "sha256:053933a8c05d212f4d0a5ef5810ad65ac40eab37bf44c9d516d5e0a770143888"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__coding_small_function_python__r1.txt",
+      "size_bytes": 2226,
+      "sha256": "sha256:16936fd08f2b88c1761e5a79c3719505b8ccc8b73ac00eee0feab7d94fbb629e"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 819,
+      "sha256": "sha256:dd4a129a4634c86d38931b0c2ecd8b4bd2bacf7f11cc775196767d65abfb3393"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__health_minimal_chat__r1.txt",
+      "size_bytes": 13,
+      "sha256": "sha256:01e6a898a9aca1d7b753899c54ffad573dbcaa7975ab4d70ef021dd00cfdbb1c"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 197,
+      "sha256": "sha256:e0544eadf5e58587129c3fa53f35fa9fa4f88ace450db06c9f4d1a94e2db5caa"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 197,
+      "sha256": "sha256:87d806a1067918ad31dcbc8659f259242a7e21778e313b783ddafcec42191d67"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 2519,
+      "sha256": "sha256:febae1127db70ea340159b56307e5faf1466e5c6e529ef8d970f9e45ea49d7c9"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 1830,
+      "sha256": "sha256:0dd2ed19a480518ccaa666fc4401ba996240d4b891674af41829e43a575b36a8"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__safety_shell_command_review__r1.txt",
+      "size_bytes": 238,
+      "sha256": "sha256:d231bc2ac7e54001dfdf9b6c7b524a588ebe95590375d5321c8841fe37e9fb5d"
+    },
+    {
+      "path": "sidecars/run_1787563338/outputs/scott-lenovo-ideapad-330s-15ikb__liquid_lfm2.5-1.2b__structured_json_capability_card__r1.txt",
+      "size_bytes": 211,
+      "sha256": "sha256:eed3a2946a2b8910f43e6b4ad2fdcf2d673189ac7d3f923b911c407de31d39dc"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1347,
+      "sha256": "sha256:8cd1a2594f315abaff3a5b87240fc4503df694dfa88cc172f6140627c219c137"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:89a0f05544bbc50e11d49bacfea85c8bbc0362349816ab36136bac7d2b93356c"
+}

@@ -1,0 +1,90 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "ornith-32k",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 146669,
+      "sha256": "sha256:09f57dc20cec0ce57ebb58956ad810f1682ff575104fd0881175f75d0414862b"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 14339,
+      "sha256": "sha256:b6959cbd784d2a50cf7d9e0782f4b4b07a01710ba06c49dad645ba935f6698ec"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 232,
+      "sha256": "sha256:204ee9f3f086961c26a27bec09f82c207f2d72d08ef897b31a09371f2cc7dde7"
+    },
+    {
+      "path": "sidecars/run_1787566506/INDEX.md",
+      "size_bytes": 148044,
+      "sha256": "sha256:ac20ba14a3b47f5d2bbda53b72a0b1ee2c334ad298992411caf81958beda23d5"
+    },
+    {
+      "path": "sidecars/run_1787566506/MODEL__x1-370__ornith-1.5-35b-a3b-apex-mtp.md",
+      "size_bytes": 2465,
+      "sha256": "sha256:6b520f5e45345e85226ad3645d793231ccb73c98c8934ebdc9d2beb2f10dbf14"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__coding_small_function_python__r1.txt",
+      "size_bytes": 1481,
+      "sha256": "sha256:aeabaa8318415fc2899cc3119f5c2715d5a88bc344fd0f4b3155e9c3a7c4e6ba"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 2434,
+      "sha256": "sha256:ebae3681e4aa0335775bbe6a1214e89c7e068201b1fd8b8d238a60098bd1f0c3"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_16384tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__long_context_recall_synthetic_8192tok__r1.txt",
+      "size_bytes": 157,
+      "sha256": "sha256:1b9c55e218ab26207cf3c293294aa84e555d9dabc12a3fd627488a01a16fad74"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 3666,
+      "sha256": "sha256:66a43e50950409d7fdb6af58b44a93dff4d00d1291dbd3878e6e52789bbde9c0"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__safety_shell_command_review__r1.txt",
+      "size_bytes": 2353,
+      "sha256": "sha256:327c3f79700ab90afa5a5fd84a06c7d5a36f06005ab12b9fe5b512b700b433b4"
+    },
+    {
+      "path": "sidecars/run_1787566506/outputs/x1-370__ornith-1.5-35b-a3b-apex-mtp__structured_json_capability_card__r1.txt",
+      "size_bytes": 656,
+      "sha256": "sha256:2b2c44ee7d6e2b22914dad4aee96ce5a9d3b5e3d31943067c8c816291f33e5b1"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1124,
+      "sha256": "sha256:7154cb7bfb5fe950a365a65cb8bca2501e6b3b6a8f2776e7df45254c63a35e6a"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:eb753ad45d85f0f47129e7b4d66bcabdf25c2f6f206f3f188d04814319088454"
+}

@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:1aced14294049aea5e411ee29a193676ca7f99c2c27caaea857cbd3f90d8acca",
+  "created_at_utc": "2026-08-24T10:26:31.324761+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:fc64a32ea024817a554bed831306fdc8d7af8632dd77d8ac25716a1f6e85bf93",
+  "namespace": "lms-fleet-operator",
+  "run_id": "x1-370-gpu-maxprod-20260823",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:b636a57b2f7a310c06993a35bb57be81fa362189be950f502b0951edb3b2758b",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

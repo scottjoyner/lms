@@ -1,0 +1,110 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "qwen38-r3",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 73678,
+      "sha256": "sha256:6fcf111b6ee2b00e4cfb74fbad55d5bb17ff04bd143cde6a85ab7f10b3d10cb1"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 39372,
+      "sha256": "sha256:e3b2cdec90c3ba38c233b627b21afb9fd98c56069cf05ff46a27f3811c231e8d"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 225,
+      "sha256": "sha256:f8fc81a521ac7130c8ebf3e29890e5c10002319deb939b4c75e5a342d9c0cf70"
+    },
+    {
+      "path": "sidecars/run_1787559680/INDEX.md",
+      "size_bytes": 74978,
+      "sha256": "sha256:53c05425a89bc522b65b94a7100dfd0a1341b55d4d12bbbd89dd7aa29a280b02"
+    },
+    {
+      "path": "sidecars/run_1787559680/MODEL__x1-370__qwen3.8-27b-nvfp4-mtp.md",
+      "size_bytes": 4955,
+      "sha256": "sha256:9278024db7be94d45a3785277ecaa15bf5a4462e22a0956b7a8246884c63aa32"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_2048tok__r2.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_2048tok__r3.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_4096tok__r2.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_4096tok__r3.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_8192tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_8192tok__r2.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__long_context_recall_synthetic_8192tok__r3.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__repo_gap_analysis_simulation__r3.txt",
+      "size_bytes": 258,
+      "sha256": "sha256:9f41133dcaf267a3939b7f5b4feca6d75669b7e112c4c50368de48aaf2adcdfd"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 236,
+      "sha256": "sha256:de226c8a5b8a2358fe1810f4506319a8e0e3e6f01e9ec4cb2d02eb4f88b04bc1"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__safety_secret_and_network_review__r2.txt",
+      "size_bytes": 2181,
+      "sha256": "sha256:21dde5dea9d594bc0d974da92ccf8a057bb570610edc4bc816752cc77103d57a"
+    },
+    {
+      "path": "sidecars/run_1787559680/outputs/x1-370__qwen3.8-27b-nvfp4-mtp__safety_secret_and_network_review__r3.txt",
+      "size_bytes": 1106,
+      "sha256": "sha256:fc77160f9e2994e573f5cf871afc437616feaf67de174bdfcdb32a9000e68acb"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1043,
+      "sha256": "sha256:77699920c065623ea4b499d4f3cd13359484429c2582de4cbb1879d7df18ef20"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:740a1d3decad22f6ff11382e6c9cb2c6ffc89c8ede11eaa7f745962bbf52b009"
+}

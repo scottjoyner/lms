@@ -1,0 +1,95 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "macbook-air",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 36868,
+      "sha256": "sha256:6333f971af0c2d57e7d86dfb464f07a626ecaeb253e9f2c91984b347295f78d3"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 9666,
+      "sha256": "sha256:3f9057181a5884a1c466519d0779a17209eb8e9b2159b3e332c597dffa38f2c3"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 242,
+      "sha256": "sha256:47a08f9d7438b887d699deda7cacc5bba94cf6974c8e8cffe4cf0326065c0c1f"
+    },
+    {
+      "path": "sidecars/run_1787563864/INDEX.md",
+      "size_bytes": 38264,
+      "sha256": "sha256:a77023a806c48feadc39f7801d5374c0c3f18cf5f636403688b37c81d997014d"
+    },
+    {
+      "path": "sidecars/run_1787563864/MODEL__scotts-macbook-air__qwen3.5-0.8b-mlx.md",
+      "size_bytes": 2320,
+      "sha256": "sha256:a65cb6f541dee6942a8a39b295bb54db18b0ffd4fe5e2b57e71ed554d01839ea"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__agent_plan_p0_p1_p2__r1.txt",
+      "size_bytes": 6091,
+      "sha256": "sha256:c4c797b6a44c984189437c200e4e2de24a42598e16ff302cf914c044976839c2"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__coding_small_function_python__r1.txt",
+      "size_bytes": 1052,
+      "sha256": "sha256:73023c014ff094b347ff736464b39fe5d688dc0b16ad0a985279df4d0dfffb8f"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 1249,
+      "sha256": "sha256:777aec77ce6464b42212fe1faf34c6d3f2c895510cbf0bdabb25caceb8a23359"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__health_minimal_chat__r1.txt",
+      "size_bytes": 13,
+      "sha256": "sha256:01e6a898a9aca1d7b753899c54ffad573dbcaa7975ab4d70ef021dd00cfdbb1c"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 145,
+      "sha256": "sha256:e21e630a1a35000ecdcdbe60b2acc1a16dc2256904920c96a0b62f8cadf9d2d9"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 4180,
+      "sha256": "sha256:b9409276da91932ed8e44810e93f77b7ce3eb7596e5cea9c2a67d0d28c1a6b5f"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 4199,
+      "sha256": "sha256:ee07ad64c1515dd0c5a112bacaa9c09120c8d473344e39b6061f85127d28a116"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__safety_shell_command_review__r1.txt",
+      "size_bytes": 1795,
+      "sha256": "sha256:40ee0fc41161923b444b9e951ad2e0759090b49e8eb50a4c221bf7167115150c"
+    },
+    {
+      "path": "sidecars/run_1787563864/outputs/scotts-macbook-air__qwen3.5-0.8b-mlx__structured_json_capability_card__r1.txt",
+      "size_bytes": 234,
+      "sha256": "sha256:70e136f25c5a3706eb44d9f2142b039871d339821364f9dd88289588f215b5c1"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1217,
+      "sha256": "sha256:90b0b1701e7c30994bf964757a020e74c21ada6764df8a4815bff1b6e35ae06f"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:e618020bf1f430f5c8bcfeaba770314239befd7360cf34f5dbd21b8e03cc8174"
+}

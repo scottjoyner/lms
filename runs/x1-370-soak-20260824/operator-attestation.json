@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:f217b8dd0fac5c37022b83bbe4d4723bd8181c70787231744b3d734fc1a46df4",
+  "created_at_utc": "2026-08-24T10:26:32.283230+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:ddd68b154634e71861fb41254bcc1bb85452eaac1625aa03505f7da81fe8f1d6",
+  "namespace": "lms-fleet-operator",
+  "run_id": "x1-370-soak-20260824",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:4c9755de10aa1562895fe3a02abebae6f7732d59d52349d9a75804e5405abdf5",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

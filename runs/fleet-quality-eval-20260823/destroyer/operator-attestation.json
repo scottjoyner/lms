@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:16ccb439a89234a3c1680041dbdfa39dd12ed6d4684d123bf2f59c89312fc67a",
+  "created_at_utc": "2026-08-24T10:26:31.855697+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:05575d756de0758a9ba4be721a8a82e232d739d219bfb66c42c9e9ca44fba611",
+  "namespace": "lms-fleet-operator",
+  "run_id": "destroyer",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:8e5aea9193d2ad4b0bdb1916a8989a037067aadc404cb85b2288195d18007ba0",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

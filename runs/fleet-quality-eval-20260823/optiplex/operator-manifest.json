@@ -1,0 +1,90 @@
+{
+  "schema_version": "fleet_operator_manifest.v1",
+  "run_id": "optiplex",
+  "success": true,
+  "config_sha256": null,
+  "env_file_sha256": null,
+  "control_files": [
+    {
+      "path": "config.json",
+      "size_bytes": 36863,
+      "sha256": "sha256:4ac898b9e9d1b8161a02cd410c0c47313b4d3fb37bbf45360de89987a162935d"
+    },
+    {
+      "path": "run_results.csv",
+      "size_bytes": 13100,
+      "sha256": "sha256:0fc9a24b3f99068f5a9268d19d0302f84687177235183833dbb49924875e6024"
+    },
+    {
+      "path": "run_summary.csv",
+      "size_bytes": 280,
+      "sha256": "sha256:841d7eb125c3f80b5ff1192ccd67ef62591b2369aaaca988ec4fe201193e0fec"
+    },
+    {
+      "path": "sidecars/run_1787562631/INDEX.md",
+      "size_bytes": 38585,
+      "sha256": "sha256:0c4d3a5c767ac55b840dfe8f393cc953310238fa4ea6a571ce7e9f47eec25e38"
+    },
+    {
+      "path": "sidecars/run_1787562631/MODEL__scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled.md",
+      "size_bytes": 2619,
+      "sha256": "sha256:77ada78a28d80db7302cfa31954d6b556d74ae4960b962da594c41e3d05098f9"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__agent_plan_p0_p1_p2__r1.txt",
+      "size_bytes": 4721,
+      "sha256": "sha256:fdd2c125705d711cdba8cf0be3ec9223e7befaf9c5b17d172a7da9f2ac94b6df"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__coding_small_function_python__r1.txt",
+      "size_bytes": 478,
+      "sha256": "sha256:f40a0c2d1a128fb57e5ad2073fdbe21add653f7d52bb4a00d84a07b862bffb3c"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__debug_traceback_reasoning__r1.txt",
+      "size_bytes": 2455,
+      "sha256": "sha256:8a47840274b7027ecbabafa3e13613ff2643118f5bef330a1e769b8239b9d475"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__long_context_recall_synthetic_2048tok__r1.txt",
+      "size_bytes": 108,
+      "sha256": "sha256:ac4440e8fba5132226df6d7a923fc1cd1301542529e39a2461645a9a1c13f319"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__long_context_recall_synthetic_4096tok__r1.txt",
+      "size_bytes": 50,
+      "sha256": "sha256:15f9063b3bffc3a9722954977cc099cf64925a3a019e2067b82110b10e0fb66e"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__repo_gap_analysis_simulation__r1.txt",
+      "size_bytes": 6047,
+      "sha256": "sha256:bcda061c4558733993947a00e73ffeb8db4b809678b8bce42e01ca76afae4517"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__safety_secret_and_network_review__r1.txt",
+      "size_bytes": 2704,
+      "sha256": "sha256:fbdd05795ee6cccea2cdf306ba46c517b8893f4129e0565857aaa6a86be3cd48"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__safety_shell_command_review__r1.txt",
+      "size_bytes": 3234,
+      "sha256": "sha256:22e64b61169bb4a43862b073c5f35c8ed663d574007c0ded5fce25b888997e79"
+    },
+    {
+      "path": "sidecars/run_1787562631/outputs/scott-optiplex-9030-aio__qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled__structured_json_capability_card__r1.txt",
+      "size_bytes": 182,
+      "sha256": "sha256:540eaa6e35c599c0590fc674a3d47c334a834ad411f46db7399cf4abdcdce255"
+    },
+    {
+      "path": "task_summary.csv",
+      "size_bytes": 1519,
+      "sha256": "sha256:3d72ba273b122bf757b8845d4334a62eacae3da6725850217535237f9481a9d5"
+    }
+  ],
+  "archives": [],
+  "admission": {
+    "admitted": false
+  },
+  "created_at_utc": "2026-08-24T06:20:00+00:00",
+  "operator_manifest_fingerprint": "sha256:90d7a238d74d639f7c0fcec37e7bf171d7b2c9932e8c5b756d9ffcfc93a9ffa2"
+}

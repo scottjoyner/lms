@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:ef6bc2d4c0626df406d5663a7b88a6e60ad48f0d97859d4c8597d9379e2bd9ab",
+  "created_at_utc": "2026-08-24T10:26:31.425431+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:b9d1da652b76cdf5a59d657fea0b01341327c63636434ec330aaad6bd71dcdca",
+  "namespace": "lms-fleet-operator",
+  "run_id": "model-shootout-20260823",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:6efe240ed7663d8f0957519aed47640a1277cedb1231c271a1fa5a2d6154c86e",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

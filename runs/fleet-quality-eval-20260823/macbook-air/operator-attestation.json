@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:ad36a9fe9f8ddfc085c5dcdc218f834cf15cbfa21e738eefe0d467123ffd1f3e",
+  "created_at_utc": "2026-08-24T10:26:32.180463+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:be95f639848c44957f21c1b8dffea8fe966adef8343c97d2172c0bb65d9cf5af",
+  "namespace": "lms-fleet-operator",
+  "run_id": "macbook-air",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:8b697d3326ac9ed2a7faa5a08cacf27ed44cabeb2c60236cfbfc4d26619dd2ad",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}

@@ -1,0 +1,16 @@
+{
+  "admission": {
+    "admitted": false
+  },
+  "attestation_fingerprint": "sha256:b5ee357f270054542a8e4810125bec22c8c9745310d76d492748aaf9695408ff",
+  "created_at_utc": "2026-08-24T10:26:32.069201+00:00",
+  "manifest": "operator-manifest.json",
+  "manifest_sha256": "sha256:0f2484e89cd1656485a90784398b25dd4a4b02c0893a51e660e3acc3760d3475",
+  "namespace": "lms-fleet-operator",
+  "run_id": "lenovo",
+  "run_success": true,
+  "schema_version": "fleet_operator_attestation.v1",
+  "signature": "operator-manifest.json.sig",
+  "signature_sha256": "sha256:59edb2f91ecbc4d056aa961aa772cfb08e3f729d1b9bed7f9ffab34ab3e17103",
+  "signing_key_fingerprint": "SHA256:L2Em6E/JupgBLs7A8wxi7fv/N4RBkYd9Z6xtCpNORWM"
+}
