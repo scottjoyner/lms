@@ -66,3 +66,17 @@ All tps = aggregate completion tokens/sec.
 - [ ] Apply tuned per-model config (FA on, KV q8_0, MTP off, sane contexts) to
       destroyer/xwing model defaults
 - [ ] joyner SSH: tailnet ACL must allow user scott before it can be censused
+
+## macbook-air re-bench after operator raised sessions 4→16 (2026-08-24 late)
+
+| conc | aggregate tps |
+|---:|---:|
+| 1 | 8.7 |
+| 8 | 52.4 |
+| 16 | 35.1 (noisy — concurrent image pipeline on device) |
+| 32 | 67.2–80.7 |
+| 64 | HTTP 500 (server-side limit) |
+
+Ceiling ~81 tps; mid-range concurrency materially improved vs 4-slot config.
+Note: dashcam/Nextcloud image-processing jobs run concurrently on this node —
+numbers are contested but directionally better. LAN IP moved to 192.168.1.233.
