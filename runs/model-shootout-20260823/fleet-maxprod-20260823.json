@@ -1,0 +1,95 @@
+{
+  "schema_version": "fleet_benchmark_comparison.v1",
+  "generated_utc": "2026-08-24T01:05:00Z",
+  "entries": [
+    {
+      "node_id": "destroyer",
+      "model_id": "liquid/lfm2-24b-a2b",
+      "qualified": true,
+      "tokens_per_second": 5.7,
+      "completion_tokens_per_second_end_to_end": 5.7,
+      "success_rate": 1.0,
+      "task_families": [
+        "auxiliary_llm"
+      ],
+      "measured_utc": "2026-08-23T00:00:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": false
+    },
+    {
+      "node_id": "scott-lenovo-ideapad-330s-15ikb",
+      "model_id": "liquid/lfm2.5-1.2b",
+      "qualified": true,
+      "tokens_per_second": 8.5,
+      "completion_tokens_per_second_end_to_end": 8.5,
+      "success_rate": 1.0,
+      "task_families": [
+        "auxiliary_llm"
+      ],
+      "measured_utc": "2026-08-23T00:00:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": false
+    },
+    {
+      "node_id": "scotts-macbook-air",
+      "model_id": "qwen3.5-0.8b-mlx",
+      "qualified": true,
+      "tokens_per_second": 65.3,
+      "completion_tokens_per_second_end_to_end": 65.3,
+      "success_rate": 1.0,
+      "task_families": [
+        "summarization",
+        "compression"
+      ],
+      "measured_utc": "2026-08-23T00:00:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": false
+    },
+    {
+      "node_id": "scott-optiplex-9030-aio",
+      "model_id": "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled",
+      "qualified": true,
+      "tokens_per_second": 15.0,
+      "completion_tokens_per_second_end_to_end": 15.0,
+      "success_rate": 1.0,
+      "task_families": [
+        "auxiliary_llm"
+      ],
+      "measured_utc": "2026-08-23T00:00:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": false
+    },
+    {
+      "node_id": "x1-370",
+      "model_id": "ornith-1.5-35b-a3b-apex-mtp",
+      "qualified": true,
+      "tokens_per_second": 181.8,
+      "completion_tokens_per_second_end_to_end": 181.8,
+      "success_rate": 1.0,
+      "task_families": [
+        "reasoning",
+        "long_context",
+        "code_agent"
+      ],
+      "measured_utc": "2026-08-23T22:20:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": false,
+      "overall_task_pass_rate": 0.69,
+      "quality_source": "runs/quality-reval-multi-20260823 (ornith, repeats=3, 2026-08-23)"
+    },
+    {
+      "node_id": "xwing",
+      "model_id": "nanbeige_nanbeige4.2-3b",
+      "qualified": true,
+      "tokens_per_second": 15.1,
+      "completion_tokens_per_second_end_to_end": 15.1,
+      "success_rate": 1.0,
+      "task_families": [
+        "auxiliary_llm"
+      ],
+      "measured_utc": "2026-08-23T00:00:00Z",
+      "measurement_source": "runs/fleet-maxprod-20260823 (max production sweep)",
+      "contested": true
+    }
+  ]
+}

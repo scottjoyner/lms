@@ -1,0 +1,68 @@
+# Safe Cleanup Approach
+
+Before running anything destructive, I'd recommend **reviewing first**, then confirming before deleting. Here's a staged approach.
+
+## Step 1: Review what exists (safe â read-only)
+
+```bash
+# See Docker resources and how much space they're using
+docker system df
+
+# List stopped containers, unused images, dangling images
+docker ps -a --filter "status=exited"
+docker images -f "dangling=true"
+
+# Check temp file sizes (review only â do NOT delete yet)
+du -sh /tmp/* 2>/dev/null | sort -rh | head -n 20
+ls -la /tmp/
+```
+
+Run these first so you can see exactly what's there. This avoids deleting something important by accident.
+
+## Step 2: Docker cleanup (REQUIRES your confirmation)
+
+Docker prune commands are destructive â they remove data from stopped containers and unused images/volumes. **Please confirm before running any of these.**
+
+```bash
+# SAFE-ish option: only removes dangling images + stopped containers
+docker system prune
+
+# More aggressive: also removes unused local volumes (data loss risk!)
+docker system prune --volumes
+
+# Most aggressive: removes ALL unused images too, not just dangling ones
+docker system prune -a --volumes
+```
+
+> â ï¸ **Backup guidance:** If you have important data in Docker volumes, back it up first:
+> ```bash
+> docker run --rm --mount source=<volume_name>,target=/data,volume-driver \
+>   -v /backup:/backup alpine tar czf /backup/volumes-backup.tar.gz -C /data .
+> ```
+
+## Step 3: Temp files (REQUIRES your confirmation)
+
+```bash
+# SAFE option: only remove temp files older than 7 days
+find /tmp -type f -mtime +7 -delete
+
+# Destructive option: removes ALL contents of /tmp â confirm first!
+rm -rf /tmp/*
+```
+
+> â ï¸ **Note:** `rm -rf /tmp/*` can break running sessions or apps that rely on temp files. The `-mtime +7` version is much safer.
+
+## Step 4: "Reset permissions" (REQUIRES your confirmation)
+
+This is the riskiest part â broad permission resets frequently **break** things rather than fix them. I'd avoid blanket commands like `chmod -R` or `chown -R /`. Instead, target specific paths. Tell me which directory you meant and I'll give a targeted command.
+
+---
+
+## My recommendation
+
+1. Run **Step 1** now and share the output â I'll help interpret it.
+2. Confirm which cleanup level you want for Docker (prune vs. prune with volumes).
+3. Confirm whether to use the safe `-mtime +7` temp filter or full removal.
+4. Tell me the specific directory for permission resets so we don't damage the system.
+
+**Which step would you like to proceed with, and can you confirm before I go further?**

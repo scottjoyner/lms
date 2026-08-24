@@ -1,0 +1,61 @@
+## Root Cause
+
+The error means you attempted to subscript (`[...]`) a `None` value at line 42. Either:
+
+- `payload` itself is `None`, **or**
+- `payload['user']` exists but evaluates to `None`.
+
+Both cases fail because `'user'`/`'id'` lookups are chained, so Python never gets a chance to validate intermediate values. This typically happens when the source (e.g., an API response, DB query, or deserialized JSON) returns a null/missing structure instead of the expected nested dict.
+
+## Safe Fix
+
+Use defensive `.get()` access with sensible defaults so any missing level yields `None` instead of raising:
+
+```python
+# Line 42 â safe version
+user_id = (payload or {}).get('user')
+user_id = user_id.get('id') if isinstance(user_id, dict) else None
+```
+
+Or, if you want to fail loudly but clearly when the shape is wrong:
+
+```python
+if not payload or not isinstance(payload.get('user'), dict):
+    raise ValueError("payload missing 'user' object")
+user_id = payload['user']['id']
+```
+
+Prefer the first form for graceful degradation; use the second when a malformed payload indicates a real bug you want surfaced.
+
+## Regression Tests
+
+```python
+import unittest
+
+
+class TestUserIdExtraction(unittest.TestCase):
+
+    def _extract(self, payload):
+        # mirrors the safe fix logic
+        user = (payload or {}).get('user')
+        return user.get('id') if isinstance(user, dict) else None
+
+    def test_valid_nested_payload(self):
+        self.assertEqual(self._extract({'user': {'id': 42}}), 42)
+
+    def test_none_payload_does_not_raise(self):
+        # previously raised TypeError: 'NoneType' object is not subscriptable
+        self.assertIsNone(self._extract(None))
+
+    def test_missing_user_key_returns_none(self):
+        self.assertIsNone(self._extract({}))
+
+    def test_user_present_but_null_returns_none(self):
+        self.assertIsNone(self._extract({'user': None}))
+
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+The two key regression cases are `test_none_payload_does_not_raise` (the original crash) and `test_user_present_but_null_returns_none` (the second possible failure point).

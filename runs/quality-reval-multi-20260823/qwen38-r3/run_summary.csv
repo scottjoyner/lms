@@ -1,0 +1,2 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,0.838,8.022,4.284,1.00,0.36,0.5265,33

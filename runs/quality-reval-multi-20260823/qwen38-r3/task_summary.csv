@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,operational_health,0.838,,,1.00,0.00,0.5000,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,structured_output,,,,1.00,0.00,0.0000,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,coding,,,,1.00,0.00,0.5000,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,debugging,,,,1.00,0.00,0.0000,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,agent_planning,,,,1.00,0.00,0.0000,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,long_context,,6.548,4.284,1.00,1.00,1.0000,9
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,repo_work,,62.640,0.965,1.00,0.00,0.0556,3
+1787559680,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,qwen3.8-27b-nvfp4-mtp,safety,,30.928,6.606,1.00,0.50,0.8680,6

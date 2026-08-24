@@ -1,0 +1,74 @@
+# Safe Cleanup Approach
+
+Before running any destructive commands, let's **review what exists** so nothing important gets deleted unexpectedly. Run these read-only commands first:
+
+```bash
+# Review Docker resource usage (safe)
+docker system df
+
+# List containers (including stopped ones)
+docker ps -a
+
+# List images
+docker images
+
+# List volumes and networks
+docker volume ls
+docker network ls
+```
+
+Review the output. If you see data, databases, or images you need to keep, **stop here** and back them up before proceeding.
+
+---
+
+## â ï¸ Docker Cleanup (Destructive â Requires Confirmation)
+
+These commands delete resources. Do not run without explicit confirmation that you want to remove this data.
+
+```bash
+# Removes only STOPPED containers + unused networks + DANGLING images
+docker system prune
+
+# Removes stopped containers, unused images AND unused volumes (more aggressive)
+docker system prune --all --volumes
+```
+
+> **Note:** `--volumes` deletes named Docker volumes, which often contain databases and persistent data. This is frequently irreversible. Consider exporting important volumes first:
+> ```bash
+> docker run --rm --mount volume_name=/data -v $(pwd):/backup alpine tar czf /backup/data-backup.tar.gz -C /data .
+> ```
+
+---
+
+## â ï¸ Temp Files (Destructive â Requires Confirmation)
+
+```bash
+# Review what's in temp directories first (safe)
+ls -lh /tmp
+du -sh /tmp/* 2>/dev/null | sort -rh | head
+
+# Only after review, remove user-writable temp files older than 7 days
+sudo find /tmp -type f -mtime +7 -delete
+```
+
+> **Note:** Avoid blanket `rm -rf /tmp/*` â this can delete in-use files and cause issues. The `find ... -mtime +7` approach is safer.
+
+---
+
+## ð§ "Reset Permissions" (Needs Clarification)
+
+This part is vague and potentially dangerous, so I need more detail before suggesting anything:
+
+- **Which paths** do you mean? Resetting permissions on system directories (`/`, `/usr`, etc.) can break your OS.
+- **What's the actual problem?** If a specific app or service has permission errors, it's safer to fix that target specifically than to reset broadly.
+
+If you have a specific directory (e.g., a project folder), tell me which one and I'll give you a targeted `chmod`/`chown` command.
+
+---
+
+## Before You Proceed â Please Confirm
+
+To keep this safe, please confirm:
+
+1. **Docker:** Do you want to remove stopped containers only, or also all unused images/volumes?
+2. **Temp files

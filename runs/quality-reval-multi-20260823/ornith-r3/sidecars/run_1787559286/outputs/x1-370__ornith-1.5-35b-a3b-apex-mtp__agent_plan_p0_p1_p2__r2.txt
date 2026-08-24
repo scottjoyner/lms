@@ -1,0 +1,5 @@
+# Implementation Plan: Auth, API Key Rotation, Audit Logging & Admin Dashboards
+
+**Assumptions (adjust if wrong):** Existing FastAPI app on SQLAlchemy + PostgreSQL, Python 3.10+, pytest in CI, no existing auth today, secrets stored via env/config only.
+
+**Prior

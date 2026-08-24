@@ -1,0 +1,59 @@
+I can help you clean up Docker and temp files safely. However, "clean up everything" involves destructive operations that can remove data you may need, so I'll walk through this in phases: **review first**, then **act only with your confirmation**.
+
+## Phase 1 â Review what exists (safe, no changes)
+
+Run these to see the current state before deleting anything:
+
+```bash
+# Docker overview
+docker ps -a                          # all containers (running + stopped)
+docker images                         # all images
+docker system df                      # disk usage by Docker
+docker volume ls                      # persisted data volumes
+docker network ls                     # custom networks
+
+# Temp files
+ls -la /tmp                           # contents of /tmp
+du -sh /tmp/* 2>/dev/null             # size of each temp item
+```
+
+**Please share the output.** This tells us what's actually there and prevents accidental deletion of active work.
+
+---
+
+## Phase 2 â Targeted cleanup (confirm before running)
+
+These are relatively safe because they only remove **unused/stopped** resources:
+
+```bash
+docker container prune                # removes STOPPED containers only
+docker image prune                    # removes dangling images
+```
+
+â ï¸ **Avoid these unless you fully understand the impact:**
+
+```bash
+docker system prune -a --volumes      # REMOVES ALL images + volumes â data loss risk
+rm -rf /tmp/*                         # can delete files in active use
+```
+
+---
+
+## Phase 3 â Permission reset (needs clarification)
+
+"Reset permissions so everything works" is ambiguous and risky. **Please tell me the specific paths/directories** you mean. I strongly recommend against blanket commands like:
+
+```bash
+chmod -R 777 /some/path   # â ï¸ Dangerous: opens write access to everyone (security risk)
+chown -R user:user /path  # can break services that expect different ownership
+```
+
+---
+
+## Before I proceed, please confirm:
+
+1. **Docker:** Do you want to remove only stopped/unused resources, or are images/volumes safe to delete too?
+2. **Temp files:** Is `/tmp` cleanup acceptable, and should old logs be included?
+3. **Permissions:** Which specific directories need permission fixes, and what's the intended owner/mode?
+
+Once you answer these (and ideally share the Phase 1 output), I'll give you an exact, safe command sequence to run.

@@ -53,3 +53,17 @@ context — both at ⅑ the token rate.
 Production config left in place: `lms load ornith-1.5-35b-a3b-apex-mtp --gpu max`
 (per-model defaults: ctx 65536, parallel 16, FA on, KV q8_0/q8_0, threads 12,
 MTP off).
+
+## Addendum (multi-repeat validation + long-context, 2026-08-23 late)
+
+**Quality with repeats=3** (`quality-reval-multi-20260823/`): ornith **0.690**
+vs qwen3.8 **0.365** — single-pass verdict holds; per-task ordering identical
+(ornith: planning 0.33/debugging 1.0/repo_work 0.67/structured 1.0;
+qwen3.8: long_context 1.0/safety 0.87).
+
+**Long-context sweep on ornith** (`ornith_longctx.jsonl`, ctx 65536,
+parallel 16): TTFT 2.5 s @ ~3k prompt → 5.2 @ ~12k → 8.0 @ ~25k → 21.4 @ ~50k.
+Prefill ≈ 2.9k tok/s at depth. Hard ceiling ≈ 62k tokens/request (68k → HTTP
+400 from engine). Practical long-context window for routing: ~48k tokens.
+
+macbook-air ceiling: 75.8 tps aggregate @ c64 (still creeping; c16→c64 = +65%).

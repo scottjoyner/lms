@@ -1,0 +1,27 @@
+# Implementation Cycle Plan
+
+## P0 â Critical (block release)
+
+- **Security: Remove or neutralize the direct shell command endpoint.** This exposes arbitrary OS command execution (RCE). If the feature is required, eliminate `shell=True`, validate against a strict allowlist of commands with fixed arguments, run as an unprivileged user in a sandbox/container, and never echo raw output to clients. Recommend full removal if not product-critical.
+- **Security: Add authentication + authorization.** With no auth, the shell endpoint and all API routes are publicly accessible. Implement token/session auth (OAuth2/JWT via FastAPI), enforce per-route guards, and apply least-privilege roles.
+
+## P1.1 â High
+
+- **Logic/Reliability: Add database migrations** (e.g., Alembic). Zero migrations risks schema drift and unsafe deploys; needed for versioning and safe rollbacks.
+- **Error handling: Standardize exception handling.** Replace weak ad-hoc handling with consistent exception handlers, correct HTTP status codes, structured error responses, strict input validation (Pydantic), and no internal-detail leakage in errors.
+- **Docker: Add a container healthcheck** for the API service (and DB if separate) so orchestrators can detect unhealthy states.
+
+## P1.2 â Medium-High
+
+- **CI: Set up a pipeline.** Lint, type-check, and run tests on every PR; gate merges before merge.
+- **Test scaffolding:** Establish pytest + `httpx.AsyncClient` fixtures, DB isolation (in-memory or temp SQLite), and an initial coverage baseline.
+
+## P2 â Standard / Hardening
+
+- **Tests: Expand coverage** for auth flows, the shell endpoint allowlist/validation, error paths, and dashboard API contracts.
+- **Security hardening:** rate limiting, request-size limits, explicit CORS config, secrets via env (no hardcoded credentials), TLS in deployment.
+- **Observability & docs:** logging standards, basic metrics/monitoring, README + OpenAPI usage docs.
+
+---
+
+**Suggested sequencing:** P0 first (security is blocking), then P1.1 to stabilize reliability and deployability, P1.2 to lock in CI/test infrastructure, and P2 for ongoing hardening.

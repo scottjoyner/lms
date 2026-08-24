@@ -1,0 +1,5 @@
+{"target_prompt_tokens": 2000, "prompt_tokens": null, "ttft_s": 2.51, "decode_s": 0.02, "completion_tokens": 1, "decode_tps": 52.9, "prompt_tps_prefill": 0.0, "model": "ornith-1.5-35b-a3b-apex-mtp"}
+{"target_prompt_tokens": 8000, "prompt_tokens": null, "ttft_s": 5.2, "decode_s": 0.02, "completion_tokens": 1, "decode_tps": 50.4, "prompt_tps_prefill": 0.0, "model": "ornith-1.5-35b-a3b-apex-mtp"}
+{"target_prompt_tokens": 16000, "prompt_tokens": null, "ttft_s": 7.99, "decode_s": 0.03, "completion_tokens": 1, "decode_tps": 38.7, "prompt_tps_prefill": 0.0, "model": "ornith-1.5-35b-a3b-apex-mtp"}
+{"target_prompt_tokens": 32000, "prompt_tokens": null, "ttft_s": 21.35, "decode_s": 0.02, "completion_tokens": 1, "decode_tps": 47.3, "prompt_tps_prefill": 0.0, "model": "ornith-1.5-35b-a3b-apex-mtp"}
+{"target_prompt_tokens": 48000, "prompt_tokens": null, "ttft_s": null, "decode_s": 0.26, "completion_tokens": 0, "decode_tps": 0.0, "prompt_tps_prefill": null, "model": "ornith-1.5-35b-a3b-apex-mtp"}

@@ -1,0 +1,7 @@
+## Implementation Cycle Plan
+
+### P0 â Security Blockers: Do Not Ship Until Complete
+**Security issues addressed**
+- Direct shell command endpoint = remote code execution risk.
+- No authentication/authorization on API or dashboard.
+- Weak error handling

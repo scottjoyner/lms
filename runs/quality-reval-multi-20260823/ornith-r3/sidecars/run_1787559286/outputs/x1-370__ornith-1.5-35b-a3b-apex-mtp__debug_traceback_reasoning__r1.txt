@@ -1,0 +1,63 @@
+# Root Cause
+
+The error means you tried to use `[]` on a `None` value. At line 42, either:
+
+- `payload['user']` is `None`, so `None['id']` fails, **or**
+- `payload` itself is `None`, so `None['user']` fails first.
+
+This typically happens when the incoming data is missing/incomplete â e.g., an API response where the `user` field was omitted or explicitly null, rather than a dict containing a nested user object. The code assumes well-formed input without validating it.
+
+# Safe Fix
+
+Validate and use `.get()` with safe defaults so missing keys return `None` instead of raising:
+
+```python
+def get_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+# Usage
+payload = get_payload()          # may be None or malformed
+user_id = get_user_id(payload)
+if user_id is None:
+    handle_missing_user()         # log / fallback / raise a clear error
+```
+
+If you prefer inline, guard each level explicitly:
+
+```python
+user = (payload or {}).get('user') or {}
+user_id = user.get('id')
+```
+
+# Regression Tests
+
+Using `unittest`:
+
+```python
+import unittest
+
+class TestGetUserId(unittest.TestCase):
+    def test_valid_nested_user(self):
+        payload = {'user': {'id': 42}}
+        self.assertEqual(get_user_id(payload), 42)
+
+    def test_missing_user_key_returns_none(self):
+        self.assertIsNone(get_user_id({'foo': 'bar'}))
+
+    def test_user_is_none_returns_none(self):
+        self.assertIsNone(get_user_id({'user': None}))
+
+    def test_payload_is_none_returns_none(self):
+        self.assertIsNone(get_user_id(None))
+
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+Run with `python -m unittest`. The first two tests confirm the happy path and that a missing/`null` user no longer raises â directly covering the original failure.

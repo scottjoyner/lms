@@ -1,0 +1,44 @@
+# Implementation Cycle Plan
+
+## P0 â Critical (block release)
+
+**Security**
+- **Remove or fully sandbox the direct shell command endpoint.** This is an unauthenticated Remote Code Execution (RCE) vector. Delete it outright, or if a feature requires it: require auth, validate/sanitize all input against a strict allowlist of commands, and execute via `subprocess` with no shell (`shell=False`) in a restricted context/container.
+- **Add authentication + authorization.** Currently the entire API is open. Implement session/token auth (e.g., OAuth2 + JWT or FastAPI's security utilities), enforce on protected routes, and apply role-based access control to admin-only endpoints.
+
+**Logic / Robustness**
+- **Fix weak error handling.** Replace bare `except`/catch-all handlers with typed exceptions that return consistent JSON error responses. Never leak stack traces, DB paths, or internal state to clients (prevents information disclosure). Add a global exception handler + validation errors via Pydantic.
+
+---
+
+## P1.1 â High (stability & deployability)
+
+**Logic / Infrastructure**
+- **Introduce database migrations.** With no migration tooling, schema drift is uncontrolled and rollbacks are impossible. Adopt Alembic (FastAPI-standard) with an `env.py` tied to the SQLite engine; generate an initial revision and wire it into startup/deploy.
+- **Add Docker healthcheck + readiness probes.** Container can report healthy while the app or DB is actually unavailable. Add a `/health` endpoint that verifies DB connectivity, and a `HEALTHCHECK` instruction in the Dockerfile plus liveness/readiness checks for orchestration.
+
+---
+
+## P1.2 â Medium (quality gates)
+
+**Testing / CI**
+- **Set up CI pipeline.** GitHub Actions (or equivalent) running linting, type-checking (`mypy`), and tests on every PR. Block merges until green.
+- **Add baseline test coverage.** Unit tests for API routes/services + integration tests using FastAPI's `TestClient` with an in-memory/temp SQLite fixture. Prioritize the shell endpoint fix, auth enforcement, and error-handling paths first.
+
+---
+
+## P2 â Lower (hardening & polish)
+
+**Security / Logic**
+- Input validation hardening across all endpoints; rate limiting on exposed routes.
+- Secrets management (env-based config, no hardcoded credentials); HTTPS/TLS in deployment.
+- Structured logging + request auditing instead of ad-hoc prints.
+
+**Testing**
+- End-to-end tests for the React dashboard against the live API.
+- Property/fuzz tests for command allowlist and edge-case inputs; coverage threshold enforcement.
+
+---
+
+### Suggested sequencing
+`P0 â P1.1 â P1.2 â P2`, re-running security-critical tests after each P0 change. The shell endpoint + auth are the only items that should gate any deployment.

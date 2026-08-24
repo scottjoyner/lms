@@ -1,0 +1,14 @@
+{
+  "task_fit": [
+    "The task requires generating a structured JSON object with specific keys and value types.",
+    "The request includes explicit formatting constraints (strict JSON, no markdown).",
+    "The output is small and self-contained, requiring minimal reasoning or external knowledge."
+  ],
+  "confidence": 0.95,
+  "limitations": [
+    "No specific task content was provided, so fit is inferred from the generic request structure.",
+    "Confidence reflects format compliance rather than domain-specific accuracy.",
+    "Actual performance may vary depending on the underlying task complexity."
+  ],
+  "recommended_max_context_tokens": 8192
+}

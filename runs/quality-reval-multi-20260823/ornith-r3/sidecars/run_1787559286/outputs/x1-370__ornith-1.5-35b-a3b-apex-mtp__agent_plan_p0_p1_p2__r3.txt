@@ -1,0 +1,46 @@
+# Implementation Plan: Security & Observability Layer for FastAPI Service
+
+## Assumptions (state if any are wrong â they affect the work)
+
+- Existing service uses a relational DB with an ORM (assumed SQLAlchemy); swap table names to match.
+- No existing auth/session system; this is greenfield on top of the current app.
+- Single deployment environment (no multi-region token validation yet).
+- Admin dashboard can be served as static assets + JSON API initially; no full SPA build pipeline required for P2.
+- Secrets stored in environment/secret manager, not committed.
+
+## Recommended architecture decisions
+
+| Concern | Choice | Rationale |
+|---|---|---|
+| Auth mechanism | JWT (access token) + refresh tokens, or secure HTTP-only session cookies | JWTs are stateless and easy to test; sessions avoid client-side storage. Pick one per team preference â plan supports both via a `get_current_user` dependency. |
+| Password hashing | Argon2id (`argon2-cffi`) with PBKDF2 fallback | Current OWASP recommendation; bcrypt is acceptable minimum. |
+| API keys | Store only SHA-256 hash + public prefix; never store raw key | Enables lookup by prefix without exposing secrets; rotation = revoke old, mint new. |
+| Audit logging | Central `AuditLog` model + FastAPI middleware that captures auth events, plus explicit event calls for state-changing actions | Single source of truth; survives app restarts; decoupled from business code via an emitter. |
+| RBAC | Role column (`admin`, `user`) + dependency guards | Minimal but sufficient to gate the admin dashboard. |
+
+---
+
+## P0 â Critical path (unblocks everything)
+
+### P0-1: User authentication (login, token issuance, user model)
+
+**Objective:** Establish a verified identity boundary so all protected routes require a valid credential.
+
+**Scope:**
+- Add `User` model (`id`, `email` unique, `password_hash`, `role`, `is_active`, timestamps).
+- Password registration/hashing utility using Argon2id.
+- `/auth/login` endpoint returning access + refresh tokens.
+- `/auth/refresh` and `/auth/logout` (revocation/blacklist for refresh tokens if stateful; or rely on expiry if JWT-only).
+- `get_current_user` dependency that validates the bearer token and loads the user.
+
+**Acceptance criteria:**
+1. Registering/logging in with a valid email+password returns a signed, non-expired access token.
+2. Invalid credentials return `401` and never reveal which field was wrong.
+3. Tokens are rejected when expired, tampered, or unsigned.
+4. Protected routes return `401` without a token and `403` for inactive users.
+5. Passwords are stored only as salted hashes; raw passwords are never persisted or logged.
+
+**Test expectations:**
+| Test | Type | Expectation |
+|---|---|---|
+| Happy-path login | Integration

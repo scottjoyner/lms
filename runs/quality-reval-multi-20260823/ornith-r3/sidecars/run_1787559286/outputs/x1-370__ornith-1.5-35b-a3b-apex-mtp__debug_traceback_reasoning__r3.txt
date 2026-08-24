@@ -1,0 +1,58 @@
+## Root Cause
+
+The error means you tried to use `[...]` indexing on a value that is `None`. At line 42:
+
+```python
+user_id = payload['user']['id']
+```
+
+Either **`payload` is `None`** (e.g., the API returned an empty body, or JSON parsing failed) **or `payload['user']` is `None`/missing**. Python evaluates left-to-right, so:
+
+- If `payload is None` â `payload['user']` raises the error.
+- If `payload['user'] is None` â `None['id']` raises the error.
+
+The most common cause in real code is an unexpected empty/failed response where `payload` comes back as `None`.
+
+## Safe Fix
+
+Validate before indexing, and fail with a clear message instead of a cryptic `TypeError`:
+
+```python
+def get_user_id(payload):
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected payload dict, got {type(payload).__name__}")
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        raise ValueError("Missing or invalid 'user' in payload")
+    return user['id']
+```
+
+If you prefer a defensive one-liner for optional data:
+
+```python
+user_id = (payload or {}).get('user') or {}
+user_id = user_id.get('id')   # returns None instead of raising
+```
+
+## Regression Tests
+
+```python
+import unittest
+
+
+class TestGetUserId(unittest.TestCase):
+
+    def test_valid_nested_payload(self):
+        payload = {"user": {"id": 42}}
+        self.assertEqual(get_user_id(payload), 42)
+
+    def test_none_payload_raises_clear_error(self):
+        with self.assertRaises(ValueError):
+            get_user_id(None)
+
+
+if __name__ == "__main__":
+    unittest.main()
+```
+
+**Tip:** If `payload` is often optional and absence of a user is acceptable, use the `.get()` variant above and handle `None` downstream rather than raising.

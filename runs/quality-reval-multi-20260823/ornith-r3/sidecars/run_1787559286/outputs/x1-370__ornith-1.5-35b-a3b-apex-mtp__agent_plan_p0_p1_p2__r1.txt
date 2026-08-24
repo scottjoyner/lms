@@ -1,0 +1,36 @@
+# Implementation Plan: Security & Admin Features for FastAPI Service
+
+**Assumptions (stated, not asked):** Existing app uses SQLAlchemy + PostgreSQL, Python 3.10+, runs behind a reverse proxy, and has no existing auth. Secrets live in env vars / a secrets manager. This plan is ordered so each layer depends on the one before it â P0 is the security-critical foundation; nothing else can be trusted until it's in place.
+
+---
+
+## P0 â Foundation & Authentication (security-critical, blocks everything else)
+
+### Task 0.1 â User model and secure password storage
+**What:** Add a `User` entity with hashed passwords. Never store plaintext. Use Argon2id (or bcrypt via passlib).
+
+**Acceptance criteria:**
+- `User` table has id, username (unique), email (unique), hashed_password, is_active, is_superuser, created_at, updated_at.
+- Passwords are hashed with Argon2id/bcrypt using a per-password salt; no plaintext column exists.
+- User creation/update goes through a hashing function â raw passwords never touch the DB.
+- `is_active` gates login; soft-delete or disable path exists.
+
+**Test expectations:**
+- Unit: registering a user produces a hash that verifies against the plaintext (`verify_password`).
+- Unit: two hashes of the same password differ (salt works).
+- Unit: wrong password fails verification.
+- Integration: creating a user with duplicate username/email returns 409.
+- DB migration test: Alembic migration applies cleanly and rolls back.
+
+### Task 0.2 â Authentication endpoints (login, token issuance)
+**What:** Provide login that validates credentials and issues an access token (short-lived JWT). Refresh tokens for session continuity.
+
+**Acceptance criteria:**
+- `POST /auth/login` accepts username/password, returns access + refresh tokens on success, 401 on failure with no user-exposure detail.
+- Access tokens are short-lived (e.g., 15 min), signed with a secret from env/secrets manager, contain subject + expiry + token type.
+- `POST /auth/refresh` exchanges a valid refresh token for a new access token; used refresh tokens are single-use or revoked.
+- Logout revokes the session/token against a blocklist (or relies on short TTL).
+
+**Test expectations:**
+- Integration: valid credentials â 200 + signed, decodable token with correct claims.
+- Integration: wrong password / unknown user â 401, response body identical for both cases (no enumeration).
