@@ -93,3 +93,15 @@ gen 468 fresh with 4 providers.
 
 Residual known-failures: tasks requesting ornith-1.0-35b (model files exist
 only on offline xwing) fail dispatch until xwing returns.
+
+## Round 4 — steady state (2026-08-24 late)
+
+- Fleet-gen inference: **10 chat 200s / 1 exit_1 per 4-min window** (was ~20
+  failures/min at start of repair). Warm optiplex serves 54–134ms; destroyer
+  CPU paths 47–120s.
+- hermes-agent `tools/mcp_tool.py`: guarded cancel() against closed-loop
+  teardown (hermes-agent@ae2595017) — shutdown crashes no longer mask results.
+- Remaining single-digit failures: MCP teardown "Exception ignored" noise
+  (cosmetic, upstream) and intermittent 503 circuit probes.
+- Router image now includes scope-reject diagnostics; rebuild required for
+  future router code changes (baked image, src not bind-mounted).
