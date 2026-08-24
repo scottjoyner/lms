@@ -191,8 +191,13 @@ def endpoint_probe(
     if not isinstance(choices, list) or not choices:
         raise ValueError("loopback completion probe returned no choices")
     message = choices[0].get("message") if isinstance(choices[0], Mapping) else None
-    content = message.get("content") if isinstance(message, Mapping) else None
-    if not str(content or "").strip():
+    content = str(message.get("content") or "").strip() if isinstance(message, Mapping) else ""
+    if not content:
+        # Reasoning models may spend a small max_tokens budget entirely on
+        # hidden reasoning; treat non-empty reasoning_content as healthy.
+        reasoning = message.get("reasoning_content") if isinstance(message, Mapping) else None
+        content = str(reasoning or "").strip()
+    if not content:
         raise ValueError("loopback completion probe returned empty content")
     return {
         "endpoint": base,
