@@ -1,0 +1,80 @@
+## Root Cause
+
+The error means you attempted to subscript (index) a value that is `None`. In `payload['user']['id']`, Python evaluates `(payload['user'])['id']` â so if `payload['user']` resolves to `None`, then `None['id']` raises this exact error.
+
+Common triggers:
+- The API/payload omitted the `user` key or explicitly set it to `null`.
+- A lookup function returned `None` (no match found) instead of an empty dict.
+- Missing/invalid authentication produced a null response body.
+
+## Safe Fix
+
+Validate before subscripting, and use `.get()` with defaults so missing keys don't crash:
+
+```python
+def extract_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')          # returns None instead of KeyError
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')               # safe; defaults to None
+
+# Usage at line 42:
+user_id = extract_user_id(payload)
+if user_id is None:
+    raise ValueError("Missing or invalid 'user.id' in payload")
+```
+
+For nested access, a small helper avoids deep `.get()` chains:
+
+```python
+def get_nested(d, *keys, default=None):
+    for key in keys:
+        if isinstance(d, dict):
+            d = d.get(key)
+        else:
+            return default
+    return default
+
+user_id = get_nested(payload, 'user', 'id')
+```
+
+## Regression Tests
+
+```python
+import unittest
+
+def extract_user_id(payload):
+    if not isinstance(payload, dict):
+        return None
+    user = payload.get('user')
+    if not isinstance(user, dict):
+        return None
+    return user.get('id')
+
+
+class TestExtractUserId(unittest.TestCase):
+
+    def test_valid_payload(self):
+        self.assertEqual(extract_user_id({'user': {'id': 42}}), 42)
+
+    def test_missing_user_key_returns_none(self):
+        # Regression: previously crashed with TypeError on None['id']
+        self.assertIsNone(extract_user_id({}))
+
+    def test_null_user_value_returns_none(self):
+        self.assertIsNone(extract_user_id({'user': None}))
+
+    def test_user_without_id_returns_none(self):
+        self.assertIsNone(extract_user_id({'user': {}}))
+
+    def test_non_dict_payload_returns_none(self):
+        self.assertIsNone(extract_user_id(None))
+
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+The two most important regression tests are `test_missing_user_key_returns_none` and `test_null_user_value_returns_none`, since they directly cover the crash path.

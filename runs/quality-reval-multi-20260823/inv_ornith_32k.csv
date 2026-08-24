@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+x1-370,127.0.0.1,1,http://127.0.0.1:1234/v1,1,1,ornith-1.5-35b-a3b-apex-mtp

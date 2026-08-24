@@ -1,0 +1,56 @@
+## Repository Review â Implementation Cycle Plan
+
+**Current state:** FastAPI + SQLite backend, React dashboard. No auth, no migrations, no CI, no tests, exposed shell command endpoint, weak error handling, no Docker healthcheck.
+
+---
+
+### ð´ P0 â Critical (block release)
+
+| # | Category | Item |
+|---|----------|------|
+| 1 | **Security** | **Remove/neutralize the direct shell command endpoint.** This is unauthenticated Remote Code Execution. Either delete it, or if required, route through a sandboxed subprocess with no shell (`shell=False`), dropped privileges, resource limits (timeout/cgroups), and allow-listed commands. Treat as incident. |
+| 2 | **Security** | **Add authentication + authorization.** No auth + RCE endpoint = total compromise. Implement session/JWT auth, protect all routes, enforce role-based access on dashboard + API. |
+| 3 | **Logic** | **SQLite write-lock / concurrency gap.** SQLite serializes writes; under concurrent dashboard/API traffic this causes `database is locked` failures. Add connection pooling (`pool_size`, `max_overflow`), WAL mode, and a sane `timeout`. Evaluate Postgres if write load grows. |
+
+---
+
+### ð  P1.1 â Core hardening (next sprint)
+
+| # | Category | Item |
+|---|----------|------|
+| 4 | **Logic** | **Database migrations.** Introduce Alembic; version schema, enable safe deploy/rollback, stop manual `CREATE TABLE` drift. |
+| 5 | **Security** | **Harden error handling.** Replace bare `except: return ...` with structured exceptions â never leak stack traces/secrets in responses. Add global exception handler + validation errors (Pydantic) â consistent JSON. |
+| 6 | **Reliability** | **Docker healthcheck.** Add `/health` endpoint + `HEALTHCHECK` in Dockerfile so orchestrators can detect dead containers. |
+| 7 | **Security** | **Input validation & sanitization.** Enforce Pydantic models on all payloads; validate/escape any data reaching subprocess or DB (prevent SQL injection via parameterized queries). |
+
+---
+
+### ð¡ P1.2 â Reliability & quality gates
+
+| # | Category | Item |
+|---|----------|------|
+| 8 | **Test** | **Unit tests.** Pytest for API routes, service logic, and validation (P0 shell fix must have regression coverage). |
+| 9 | **Test** | **Integration tests.** End-to-end flow against a test DB fixture; cover auth-protected + protected routes. |
+| 10 | **Reliability** | **CI pipeline.** GitHub Actions: lint, type-check, run tests, build image â gate merges on green. |
+| 11 | **Security** | **Secrets & config management.** Move secrets to env/secret manager; no hardcoded keys in repo or `.env` committed. |
+
+---
+
+### âª P2 â Polish / enhancements
+
+| # | Category | Item |
+|---|----------|------|
+| 12 | **Reliability** | **Rate limiting + auth failure throttling** to blunt brute-force on the new auth layer. |
+| 13 | **Observability** | **Structured logging + request tracing**; remove debug-level secrets from logs. |
+| 14 | **Logic** | **Graceful DB migration strategy** for zero-downtime deploys (backup/rollback runbook). |
+| 15 | **Docs** | **API + runbook docs**, threat model for the shell endpoint, and onboarding setup guide. |
+
+---
+
+### Suggested sequencing
+1. **P0 now:** kill RCE â add auth â fix SQLite concurrency.
+2. **P1.1 next:** migrations + error handling + healthcheck + validation.
+3. **P1.2 in parallel:** tests + CI (CI should go live before broad feature work).
+4. **P2 after stability:** rate limiting, logging, docs.
+
+**Key test deliverables to track:** P0 shell regression test (#9), auth-coverage integration suite (#10), and a green CI gate (#11) as the minimum quality bar.

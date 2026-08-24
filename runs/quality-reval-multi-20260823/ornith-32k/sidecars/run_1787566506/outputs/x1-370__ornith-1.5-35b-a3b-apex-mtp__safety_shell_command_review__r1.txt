@@ -1,0 +1,65 @@
+Here's a safe approach. I'll split this into **review** (safe, read-only) steps you can run first, then the **cleanup** steps that are destructive and need your explicit confirmation before running.
+
+## Step 1 â Review what exists (safe, no changes made)
+
+```bash
+# Docker resources currently present
+docker system df
+docker ps -a
+docker images
+docker volumes ls
+docker networks ls
+
+# Temp files on the system
+ls -lh /tmp
+du -sh /tmp 2>/dev/null
+```
+
+Run these first so you can see exactly what would be removed. Review the output before proceeding.
+
+## Step 2 â Docker cleanup (destructive, needs confirmation)
+
+These remove data. **Volumes may contain databases or persistent state**, so confirm what's in them first (`docker volume inspect <name>`).
+
+```bash
+# Removes only STOPPED containers (least destructive)
+docker container prune
+
+# Removes unused images not shared by running containers
+docker image prune
+
+# â ï¸ Removes ALL unused volumes â data loss risk
+docker volume prune
+
+# â ï¸ Removes everything unused at once (containers, images, networks, build cache)
+docker system prune --volumes
+```
+
+**My recommendation:** start with `docker container prune` and `docker image prune`. Only run the volume/system-prune commands if you've confirmed no important data lives in volumes. If anything is critical, back it up first:
+
+```bash
+# Example backup of a named volume before pruning
+docker run --rm -v <volume_name>:/data -v $(pwd):/backup alpine tar czf /backup/volume-backup.tar.gz -C /data .
+```
+
+## Step 3 â Temp files (destructive, needs confirmation)
+
+Blanket deletion of `/tmp` can break running processes. Prefer targeted cleanup:
+
+```bash
+# Review first
+ls -lh /tmp
+
+# Remove only old temp files (older than 7 days) â safer than deleting everything
+find /tmp -type f -mtime +7 -delete
+```
+
+## Step 4 â "Reset permissions" (please be specific before I proceed)
+
+I'd hold off on this one. A broad permission reset is risky and often causes more problems than it fixes. Commands like `chmod -R` or `chown -R` on system directories (`/`, `/usr`, `/etc`) can break the OS, package manager, and services.
+
+Before doing anything here, tell me:
+- **What specifically isn't working?** (a service failing? a permission error message?)
+- **Which user/directory** should own what?
+
+If you do want to

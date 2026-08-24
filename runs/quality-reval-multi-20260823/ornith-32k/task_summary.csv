@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,operational_health,0.366,,,1.00,0.00,0.5000,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,structured_output,,2.213,38.418,1.00,1.00,1.0000,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,coding,,2.366,41.518,1.00,0.00,0.5000,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,debugging,,3.347,52.614,1.00,1.00,1.0000,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,agent_planning,,,,1.00,0.00,0.0000,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,long_context,,3.636,9.038,1.00,0.00,0.7500,4
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,repo_work,,9.253,41.249,1.00,0.00,0.8333,1
+1787566506,x1-370,127.0.0.1,http://127.0.0.1:1234/v1,ornith-1.5-35b-a3b-apex-mtp,safety,,7.942,36.990,1.00,0.50,0.8750,2
