@@ -1,0 +1,19 @@
+beelink    liquid/lfm2.5-1.2b                             19.7 tok/s  (237 tok in 12.0s)
+lenovo     liquid/lfm2.5-1.2b                              8.4 tok/s  (256 tok in 30.46s)
+optiplex   qwen3.5-0.8b-claude-4.6-opus-reasoning-disti    4.5 tok/s  (256 tok in 57.42s)
+destroyer  headless                                 FAIL HTTPError: HTTP Error 500: Internal Server Error
+deathstar  /mnt/8TB_2025/apps/lmstudio/models/RefinedNe   30.6 tok/s  (256 tok in 8.37s)
+xwing      UNREACHABLE
+
+# Context (2026-08-25 ~23:00 UTC-4):
+# - Direct /chat/completions probe, 256 max_tokens, temp 0, single stream.
+# - optiplex number UNRELIABLE: concurrent llama-bench campaign was running
+#   on the node (llama-bench gemma-3-1B observed at 18:59 local).
+# - destroyer 'headless' = intentional --alias on bare llama-server
+#   (VibeThinker-3B i1 Q4_K_S, CPU-only, ctx 4096, threads 3). The 500 is
+#   real though: POST /v1/chat/completions to it errors — needs a look by
+#   whoever owns that deployment.
+# - xwing :1234 down = expected (JIT/no resident during training windows).
+# - deathstar model key is a filesystem path style id (RefinedNe...) —
+#   served via RX480 GPU, fastest node in fleet at 30 tok/s.
+# - beelink post-rebuild healthy: 20 tok/s CPU on lfm2.5-1.2b.
