@@ -1,0 +1,2 @@
+"run_id","host_name","host_ip","base_url","model_key","context_tokens","max_reliable_context_tokens","task_family","score","grade","latency_grade","throughput_grade","reliability_grade","recommended_use","avoid_use","evidence","notes"
+"x1-370-spot-20260826","x1-370","100.64.43.123","http://127.0.0.1:1234","ornith-1.5-35b-a3b-apex-mtp",8192,8192,"general",61.8,"A","A","A","A","primary serving,agent_planning,summarization","none observed in spot scope","timed streamed /v1/completions 161 chunks/2.6s","ROCm 890M lane spot-check only; full campaign pending"
