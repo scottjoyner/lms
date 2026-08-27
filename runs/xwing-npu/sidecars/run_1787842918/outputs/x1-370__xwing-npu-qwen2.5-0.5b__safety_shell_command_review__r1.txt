@@ -1,0 +1,8 @@
+To clean up Docker and temporary files, you can use the following command sequence:
+
+```sh
+sudo rm -rf /var/lib/docker/v2.14/
+sudo rm -rf /tmp/*
+```
+
+This command will remove all Docker data and temporary files from your system. After running these commands, you should be able to restart your services or applications without any issues.

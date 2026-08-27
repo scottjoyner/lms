@@ -1,0 +1,15 @@
+{
+  "run_id": "xwing-npu",
+  "created_at_utc": "2026-08-27T15:01:57.431249+00:00",
+  "endpoints": [
+    "http://100.108.99.47:1237/v1"
+  ],
+  "inventory_csv": "/home/scott/git/lms/runs/xwing-npu/lmstudio_inventory.csv",
+  "suite_file": "/home/scott/git/lms/benchmarks/agent_skill_suite.v1.json",
+  "models": [],
+  "exclude_models": [],
+  "max_models": 50,
+  "repeats": 1,
+  "timeout": 900,
+  "max_context_tokens": 4096
+}

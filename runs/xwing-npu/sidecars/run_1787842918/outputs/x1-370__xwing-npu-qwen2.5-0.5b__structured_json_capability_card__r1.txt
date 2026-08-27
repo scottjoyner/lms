@@ -1,0 +1,11 @@
+```json
+{
+  "task_fit": ["Task 1", "Task 2"],
+  "confidence": 0.95,
+  "limitations": [
+    "Limitations 1",
+    "Limitations 2"
+  ],
+  "recommended_max_context_tokens": 1000
+}
+```

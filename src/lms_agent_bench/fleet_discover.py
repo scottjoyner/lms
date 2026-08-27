@@ -49,7 +49,7 @@ def _reachable(url: str, retries: int = 3, backoff: float = 1.5) -> bool:
     last: Optional[Exception] = None
     for attempt in range(1, retries + 1):
         try:
-            urllib.request.urlopen(url + "/v1/models", timeout=8)
+            urllib.request.urlopen(url.rstrip("/") + "/models", timeout=8)
             return True
         except Exception as e:  # noqa: BLE001
             last = e

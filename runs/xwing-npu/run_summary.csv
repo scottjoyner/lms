@@ -1,0 +1,2 @@
+run_id,host_name,host_ip,base_url,model_key,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,0.588,3.810,67.750,1.00,0.50,0.7904,10

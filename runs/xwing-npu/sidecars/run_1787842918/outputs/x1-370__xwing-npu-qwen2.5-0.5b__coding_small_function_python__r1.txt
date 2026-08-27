@@ -1,0 +1,41 @@
+```python
+import re
+
+def normalize_phone_number(value: str) -> str:
+    """
+    Strips non-digit characters from the input string, supports both 10-digit and 11-digit US phone numbers,
+    and raises ValueError for any other characters.
+
+    Parameters:
+    value (str): The string to be normalized.
+
+    Returns:
+    str: The normalized string.
+
+    Raises:
+    ValueError: If the input string contains non-digit characters.
+    """
+    # Define the regular expression pattern for matching digits
+    digit_pattern = re.compile(r'\d')
+
+    # Apply the digit pattern to the input string
+    normalized_value = digit_pattern.sub('', value)
+
+    # Check if the normalized value is valid (10-digit or 11-digit)
+    if len(normalized_value) in [10, 11]:
+        return normalized_value
+    else:
+        raise ValueError("Invalid phone number format")
+
+# Test cases
+assert normalize_phone_number("Hello, World! 123") == "Hello, World! "
+assert normalize_phone_number("My phone number is 415-555-1234.") == "My phone number is 415-555-1234"
+assert normalize_phone_number("No numbers here!") == "No numbers here!"
+assert normalize_phone_number("1234567890") == "1234567890"
+assert normalize_phone_number("Starts with 1") == "Starts with 1"
+assert normalize_phone_number("No leading digit") == "No leading digit"
+
+print("All tests passed successfully.")
+
+
+```

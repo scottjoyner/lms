@@ -44,7 +44,7 @@ HARDWARE_AT_BENCH = __import__("os").environ.get("BENCH_CAPTURE_HW", "1") == "1"
 def _reachable(url: str) -> bool:
     import urllib.request
     try:
-        urllib.request.urlopen(url + "/v1/models", timeout=8)
+        urllib.request.urlopen(url.rstrip("/") + "/models", timeout=8)
         return True
     except Exception:
         return False

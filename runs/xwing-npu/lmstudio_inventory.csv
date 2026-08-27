@@ -1,0 +1,2 @@
+host_name,host_ip,endpoint_id,base_url,reachable,model_id,model_key
+xwing-npu,192.168.1.237,1,http://100.108.99.47:1237/v1,1,1,xwing-npu-qwen2.5-0.5b

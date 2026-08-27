@@ -14,6 +14,17 @@ url = "http://xwing.tailcb8954.ts.net:1234/v1"
 notes = "Ryzen AI MAX PRO 390, 23 GiB RAM."
 
 [[nodes]]
+name = "x1-npu"
+url = "http://100.64.43.123:52625/v1"
+notes = "Endpoint lane on physical x1-370. FastFlowLM RyzenAI NPU, Qwen3.6-35B-A3B. Cap-1 until measured concurrency proves otherwise."
+shared = true
+
+[[nodes]]
+name = "xwing-npu"
+url = "http://100.108.99.47:1237/v1"
+notes = "Endpoint lane on physical xwing. RyzenAI ONNX Runtime GenAI NPU, Qwen2.5-0.5B. Cap-1 until measured concurrency proves otherwise."
+
+[[nodes]]
 name = "destroyer"
 url = "http://destroyer.tailcb8954.ts.net:1234/v1"
 notes = "i7-10610U, 31 GiB RAM. Cap-1 (single-stream)."

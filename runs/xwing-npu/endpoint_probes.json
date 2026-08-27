@@ -1,0 +1,13 @@
+[
+  {
+    "base_url": "http://100.108.99.47:1237/v1",
+    "reachable": true,
+    "status": 200,
+    "elapsed_s": 0.0122,
+    "model_count": 1,
+    "models": [
+      "xwing-npu-qwen2.5-0.5b"
+    ],
+    "error": null
+  }
+]

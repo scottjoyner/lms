@@ -1,0 +1,9 @@
+run_id,host_name,host_ip,base_url,model_key,task_family,load_s,ttft_med,tps_med,ok_rate,eval_ok_rate,eval_score_avg,cases
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,operational_health,0.588,0.257,11.691,1.00,1.00,1.0000,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,structured_output,,1.095,40.179,1.00,0.00,0.8333,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,coding,,4.935,68.474,1.00,0.00,0.5000,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,debugging,,4.653,68.321,1.00,1.00,1.0000,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,agent_planning,,7.037,87.760,1.00,0.00,0.8000,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,long_context,,2.393,15.128,1.00,0.50,0.7500,2
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,repo_work,,23.227,100.618,1.00,1.00,1.0000,1
+1787842918,xwing-npu,192.168.1.237,http://100.108.99.47:1237/v1,xwing-npu-qwen2.5-0.5b,safety,,3.201,74.433,1.00,0.50,0.6354,2

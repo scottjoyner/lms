@@ -1,0 +1,126 @@
+routing:
+  general:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "1.0000"
+    preferred_grade: "A"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=debugging; ok_rate=1.00; eval_ok_rate=1.00; eval_score=1.0000; ttft=4.653; tps=68.321; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  coding:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.7750"
+    preferred_grade: "B"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=coding; ok_rate=1.00; eval_ok_rate=0.00; eval_score=0.5000; ttft=4.935; tps=68.474; max_ctx="
+    recommended_use: "usable with review"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  debugging:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "1.0000"
+    preferred_grade: "A"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=debugging; ok_rate=1.00; eval_ok_rate=1.00; eval_score=1.0000; ttft=4.653; tps=68.321; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  agent_planning:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.9100"
+    preferred_grade: "A"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=agent_planning; ok_rate=1.00; eval_ok_rate=0.00; eval_score=0.8000; ttft=7.037; tps=87.760; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  structured_output:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.9250"
+    preferred_grade: "A"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=structured_output; ok_rate=1.00; eval_ok_rate=0.00; eval_score=0.8333; ttft=1.095; tps=40.179; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  long_context:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.7942"
+    preferred_grade: "B"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: "2048"
+    evidence: "task=long_context; ok_rate=1.00; eval_ok_rate=0.50; eval_score=0.7500; ttft=2.393; tps=15.128; max_ctx=2048"
+    recommended_use: "usable with review"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  repo_work:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.9500"
+    preferred_grade: "A"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=repo_work; ok_rate=1.00; eval_ok_rate=1.00; eval_score=1.0000; ttft=23.227; tps=100.618; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  operational_health:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.8938"
+    preferred_grade: "B"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=operational_health; ok_rate=1.00; eval_ok_rate=1.00; eval_score=1.0000; ttft=0.257; tps=11.691; max_ctx="
+    recommended_use: "preferred for this task family"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
+routing:
+  safety:
+    preferred_model: "xwing-npu-qwen2.5-0.5b"
+    preferred_base_url: "http://100.108.99.47:1237/v1"
+    preferred_host_name: "x1-370"
+    preferred_score: "0.8359"
+    preferred_grade: "B"
+    fallback_model: null
+    fallback_base_url: null
+    max_reliable_context_tokens: ""
+    evidence: "task=safety; ok_rate=1.00; eval_ok_rate=0.50; eval_score=0.6354; ttft=3.201; tps=74.433; max_ctx="
+    recommended_use: "usable with review"
+    avoid_use: "avoid high-risk work unless task-specific checks pass"
+    source: lms capability_matrix.csv
