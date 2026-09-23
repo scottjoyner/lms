@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -22,6 +23,7 @@ import subprocess
 import sys
 import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
@@ -255,10 +257,133 @@ def _library(lm_url: str) -> List[Dict[str, Any]]:
     return out
 
 
+def _normalize_runtime_url(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "http://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return ""
+    path = parsed.path.rstrip("/")
+    if path == "/v1":
+        path = ""
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            path,
+            "",
+            "",
+            "",
+        )
+    ).rstrip("/")
+
+
+def _configured_runtime_urls(
+    lm_url: str,
+    extra_urls: Optional[List[str]] = None,
+) -> List[str]:
+    candidates = [lm_url]
+    candidates.extend(extra_urls or [])
+    candidates.extend(
+        item.strip()
+        for item in os.getenv("FLEET_RUNTIME_URLS", "").split(",")
+        if item.strip()
+    )
+    out: List[str] = []
+    seen = set()
+    for candidate in candidates:
+        normalized = _normalize_runtime_url(candidate)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            out.append(normalized)
+    return out
+
+
+def _openai_models(runtime_url: str) -> Optional[List[str]]:
+    data = _http_get_json(f"{runtime_url.rstrip('/')}/v1/models")
+    if not isinstance(data, dict):
+        return None
+    items = data.get("data")
+    if not isinstance(items, list):
+        return None
+    return sorted(
+        {
+            str(item.get("id")).strip()
+            for item in items
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+    )
+
+
+def _runtime_observation(runtime_url: str, hostname: str) -> Optional[Dict[str, Any]]:
+    """Observe one serving process without granting it admission authority.
+
+    This intentionally separates *discovery* from the approved AssistX runtime
+    projection. A reachable process can become visible immediately, while
+    artifact identity / capacity / access-path evidence still has to pass the
+    existing operator-reviewed admission gates before Auto-Router may use it.
+    """
+
+    normalized = _normalize_runtime_url(runtime_url)
+    if not normalized:
+        return None
+
+    native = _http_get_json(f"{normalized}/api/v1/models")
+    if isinstance(native, dict) and isinstance(native.get("models"), list):
+        runtime_kind = "lmstudio"
+        models = sorted(set(_loaded_models(normalized)))
+        protocol = "lmstudio-native"
+    else:
+        generic_models = _openai_models(normalized)
+        if generic_models is None:
+            return None
+        runtime_kind = "openai_compatible"
+        models = generic_models
+        protocol = "openai-compatible"
+
+    seed = f"{hostname}|{normalized}|{runtime_kind}"
+    observation_id = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
+    return {
+        "observation_schema": "fleet-runtime-observation.v1",
+        "runtime_observation_id": f"runtime-observation:{observation_id}",
+        "runtime_kind": runtime_kind,
+        "protocol": protocol,
+        "base_url": normalized,
+        "models": models,
+        "ready": True,
+        "observed_at": int(time.time()),
+        # Observation is evidence only. Never allow the reporter to mint an
+        # admitted RuntimeInstance by implication.
+        "admitted": False,
+    }
+
+
+def _runtime_observations(
+    lm_url: str,
+    hostname: str,
+    extra_urls: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    observations = []
+    for runtime_url in _configured_runtime_urls(lm_url, extra_urls):
+        observation = _runtime_observation(runtime_url, hostname)
+        if observation is not None:
+            observations.append(observation)
+    return sorted(
+        observations,
+        key=lambda item: (str(item["runtime_kind"]), str(item["base_url"])),
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Report + loop
 # --------------------------------------------------------------------------- #
-def build_report(lm_url: str) -> Dict[str, Any]:
+def build_report(
+    lm_url: str,
+    runtime_urls: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     specs = _specs()
     hostname = socket.gethostname()
     return {
@@ -266,6 +391,11 @@ def build_report(lm_url: str) -> Dict[str, Any]:
         "host_name": hostname,
         "library": _library(lm_url),
         "loaded": _loaded_models(lm_url),
+        "runtimes": _runtime_observations(
+            lm_url,
+            hostname,
+            runtime_urls,
+        ),
         "specs": specs,
     }
 
@@ -291,20 +421,31 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Fleet node reporter")
     parser.add_argument("--router-url", default="http://100.64.43.123:8088")
     parser.add_argument("--lmstudio-url", default=f"http://localhost:{LM_PORT}")
+    parser.add_argument(
+        "--runtime-url",
+        action="append",
+        default=[],
+        help=(
+            "Additional local inference runtime root URL. Repeat for llama.cpp, "
+            "SGLang, vLLM, secondary LM Studio servers, or other OpenAI-compatible "
+            "runtimes. FLEET_RUNTIME_URLS may also provide a comma-separated list."
+        ),
+    )
     parser.add_argument("--interval", type=float, default=30.0)
     args = parser.parse_args(argv)
 
     print(
         f"reporter: router={args.router_url} lmstudio={args.lmstudio_url} "
-        f"interval={args.interval}s",
+        f"extra_runtimes={len(args.runtime_url)} interval={args.interval}s",
         flush=True,
     )
     while True:
-        report = build_report(args.lmstudio_url)
+        report = build_report(args.lmstudio_url, args.runtime_url)
         ok = post_report(args.router_url, report)
         print(
             f"report {report['hostname']}: library={len(report['library'])} "
-            f"loaded={len(report['loaded'])} ram={report['specs'].get('system_ram_gib')} "
+            f"loaded={len(report['loaded'])} runtimes={len(report['runtimes'])} "
+            f"ram={report['specs'].get('system_ram_gib')} "
             f"avail={report['specs'].get('available_ram_gib')} posted={ok}",
             flush=True,
         )
