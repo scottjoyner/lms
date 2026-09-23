@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-import fleet_node_reporter as reporter
+import importlib.util
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location(
+    "fleet_node_reporter",
+    ROOT / "fleet_node_reporter.py",
+)
+assert SPEC and SPEC.loader
+reporter = importlib.util.module_from_spec(SPEC)
+sys.modules["fleet_node_reporter"] = reporter
+SPEC.loader.exec_module(reporter)
 
 
 def test_runtime_observations_cover_native_and_openai_compatible(monkeypatch):
