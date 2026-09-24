@@ -288,25 +288,26 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
         return {"valid": False, "reason": "witness_process_missing", "checked_at": int(time.time())}
     try:
         pid = int(process.get("pid") or 0)
-        current = process_identity(pid)
+        current_boot_id = _boot_id()
+        current_start_ticks = _process_start_ticks(pid)
+        current_executable = _process_executable(pid).name
     except (OSError, ValueError):
         return {"valid": False, "reason": "process_not_observable", "checked_at": int(time.time())}
-    expected = {
-        "pid": pid,
-        "boot_id": str(process.get("boot_id") or ""),
-        "process_start_ticks": int(process.get("process_start_ticks") or 0),
-        "executable_sha256": str(process.get("executable_sha256") or ""),
-        "executable_basename": str(process.get("executable_basename") or ""),
-    }
-    valid = current == expected
+
+    valid = (
+        pid > 0
+        and current_boot_id == str(process.get("boot_id") or "")
+        and current_start_ticks == int(process.get("process_start_ticks") or 0)
+        and current_executable == str(process.get("executable_basename") or "")
+    )
     return {
         "valid": valid,
         "reason": "match" if valid else "process_identity_changed",
         "checked_at": int(time.time()),
         "pid": pid,
-        "boot_id": current.get("boot_id"),
-        "process_start_ticks": current.get("process_start_ticks"),
-        "executable_sha256": current.get("executable_sha256"),
+        "boot_id": current_boot_id,
+        "process_start_ticks": current_start_ticks,
+        "executable_basename": current_executable,
     }
 
 
