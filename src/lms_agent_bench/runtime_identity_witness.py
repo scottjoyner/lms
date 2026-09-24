@@ -75,6 +75,18 @@ def _process_executable(pid: int) -> Path:
 
 def _process_references_model(pid: int, model_path: Path) -> str:
     target = str(model_path)
+
+    # A mapped file is the strongest cheap continuity signal available without
+    # repeatedly hashing multi-GB weights. Prefer it over a launch argument,
+    # because a process capable of hot reload may retain an old model path in
+    # argv while serving different bytes.
+    try:
+        maps = Path(f"/proc/{pid}/maps").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        maps = ""
+    if target in maps:
+        return "proc_maps"
+
     try:
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\x00", b" ").decode(
             "utf-8", errors="replace"
@@ -83,15 +95,8 @@ def _process_references_model(pid: int, model_path: Path) -> str:
         cmdline = ""
     if target in cmdline:
         return "cmdline"
-
-    try:
-        maps = Path(f"/proc/{pid}/maps").read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        maps = ""
-    if target in maps:
-        return "proc_maps"
     raise ValueError(
-        "model path is not bound to the selected process through cmdline or /proc maps"
+        "model path is not bound to the selected process through /proc maps or cmdline"
     )
 
 
@@ -174,6 +179,7 @@ def build_witness(
             "inode": int(model_stat.st_ino),
             "size_bytes": int(model_stat.st_size),
             "mtime_ns": int(model_stat.st_mtime_ns),
+            "ctime_ns": int(model_stat.st_ctime_ns),
         },
         "process": process,
         "canary": {
@@ -320,6 +326,7 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
                 and int(stat.st_ino) == int(model_identity.get("inode"))
                 and int(stat.st_size) == int(model_identity.get("size_bytes"))
                 and int(stat.st_mtime_ns) == int(model_identity.get("mtime_ns"))
+                and int(stat.st_ctime_ns) == int(model_identity.get("ctime_ns"))
             )
             _process_references_model(pid, current_model)
             model_binding_valid = True
@@ -346,6 +353,11 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
         "executable_basename": current_executable,
         "model_file_valid": model_file_valid,
         "model_process_binding_valid": model_binding_valid,
+        "model_process_binding": (
+            _process_references_model(pid, _regular_model(model_path))
+            if valid
+            else None
+        ),
     }
 
 
