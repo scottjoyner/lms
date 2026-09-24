@@ -124,7 +124,7 @@ def test_build_report_keeps_legacy_fields_and_adds_non_admitting_runtime_evidenc
     monkeypatch.setattr(
         reporter,
         "_runtime_observations",
-        lambda _url, _hostname, _extra: [
+        lambda _url, _hostname, _extra, _witnesses=None: [
             {
                 "observation_schema": "fleet-runtime-observation.v1",
                 "runtime_observation_id": "runtime-observation:abc",
@@ -170,4 +170,55 @@ def test_empty_model_list_is_visible_but_not_ready(monkeypatch):
     assert observation["models"] == []
     assert observation["observed_model_count"] == 0
     assert observation["ready"] is False
+    assert observation["admitted"] is False
+
+
+def test_runtime_observation_attaches_signed_witness_evidence(monkeypatch):
+    def fake_get(url: str, timeout: float = 5.0):
+        if url == "http://localhost:1235/api/v1/models":
+            return None
+        if url == "http://localhost:1235/v1/models":
+            return {"data": [{"id": "k2-36b"}]}
+        return None
+
+    monkeypatch.setattr(reporter, "_http_get_json", fake_get)
+    monkeypatch.setattr(
+        reporter._runtime_witness,
+        "observe_process_continuity",
+        lambda _witness: {
+            "valid": True,
+            "reason": "match",
+            "checked_at": 123,
+            "pid": 42,
+            "boot_id": "boot",
+            "process_start_ticks": 99,
+            "executable_basename": "server",
+        },
+    )
+    witness = {
+        "schema_version": "fleet-runtime-identity-witness.v1",
+        "runtime_url": "http://localhost:1235",
+        "provider_model": "k2-36b",
+    }
+    payload = json.dumps(
+        witness,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ) + "\n"
+
+    observation = reporter._runtime_observation(
+        "http://localhost:1235",
+        "destroyer",
+        {
+            "witness": witness,
+            "payload": payload,
+            "signature": "-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n",
+        },
+    )
+
+    assert observation is not None
+    assert observation["runtime_identity_witness_json"] == payload
+    assert "BEGIN SSH SIGNATURE" in observation["runtime_identity_witness_signature"]
+    assert observation["runtime_identity_continuity"]["valid"] is True
     assert observation["admitted"] is False
