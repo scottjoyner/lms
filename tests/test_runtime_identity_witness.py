@@ -264,3 +264,69 @@ def test_proc_maps_binding_is_inode_based_not_path_based(tmp_path):
             assert witness._mapped_file_binding(os.getpid(), new_identity) is False
         finally:
             mapping.close()
+
+
+@pytest.mark.skipif(shutil.which("ssh-keygen") is None, reason="OpenSSH unavailable")
+def test_build_continuity_attestation_signs_exact_runtime_observation(
+    monkeypatch, tmp_path
+):
+    key = tmp_path / "destroyer-continuity-key"
+    generated = subprocess.run(
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)],
+        capture_output=True,
+        check=False,
+    )
+    assert generated.returncode == 0
+    monkeypatch.setattr(
+        witness,
+        "observe_process_continuity",
+        lambda _witness: {
+            "valid": True,
+            "reason": "match",
+            "checked_at": 110,
+            "pid": 42,
+            "boot_id": "boot",
+            "process_start_ticks": 99,
+            "executable_basename": "llama-server",
+            "executable_file_valid": True,
+            "model_file_valid": True,
+            "model_process_binding_valid": True,
+            "model_process_binding": "proc_maps",
+        },
+    )
+    identity_witness = {
+        "schema_version": witness.SCHEMA_VERSION,
+        "node_id": "destroyer",
+        "runtime_url": "http://localhost:1235",
+        "runtime_kind": "llama_cpp",
+        "provider_model": "k2-36b",
+        "witness_fingerprint": "sha256:" + "1" * 64,
+    }
+    observation = {
+        "runtime_observation_id": "runtime-observation:k2",
+        "observed_at": 100,
+        "runtime_kind": "openai_compatible",
+        "protocol": "openai-compatible",
+        "base_url": "http://localhost:1235",
+        "models": ["k2-36b"],
+        "ready": True,
+    }
+
+    attestation, payload, signature = witness.build_continuity_attestation(
+        identity_witness,
+        runtime_observation=observation,
+        signing_key=key,
+        signer_identity="destroyer",
+    )
+
+    assert attestation["schema_version"] == witness.CONTINUITY_SCHEMA_VERSION
+    assert attestation["node_id"] == "destroyer"
+    assert attestation["observation"] == {
+        **observation,
+        "observed_model_count": 1,
+    }
+    assert attestation["continuity"]["valid"] is True
+    assert attestation["signer_identity"] == "destroyer"
+    assert attestation["signature_namespace"] == witness.CONTINUITY_NAMESPACE
+    assert payload == witness._canonical_bytes(attestation)
+    assert b"BEGIN SSH SIGNATURE" in signature
