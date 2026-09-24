@@ -18,6 +18,8 @@ from lms_agent_bench.model_loadout import validate_manifest
 
 SCHEMA_VERSION = "fleet-runtime-identity-witness.v1"
 DEFAULT_NAMESPACE = "lms-runtime-identity-witness"
+CONTINUITY_SCHEMA_VERSION = "fleet-runtime-continuity-attestation.v1"
+CONTINUITY_NAMESPACE = "lms-runtime-continuity"
 
 
 def _normalize_runtime_url(value: str) -> str:
@@ -287,18 +289,19 @@ def build_witness(
     return witness, _canonical_bytes(witness)
 
 
-def sign_witness_bytes(
+def _sign_payload_bytes(
     payload: bytes,
     *,
     signing_key: Path,
-    namespace: str = DEFAULT_NAMESPACE,
+    namespace: str,
+    label: str,
 ) -> bytes:
-    key = _ssh._require_regular(signing_key, "witness signing key", private=True)  # noqa: SLF001
+    key = _ssh._require_regular(signing_key, f"{label} signing key", private=True)  # noqa: SLF001
     namespace = _ssh._namespace(namespace)  # noqa: SLF001
     import tempfile
 
-    with tempfile.TemporaryDirectory(prefix="runtime-witness-") as directory:
-        path = Path(directory) / "runtime-identity-witness.json"
+    with tempfile.TemporaryDirectory(prefix=f"{label}-") as directory:
+        path = Path(directory) / "payload.json"
         path.write_bytes(payload)
         process = subprocess.run(
             [
@@ -317,11 +320,25 @@ def sign_witness_bytes(
             check=False,
         )
         if process.returncode != 0:
-            raise ValueError("runtime witness signing failed: " + process.stderr.strip())
+            raise ValueError(f"{label} signing failed: " + process.stderr.strip())
         signature = Path(str(path) + ".sig")
         if not signature.is_file() or signature.stat().st_size <= 0:
-            raise ValueError("ssh-keygen produced no runtime witness signature")
+            raise ValueError(f"ssh-keygen produced no {label} signature")
         return signature.read_bytes()
+
+
+def sign_witness_bytes(
+    payload: bytes,
+    *,
+    signing_key: Path,
+    namespace: str = DEFAULT_NAMESPACE,
+) -> bytes:
+    return _sign_payload_bytes(
+        payload,
+        signing_key=signing_key,
+        namespace=namespace,
+        label="runtime-witness",
+    )
 
 
 def verify_witness_bytes(
@@ -468,6 +485,62 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
         "model_process_binding_valid": model_binding_valid,
         "model_process_binding": model_binding,
     }
+
+
+
+def build_continuity_attestation(
+    witness: Mapping[str, Any],
+    *,
+    runtime_observation_id: str,
+    signing_key: Path,
+    signer_identity: str,
+    namespace: str = CONTINUITY_NAMESPACE,
+) -> tuple[dict[str, Any], bytes, bytes]:
+    if witness.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError("continuity attestation requires a runtime identity witness")
+    witness_fingerprint = str(witness.get("witness_fingerprint") or "")
+    if not witness_fingerprint.startswith("sha256:"):
+        raise ValueError("runtime witness fingerprint is missing")
+    observation_id = str(runtime_observation_id or "").strip()
+    if not observation_id:
+        raise ValueError("runtime observation ID is required")
+    signer_identity = _ssh._identity(signer_identity)  # noqa: SLF001
+    namespace = _ssh._namespace(namespace)  # noqa: SLF001
+    if signer_identity != str(witness.get("node_id") or ""):
+        raise ValueError("continuity signer identity must equal witness node_id")
+
+    signing_key_path = _ssh._require_regular(  # noqa: SLF001
+        signing_key,
+        "runtime continuity signing key",
+        private=True,
+    )
+    continuity = observe_process_continuity(witness)
+    core = {
+        "schema_version": CONTINUITY_SCHEMA_VERSION,
+        "node_id": str(witness.get("node_id") or ""),
+        "runtime_observation_id": observation_id,
+        "witness_fingerprint": witness_fingerprint,
+        "runtime_url": str(witness.get("runtime_url") or ""),
+        "runtime_kind": str(witness.get("runtime_kind") or ""),
+        "provider_model": str(witness.get("provider_model") or ""),
+        "continuity": continuity,
+        "signer_identity": signer_identity,
+        "signature_namespace": namespace,
+        "signing_key_fingerprint": _ssh._key_fingerprint(signing_key_path),  # noqa: SLF001
+        "admission": {"admitted": False},
+    }
+    attestation = {
+        **core,
+        "attestation_fingerprint": _operator.canonical_hash(core),
+    }
+    payload = _canonical_bytes(attestation)
+    signature = _sign_payload_bytes(
+        payload,
+        signing_key=signing_key_path,
+        namespace=namespace,
+        label="runtime-continuity",
+    )
+    return attestation, payload, signature
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
