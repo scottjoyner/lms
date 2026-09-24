@@ -91,6 +91,7 @@ def test_build_witness_binds_canary_model_hash_and_process(monkeypatch, tmp_path
     assert built["model_content_sha256"] == loadout["model"]["content_sha256"]
     assert built["loadout_fingerprint"] == loadout["loadout_fingerprint"]
     assert built["model_process_binding"] == "cmdline"
+    assert built["model_file_identity"]["size_bytes"] == model_path.stat().st_size
     assert built["process"]["process_start_ticks"] == 12345
     assert built["canary"]["rollback_succeeded"] is True
     assert built["admission"]["admitted"] is False
@@ -162,12 +163,33 @@ def test_signed_witness_round_trip(tmp_path):
     assert verified == document
 
 
-def test_live_process_continuity_uses_pid_start_and_boot_identity():
+def test_live_process_continuity_uses_process_and_model_file_identity(
+    monkeypatch, tmp_path
+):
     current = witness.process_identity(os.getpid())
-    document = {"process": current}
+    model_path = tmp_path / "model.gguf"
+    model_path.write_bytes(b"model")
+    stat = model_path.stat()
+    document = {
+        "process": current,
+        "model_path": str(model_path),
+        "model_file_identity": {
+            "device": int(stat.st_dev),
+            "inode": int(stat.st_ino),
+            "size_bytes": int(stat.st_size),
+            "mtime_ns": int(stat.st_mtime_ns),
+        },
+    }
+    monkeypatch.setattr(
+        witness,
+        "_process_references_model",
+        lambda _pid, _path: "proc_maps",
+    )
 
     observed = witness.observe_process_continuity(document)
 
     assert observed["valid"] is True
     assert observed["pid"] == os.getpid()
     assert observed["process_start_ticks"] == current["process_start_ticks"]
+    assert observed["model_file_valid"] is True
+    assert observed["model_process_binding_valid"] is True
