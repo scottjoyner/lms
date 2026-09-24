@@ -49,6 +49,7 @@ lms-loadout-qualification-run = "lms_agent_bench.loadout_qualification_secure_en
 lms-loadout-qualification-attest = "lms_agent_bench.loadout_qualification_attestation:main"
 lms-runtime-canary = "lms_agent_bench.runtime_canary_secure_entrypoint:main"
 lms-runtime-canary-attest = "lms_agent_bench.runtime_canary_attestation:main"
+lms-runtime-witness = "lms_agent_bench.runtime_identity_witness:main"
 lms-prompt-cache = "lms_agent_bench.prompt_cache_cli:main"
 
 [tool.setuptools]
