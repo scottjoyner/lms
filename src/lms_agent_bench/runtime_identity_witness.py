@@ -220,6 +220,7 @@ def build_witness(
     provider_model: str,
     model_path: Path,
     signing_key: Path,
+    witness_identity: str,
     namespace: str = DEFAULT_NAMESPACE,
 ) -> tuple[dict[str, Any], bytes]:
     loadout = validate_manifest(loadout_raw, require_fingerprint=True)
@@ -249,6 +250,8 @@ def build_witness(
         raise ValueError("runtime kind and provider model are required")
 
     signing_key_path = _ssh._require_regular(signing_key, "witness signing key", private=True)  # noqa: SLF001
+    witness_identity = _ssh._identity(witness_identity)  # noqa: SLF001
+    namespace = _ssh._namespace(namespace)  # noqa: SLF001
     core = {
         "schema_version": SCHEMA_VERSION,
         "node_id": str(loadout["node_id"]),
@@ -271,6 +274,8 @@ def build_witness(
             "signing_key_fingerprint": canary.get("signing_key_fingerprint"),
             "rollback_succeeded": canary.get("rollback_succeeded") is True,
         },
+        "witness_signer_identity": witness_identity,
+        "witness_signature_namespace": namespace,
         "witness_signing_key_fingerprint": _ssh._key_fingerprint(signing_key_path),  # noqa: SLF001
         "admission": {"admitted": False},
         "created_at_unix": int(time.time()),
@@ -477,6 +482,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--provider-model", required=True)
     parser.add_argument("--model-path", type=Path, required=True)
     parser.add_argument("--signing-key", type=Path, required=True)
+    parser.add_argument("--witness-identity", required=True)
     parser.add_argument("--namespace", default=DEFAULT_NAMESPACE)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -496,6 +502,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             provider_model=args.provider_model,
             model_path=args.model_path,
             signing_key=args.signing_key,
+            witness_identity=args.witness_identity,
             namespace=args.namespace,
         )
         signature = sign_witness_bytes(
