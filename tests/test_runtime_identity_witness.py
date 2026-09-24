@@ -330,3 +330,134 @@ def test_build_continuity_attestation_signs_exact_runtime_observation(
     assert attestation["signature_namespace"] == witness.CONTINUITY_NAMESPACE
     assert payload == witness._canonical_bytes(attestation)
     assert b"BEGIN SSH SIGNATURE" in signature
+
+
+def test_darwin_boot_identity_is_stable_sysctl_value(monkeypatch):
+    monkeypatch.setattr(witness, "_platform_name", lambda: "darwin")
+    monkeypatch.setattr(
+        witness,
+        "_run_text",
+        lambda *_args, **_kwargs: (
+            "{ sec = 1780000000, usec = 12345 } Thu Sep 24 10:00:00 2026\n"
+        ),
+    )
+
+    assert witness._boot_id() == "darwin-boottime:1780000000.012345"
+
+
+def test_darwin_process_start_identity_uses_exact_lstart(monkeypatch):
+    monkeypatch.setattr(witness, "_platform_name", lambda: "darwin")
+    monkeypatch.setattr(
+        witness,
+        "_run_text",
+        lambda *_args, **_kwargs: "Thu Sep 24 19:04:05 2026\n",
+    )
+
+    expected = int(
+        __import__("time").mktime(
+            __import__("datetime").datetime.strptime(
+                "Thu Sep 24 19:04:05 2026",
+                "%a %b %d %H:%M:%S %Y",
+            ).timetuple()
+        )
+    )
+    assert witness._process_start_ticks(4242) == expected
+
+
+def test_darwin_lsof_records_are_machine_parsed(monkeypatch):
+    monkeypatch.setattr(
+        witness,
+        "_run_text",
+        lambda *_args, **_kwargs: (
+            "p4242\n"
+            "ftxt\n"
+            "D0x1000004\n"
+            "i123\n"
+            "n/Applications/runtime\n"
+            "f12\n"
+            "D0x1000004\n"
+            "i456\n"
+            "n/models/k2.gguf\n"
+        ),
+    )
+
+    records = witness._darwin_lsof_records(4242)
+
+    assert records == [
+        {
+            "f": "txt",
+            "D": "0x1000004",
+            "i": "123",
+            "n": "/Applications/runtime",
+        },
+        {
+            "f": "12",
+            "D": "0x1000004",
+            "i": "456",
+            "n": "/models/k2.gguf",
+        },
+    ]
+
+
+def test_darwin_strong_binding_requires_vmmap_and_device_inode(monkeypatch, tmp_path):
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"model")
+    identity = witness._stat_identity(model.stat())
+
+    monkeypatch.setattr(witness, "_platform_name", lambda: "darwin")
+    monkeypatch.setattr(
+        witness,
+        "_darwin_vmmap_contains_path",
+        lambda _pid, _path: True,
+    )
+    monkeypatch.setattr(
+        witness,
+        "_darwin_lsof_records",
+        lambda _pid, **_kwargs: [
+            {
+                "f": "12",
+                "D": hex(identity["device"]),
+                "i": str(identity["inode"]),
+                "n": str(model),
+            }
+        ],
+    )
+
+    assert witness._mapped_file_binding(4242, identity, model) is True
+    assert (
+        witness._process_references_model(4242, model, identity)
+        == "darwin_vmmap_lsof"
+    )
+
+
+def test_darwin_path_match_without_inode_match_is_not_strong(monkeypatch, tmp_path):
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"model")
+    identity = witness._stat_identity(model.stat())
+
+    monkeypatch.setattr(witness, "_platform_name", lambda: "darwin")
+    monkeypatch.setattr(
+        witness,
+        "_darwin_vmmap_contains_path",
+        lambda _pid, _path: True,
+    )
+    monkeypatch.setattr(
+        witness,
+        "_darwin_lsof_records",
+        lambda _pid, **_kwargs: [
+            {
+                "f": "12",
+                "D": hex(identity["device"]),
+                "i": str(identity["inode"] + 1),
+                "n": str(model),
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        witness,
+        "_process_command_line",
+        lambda _pid: f"runtime --model {model}",
+    )
+
+    assert witness._mapped_file_binding(4242, identity, model) is False
+    assert witness._process_references_model(4242, model, identity) == "cmdline"
