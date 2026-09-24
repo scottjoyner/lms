@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import mmap
 import os
 import shutil
 import subprocess
@@ -64,12 +66,19 @@ def test_build_witness_binds_canary_model_hash_and_process(monkeypatch, tmp_path
             "process_start_ticks": 12345,
             "executable_sha256": "sha256:" + "3" * 64,
             "executable_basename": "llama-server",
+            "executable_file_identity": {
+                "device": 1,
+                "inode": 2,
+                "size_bytes": 3,
+                "mtime_ns": 4,
+                "ctime_ns": 5,
+            },
         },
     )
     monkeypatch.setattr(
         witness,
         "_process_references_model",
-        lambda _pid, _path: "cmdline",
+        lambda _pid, _path, _identity: "cmdline",
     )
     monkeypatch.setattr(
         witness._ssh,
@@ -145,6 +154,13 @@ def test_signed_witness_round_trip(tmp_path):
             "process_start_ticks": 99,
             "executable_sha256": "sha256:" + "3" * 64,
             "executable_basename": "llama-server",
+            "executable_file_identity": {
+                "device": 10,
+                "inode": 11,
+                "size_bytes": 12,
+                "mtime_ns": 13,
+                "ctime_ns": 14,
+            },
         },
         "canary": {
             "run_id": "run",
@@ -196,7 +212,7 @@ def test_live_process_continuity_uses_process_and_model_file_identity(
     monkeypatch.setattr(
         witness,
         "_process_references_model",
-        lambda _pid, _path: "proc_maps",
+        lambda _pid, _path, _identity: "proc_maps",
     )
 
     observed = witness.observe_process_continuity(document)
@@ -206,3 +222,40 @@ def test_live_process_continuity_uses_process_and_model_file_identity(
     assert observed["process_start_ticks"] == current["process_start_ticks"]
     assert observed["model_file_valid"] is True
     assert observed["model_process_binding_valid"] is True
+
+
+def test_stable_model_hash_rejects_file_change_during_hash(monkeypatch, tmp_path):
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"stable-before-hash")
+
+    def mutating_hash(path: Path) -> str:
+        original = path.read_bytes()
+        digest = "sha256:" + hashlib.sha256(original).hexdigest()
+        path.write_bytes(original + b"-changed")
+        return digest
+
+    monkeypatch.setattr(witness._ssh, "file_sha256", mutating_hash)
+
+    with pytest.raises(ValueError, match="changed while it was being hashed"):
+        witness._stable_file_sha256(model, "live model file")
+
+
+def test_proc_maps_binding_is_inode_based_not_path_based(tmp_path):
+    model = tmp_path / "model.gguf"
+    model.write_bytes(b"mapped-model-bytes")
+    with model.open("r+b") as handle:
+        mapping = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
+        try:
+            old_identity = witness._stat_identity(model.stat())
+            assert witness._mapped_file_binding(os.getpid(), old_identity) is True
+
+            replacement = tmp_path / "replacement.gguf"
+            replacement.write_bytes(b"different-model")
+            os.replace(replacement, model)
+            new_identity = witness._stat_identity(model.stat())
+
+            assert new_identity["inode"] != old_identity["inode"]
+            assert witness._mapped_file_binding(os.getpid(), old_identity) is True
+            assert witness._mapped_file_binding(os.getpid(), new_identity) is False
+        finally:
+            mapping.close()
