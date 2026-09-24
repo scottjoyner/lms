@@ -157,6 +157,7 @@ def build_witness(
         raise ValueError("runtime kind and provider model are required")
 
     signing_key_path = _ssh._require_regular(signing_key, "witness signing key", private=True)  # noqa: SLF001
+    model_stat = model.stat()
     core = {
         "schema_version": SCHEMA_VERSION,
         "node_id": str(loadout["node_id"]),
@@ -166,9 +167,15 @@ def build_witness(
         "loadout_fingerprint": loadout["loadout_fingerprint"],
         "model_id": str(loadout["model"]["id"]),
         "model_content_sha256": loadout["model"]["content_sha256"],
-        "model_size_bytes": int(model.stat().st_size),
+        "model_size_bytes": int(model_stat.st_size),
         "model_path": str(model),
         "model_process_binding": binding_method,
+        "model_file_identity": {
+            "device": int(model_stat.st_dev),
+            "inode": int(model_stat.st_ino),
+            "size_bytes": int(model_stat.st_size),
+            "mtime_ns": int(model_stat.st_mtime_ns),
+        },
         "process": process,
         "canary": {
             "run_id": canary.get("run_id"),
@@ -294,20 +301,52 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
     except (OSError, ValueError):
         return {"valid": False, "reason": "process_not_observable", "checked_at": int(time.time())}
 
-    valid = (
+    process_valid = (
         pid > 0
         and current_boot_id == str(process.get("boot_id") or "")
         and current_start_ticks == int(process.get("process_start_ticks") or 0)
         and current_executable == str(process.get("executable_basename") or "")
     )
+
+    model_identity = witness.get("model_file_identity")
+    model_path = Path(str(witness.get("model_path") or ""))
+    model_binding_valid = False
+    model_file_valid = False
+    try:
+        if isinstance(model_identity, Mapping):
+            current_model = _regular_model(model_path)
+            stat = current_model.stat()
+            model_file_valid = (
+                int(stat.st_dev) == int(model_identity.get("device"))
+                and int(stat.st_ino) == int(model_identity.get("inode"))
+                and int(stat.st_size) == int(model_identity.get("size_bytes"))
+                and int(stat.st_mtime_ns) == int(model_identity.get("mtime_ns"))
+            )
+            _process_references_model(pid, current_model)
+            model_binding_valid = True
+    except (OSError, TypeError, ValueError):
+        model_file_valid = False
+        model_binding_valid = False
+
+    valid = process_valid and model_file_valid and model_binding_valid
+    if valid:
+        reason = "match"
+    elif not process_valid:
+        reason = "process_identity_changed"
+    elif not model_file_valid:
+        reason = "model_file_identity_changed"
+    else:
+        reason = "model_process_binding_changed"
     return {
         "valid": valid,
-        "reason": "match" if valid else "process_identity_changed",
+        "reason": reason,
         "checked_at": int(time.time()),
         "pid": pid,
         "boot_id": current_boot_id,
         "process_start_ticks": current_start_ticks,
         "executable_basename": current_executable,
+        "model_file_valid": model_file_valid,
+        "model_process_binding_valid": model_binding_valid,
     }
 
 
