@@ -125,7 +125,7 @@ def test_build_report_keeps_legacy_fields_and_adds_non_admitting_runtime_evidenc
     monkeypatch.setattr(
         reporter,
         "_runtime_observations",
-        lambda _url, _hostname, _extra, _witnesses=None: [
+        lambda _url, _hostname, _extra, _witnesses=None, _key=None, _identity=None: [
             {
                 "observation_schema": "fleet-runtime-observation.v1",
                 "runtime_observation_id": "runtime-observation:abc",
