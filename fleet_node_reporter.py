@@ -387,6 +387,8 @@ def _runtime_observation(
     runtime_url: str,
     hostname: str,
     witness_record: Optional[Dict[str, Any]] = None,
+    continuity_signing_key: Optional[str] = None,
+    continuity_identity: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """Observe one serving process without granting it admission authority.
 
@@ -440,6 +442,32 @@ def _runtime_observation(
             observation["runtime_identity_continuity"] = (
                 _runtime_witness.observe_process_continuity(witness)
             )
+            if continuity_signing_key:
+                signer_identity = (
+                    str(continuity_identity or "").strip()
+                    or str(witness.get("node_id") or "").strip()
+                    or hostname
+                )
+                try:
+                    _attestation, continuity_payload, continuity_signature = (
+                        _runtime_witness.build_continuity_attestation(
+                            witness,
+                            runtime_observation_id=observation[
+                                "runtime_observation_id"
+                            ],
+                            signing_key=Path(continuity_signing_key),
+                            signer_identity=signer_identity,
+                        )
+                    )
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    pass
+                else:
+                    observation["runtime_identity_continuity_json"] = (
+                        continuity_payload.decode("utf-8")
+                    )
+                    observation["runtime_identity_continuity_signature"] = (
+                        continuity_signature.decode("utf-8")
+                    )
     return observation
 
 
@@ -448,6 +476,8 @@ def _runtime_observations(
     hostname: str,
     extra_urls: Optional[List[str]] = None,
     witness_paths: Optional[List[str]] = None,
+    continuity_signing_key: Optional[str] = None,
+    continuity_identity: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     observations = []
     witnesses = _runtime_witnesses(witness_paths)
@@ -457,6 +487,8 @@ def _runtime_observations(
             runtime_url,
             hostname,
             witnesses.get(normalized),
+            continuity_signing_key,
+            continuity_identity,
         )
         if observation is not None:
             observations.append(observation)
@@ -473,6 +505,8 @@ def build_report(
     lm_url: str,
     runtime_urls: Optional[List[str]] = None,
     runtime_witnesses: Optional[List[str]] = None,
+    runtime_continuity_signing_key: Optional[str] = None,
+    runtime_continuity_identity: Optional[str] = None,
 ) -> Dict[str, Any]:
     specs = _specs()
     hostname = socket.gethostname()
@@ -486,6 +520,8 @@ def build_report(
             hostname,
             runtime_urls,
             runtime_witnesses,
+            runtime_continuity_signing_key,
+            runtime_continuity_identity,
         ),
         "specs": specs,
     }
@@ -532,13 +568,31 @@ def main(argv: Optional[List[str]] = None) -> int:
             "FLEET_RUNTIME_WITNESSES may also provide comma-separated paths."
         ),
     )
+    parser.add_argument(
+        "--runtime-continuity-signing-key",
+        default=os.getenv("FLEET_RUNTIME_CONTINUITY_SIGNING_KEY", ""),
+        help=(
+            "Node-local private OpenSSH key used only to attest fresh runtime "
+            "continuity. May also be set with FLEET_RUNTIME_CONTINUITY_SIGNING_KEY."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-continuity-identity",
+        default=os.getenv("FLEET_RUNTIME_CONTINUITY_IDENTITY", ""),
+        help=(
+            "Allowed-signers principal for node continuity attestation. Defaults "
+            "to the witness node_id when omitted."
+        ),
+    )
     parser.add_argument("--interval", type=float, default=30.0)
     args = parser.parse_args(argv)
 
     print(
         f"reporter: router={args.router_url} lmstudio={args.lmstudio_url} "
         f"extra_runtimes={len(args.runtime_url)} "
-        f"runtime_witnesses={len(args.runtime_witness)} interval={args.interval}s",
+        f"runtime_witnesses={len(args.runtime_witness)} "
+        f"continuity_attestation={bool(args.runtime_continuity_signing_key)} "
+        f"interval={args.interval}s",
         flush=True,
     )
     while True:
@@ -546,6 +600,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             args.lmstudio_url,
             args.runtime_url,
             args.runtime_witness,
+            args.runtime_continuity_signing_key or None,
+            args.runtime_continuity_identity or None,
         )
         ok = post_report(args.router_url, report)
         print(
