@@ -196,6 +196,15 @@ def test_runtime_observation_attaches_signed_witness_evidence(monkeypatch):
             "executable_basename": "server",
         },
     )
+    monkeypatch.setattr(
+        reporter._runtime_witness,
+        "build_continuity_attestation",
+        lambda _witness, **_kwargs: (
+            {"schema_version": "fleet-runtime-continuity-attestation.v1"},
+            b'{"schema_version":"fleet-runtime-continuity-attestation.v1"}\n',
+            b"-----BEGIN SSH SIGNATURE-----\ncontinuity\n-----END SSH SIGNATURE-----\n",
+        ),
+    )
     witness = {
         "schema_version": "fleet-runtime-identity-witness.v1",
         "runtime_url": "http://localhost:1235",
@@ -216,10 +225,17 @@ def test_runtime_observation_attaches_signed_witness_evidence(monkeypatch):
             "payload": payload,
             "signature": "-----BEGIN SSH SIGNATURE-----\nabc\n-----END SSH SIGNATURE-----\n",
         },
+        "/tmp/node-continuity-key",
+        "destroyer",
     )
 
     assert observation is not None
     assert observation["runtime_identity_witness_json"] == payload
     assert "BEGIN SSH SIGNATURE" in observation["runtime_identity_witness_signature"]
     assert observation["runtime_identity_continuity"]["valid"] is True
+    assert (
+        observation["runtime_identity_continuity_json"]
+        == '{"schema_version":"fleet-runtime-continuity-attestation.v1"}\n'
+    )
+    assert "continuity" in observation["runtime_identity_continuity_signature"]
     assert observation["admitted"] is False
