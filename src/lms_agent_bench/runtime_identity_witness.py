@@ -4,9 +4,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import platform
+import re
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, Optional, Sequence
 from urllib.parse import urlparse, urlunparse
@@ -49,14 +52,59 @@ def _canonical_bytes(payload: Mapping[str, Any]) -> bytes:
     ).encode("utf-8")
 
 
+def _platform_name() -> str:
+    return platform.system().strip().lower()
+
+
+def _run_text(args: Sequence[str], label: str, *, timeout: int = 15) -> str:
+    process = subprocess.run(
+        list(args),
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        check=False,
+    )
+    if process.returncode != 0:
+        detail = process.stderr.strip() or process.stdout.strip()
+        raise ValueError(f"{label} failed: {detail}" if detail else f"{label} failed")
+    return process.stdout
+
+
 def _boot_id() -> str:
-    value = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+    if _platform_name() == "darwin":
+        output = _run_text(
+            ["/usr/sbin/sysctl", "-n", "kern.boottime"],
+            "Darwin boot identity query",
+        )
+        match = re.search(r"sec\s*=\s*(\d+)\s*,\s*usec\s*=\s*(\d+)", output)
+        if not match:
+            raise ValueError("unable to parse Darwin boot identity")
+        return f"darwin-boottime:{match.group(1)}.{match.group(2).zfill(6)}"
+
+    value = Path("/proc/sys/kernel/random/boot_id").read_text(
+        encoding="utf-8"
+    ).strip()
     if not value:
         raise ValueError("boot identity is unavailable")
     return value
 
 
 def _process_start_ticks(pid: int) -> int:
+    if _platform_name() == "darwin":
+        output = _run_text(
+            ["/bin/ps", "-p", str(pid), "-o", "lstart="],
+            f"Darwin process start query for pid {pid}",
+        ).strip()
+        if not output:
+            raise ValueError(f"unable to observe process start time for pid {pid}")
+        try:
+            started = datetime.strptime(output, "%a %b %d %H:%M:%S %Y")
+        except ValueError as exc:
+            raise ValueError(
+                f"unable to parse process start time for pid {pid}"
+            ) from exc
+        return int(time.mktime(started.timetuple()))
+
     stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
     try:
         tail = stat.rsplit(")", 1)[1].strip().split()
@@ -94,7 +142,59 @@ def _stable_file_sha256(path: Path, label: str) -> tuple[str, dict[str, int]]:
     return digest, after
 
 
+def _darwin_lsof_records(pid: int, *, descriptors: str | None = None) -> list[dict[str, str]]:
+    args = ["/usr/sbin/lsof", "-nP", "-a", "-p", str(pid)]
+    if descriptors:
+        args.extend(["-d", descriptors])
+    args.extend(["-F", "fDin"])
+    output = _run_text(args, f"Darwin lsof query for pid {pid}")
+    records: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for raw in output.splitlines():
+        if not raw:
+            continue
+        field = raw[0]
+        value = raw[1:]
+        if field == "f":
+            if current is not None:
+                records.append(current)
+            current = {"f": value}
+        elif current is not None and field in {"D", "i", "n"}:
+            current[field] = value
+    if current is not None:
+        records.append(current)
+    return records
+
+
+def _darwin_record_matches_identity(
+    record: Mapping[str, str],
+    file_identity: Mapping[str, Any],
+) -> bool:
+    try:
+        expected_device = int(file_identity.get("device"))
+        expected_inode = int(file_identity.get("inode"))
+        observed_inode = int(record.get("i") or 0)
+        device_text = str(record.get("D") or "")
+        observed_device = int(device_text, 16) if device_text.startswith("0x") else int(device_text)
+    except (TypeError, ValueError):
+        return False
+    return observed_device == expected_device and observed_inode == expected_inode
+
+
 def _process_executable_path(pid: int) -> Path:
+    if _platform_name() == "darwin":
+        for record in _darwin_lsof_records(pid, descriptors="txt"):
+            raw_path = str(record.get("n") or "")
+            if not raw_path.startswith("/"):
+                continue
+            candidate = Path(raw_path)
+            try:
+                if candidate.is_file():
+                    return candidate
+            except OSError:
+                continue
+        raise ValueError(f"unable to resolve executable text file for pid {pid}")
+
     path = Path(f"/proc/{pid}/exe")
     try:
         path.stat()
@@ -104,6 +204,9 @@ def _process_executable_path(pid: int) -> Path:
 
 
 def _process_executable_basename(pid: int) -> str:
+    if _platform_name() == "darwin":
+        return _process_executable_path(pid).name
+
     try:
         target = os.readlink(f"/proc/{pid}/exe")
     except OSError as exc:
@@ -115,9 +218,24 @@ def _process_executable_basename(pid: int) -> str:
     return name
 
 
+def _darwin_vmmap_contains_path(pid: int, path: Path) -> bool:
+    try:
+        output = _run_text(
+            ["/usr/bin/vmmap", "-w", str(pid)],
+            f"Darwin vmmap query for pid {pid}",
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return False
+    target = str(path)
+    resolved = str(path.resolve())
+    return target in output or resolved in output
+
+
 def _mapped_file_binding(
     pid: int,
     file_identity: Mapping[str, Any],
+    file_path: Path | None = None,
 ) -> bool:
     try:
         expected_dev = int(file_identity.get("device"))
@@ -126,6 +244,15 @@ def _mapped_file_binding(
         return False
     if expected_inode <= 0:
         return False
+
+    if _platform_name() == "darwin":
+        if file_path is None or not _darwin_vmmap_contains_path(pid, file_path):
+            return False
+        return any(
+            _darwin_record_matches_identity(record, file_identity)
+            for record in _darwin_lsof_records(pid)
+        )
+
     expected_major = os.major(expected_dev)
     expected_minor = os.minor(expected_dev)
     try:
@@ -157,23 +284,42 @@ def _mapped_file_binding(
     return False
 
 
+def _process_command_line(pid: int) -> str:
+    if _platform_name() == "darwin":
+        try:
+            return _run_text(
+                ["/bin/ps", "-p", str(pid), "-o", "command="],
+                f"Darwin command-line query for pid {pid}",
+            ).strip()
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return ""
+    try:
+        return (
+            Path(f"/proc/{pid}/cmdline")
+            .read_bytes()
+            .replace(b"\x00", b" ")
+            .decode("utf-8", errors="replace")
+        )
+    except OSError:
+        return ""
+
+
 def _process_references_model(
     pid: int,
     model_path: Path,
     model_identity: Mapping[str, Any],
 ) -> str:
-    # Strong evidence is device+inode continuity with a file mapped by the
-    # process. Matching a pathname alone is insufficient because the path may
-    # have been atomically replaced after the process mapped the old inode.
-    if _mapped_file_binding(pid, model_identity):
-        return "proc_maps"
-
-    try:
-        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\x00", b" ").decode(
-            "utf-8", errors="replace"
+    # Strong evidence requires stable device+inode identity plus a kernel/OS
+    # virtual-memory view. Path-only evidence is diagnostic because a pathname
+    # can be replaced while an older inode remains mapped.
+    if _mapped_file_binding(pid, model_identity, model_path):
+        return (
+            "darwin_vmmap_lsof"
+            if _platform_name() == "darwin"
+            else "proc_maps"
         )
-    except OSError:
-        cmdline = ""
+
+    cmdline = _process_command_line(pid)
     if str(model_path) in cmdline:
         return "cmdline"
     raise ValueError(
@@ -200,10 +346,17 @@ def process_identity(pid: int) -> dict[str, Any]:
         executable,
         "process executable",
     )
+    platform_name = _platform_name()
     return {
         "pid": pid,
+        "platform": platform_name,
         "boot_id": _boot_id(),
         "process_start_ticks": _process_start_ticks(pid),
+        "process_start_source": (
+            "darwin_ps_lstart_epoch_seconds"
+            if platform_name == "darwin"
+            else "linux_proc_start_ticks"
+        ),
         "executable_sha256": executable_sha256,
         "executable_basename": _process_executable_basename(pid),
         "executable_file_identity": executable_file_identity,
