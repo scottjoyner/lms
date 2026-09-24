@@ -452,9 +452,7 @@ def _runtime_observation(
                     _attestation, continuity_payload, continuity_signature = (
                         _runtime_witness.build_continuity_attestation(
                             witness,
-                            runtime_observation_id=observation[
-                                "runtime_observation_id"
-                            ],
+                            runtime_observation=observation,
                             signing_key=Path(continuity_signing_key),
                             signer_identity=signer_identity,
                         )
