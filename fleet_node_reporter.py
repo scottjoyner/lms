@@ -28,7 +28,16 @@ from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
-from lms_agent_bench import runtime_identity_witness as _runtime_witness
+try:
+    from lms_agent_bench import runtime_identity_witness as _runtime_witness
+except ModuleNotFoundError:
+    # Preserve the historical direct-from-clone invocation:
+    #   python3 fleet_node_reporter.py ...
+    # without requiring an editable/package install first.
+    _src = Path(__file__).resolve().parent / "src"
+    if str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
+    from lms_agent_bench import runtime_identity_witness as _runtime_witness
 
 
 LM_PORT = 1234
