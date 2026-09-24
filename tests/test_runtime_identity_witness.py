@@ -131,7 +131,14 @@ def test_signed_witness_round_trip(tmp_path):
         "model_content_sha256": "sha256:" + "2" * 64,
         "model_size_bytes": 123,
         "model_path": "/models/k2.gguf",
-        "model_process_binding": "cmdline",
+        "model_process_binding": "proc_maps",
+        "model_file_identity": {
+            "device": 1,
+            "inode": 2,
+            "size_bytes": 123,
+            "mtime_ns": 456,
+            "ctime_ns": 457,
+        },
         "process": {
             "pid": 42,
             "boot_id": "boot",
@@ -183,6 +190,7 @@ def test_live_process_continuity_uses_process_and_model_file_identity(
             "inode": int(stat.st_ino),
             "size_bytes": int(stat.st_size),
             "mtime_ns": int(stat.st_mtime_ns),
+            "ctime_ns": int(stat.st_ctime_ns),
         },
     }
     monkeypatch.setattr(
