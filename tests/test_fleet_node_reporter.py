@@ -72,6 +72,8 @@ def test_runtime_observations_cover_native_and_openai_compatible(monkeypatch):
     assert bonsai["models"] == ["ternary-bonsai-2"]
 
     assert all(item["admitted"] is False for item in observations)
+    assert all(item["ready"] is True for item in observations)
+    assert all(item["observed_model_count"] == 1 for item in observations)
     assert all(
         item["runtime_observation_id"].startswith("runtime-observation:")
         for item in observations
@@ -147,3 +149,25 @@ def test_build_report_keeps_legacy_fields_and_adds_non_admitting_runtime_evidenc
     assert report["loaded"] == ["legacy-loaded-model"]
     assert report["runtimes"][0]["models"] == ["k2-36b"]
     assert report["runtimes"][0]["admitted"] is False
+
+
+def test_empty_model_list_is_visible_but_not_ready(monkeypatch):
+    def fake_get(url: str, timeout: float = 5.0):
+        if url == "http://localhost:1235/api/v1/models":
+            return None
+        if url == "http://localhost:1235/v1/models":
+            return {"data": []}
+        return None
+
+    monkeypatch.setattr(reporter, "_http_get_json", fake_get)
+
+    observation = reporter._runtime_observation(
+        "http://localhost:1235",
+        "destroyer",
+    )
+
+    assert observation is not None
+    assert observation["models"] == []
+    assert observation["observed_model_count"] == 0
+    assert observation["ready"] is False
+    assert observation["admitted"] is False
