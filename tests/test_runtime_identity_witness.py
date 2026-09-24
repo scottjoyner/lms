@@ -12,9 +12,14 @@ from lms_agent_bench import runtime_identity_witness as witness
 from lms_agent_bench.model_loadout import validate_manifest
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def _example_loadout(model_path: Path) -> dict:
     payload = json.loads(
-        Path("examples/model-loadouts.v1.example.json").read_text(encoding="utf-8")
+        (ROOT / "examples/model-loadouts.v1.example.json").read_text(
+            encoding="utf-8"
+        )
     )
     raw = payload["base_manifests"][0]
     raw["node_id"] = "destroyer"
