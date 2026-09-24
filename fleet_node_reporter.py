@@ -27,6 +27,8 @@ from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 
+from lms_agent_bench import runtime_identity_witness as _runtime_witness
+
 
 LM_PORT = 1234
 
@@ -302,6 +304,59 @@ def _configured_runtime_urls(
     return out
 
 
+
+def _configured_runtime_witness_paths(
+    extra_paths: Optional[List[str]] = None,
+) -> List[str]:
+    candidates = list(extra_paths or [])
+    candidates.extend(
+        item.strip()
+        for item in os.getenv("FLEET_RUNTIME_WITNESSES", "").split(",")
+        if item.strip()
+    )
+    out: List[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        resolved = str(Path(candidate).expanduser().resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            out.append(resolved)
+    return out
+
+
+def _runtime_witnesses(
+    extra_paths: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for raw_path in _configured_runtime_witness_paths(extra_paths):
+        path = Path(raw_path)
+        signature_path = Path(str(path) + ".sig")
+        try:
+            payload = path.read_bytes()
+            if len(payload) > 16 * 1024:
+                continue
+            witness = json.loads(payload.decode("utf-8"))
+            if not isinstance(witness, dict):
+                continue
+            if witness.get("schema_version") != _runtime_witness.SCHEMA_VERSION:
+                continue
+            if _runtime_witness._canonical_bytes(witness) != payload:  # noqa: SLF001
+                continue
+            signature = signature_path.read_text(encoding="utf-8")
+            if len(signature) > 8 * 1024 or "BEGIN SSH SIGNATURE" not in signature:
+                continue
+            runtime_url = _normalize_runtime_url(str(witness.get("runtime_url") or ""))
+            if not runtime_url or runtime_url in out:
+                continue
+            out[runtime_url] = {
+                "witness": witness,
+                "payload": payload.decode("utf-8"),
+                "signature": signature,
+            }
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            continue
+    return out
+
 def _openai_models(runtime_url: str) -> Optional[List[str]]:
     data = _http_get_json(f"{runtime_url.rstrip('/')}/v1/models")
     if not isinstance(data, dict):
@@ -318,7 +373,11 @@ def _openai_models(runtime_url: str) -> Optional[List[str]]:
     )
 
 
-def _runtime_observation(runtime_url: str, hostname: str) -> Optional[Dict[str, Any]]:
+def _runtime_observation(
+    runtime_url: str,
+    hostname: str,
+    witness_record: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
     """Observe one serving process without granting it admission authority.
 
     This intentionally separates *discovery* from the approved AssistX runtime
@@ -346,7 +405,7 @@ def _runtime_observation(runtime_url: str, hostname: str) -> Optional[Dict[str, 
 
     seed = f"{hostname}|{normalized}|{runtime_kind}"
     observation_id = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
-    return {
+    observation = {
         "observation_schema": "fleet-runtime-observation.v1",
         "runtime_observation_id": f"runtime-observation:{observation_id}",
         "runtime_kind": runtime_kind,
@@ -363,16 +422,32 @@ def _runtime_observation(runtime_url: str, hostname: str) -> Optional[Dict[str, 
         # admitted RuntimeInstance by implication.
         "admitted": False,
     }
+    if witness_record is not None:
+        witness = witness_record.get("witness")
+        if isinstance(witness, dict):
+            observation["runtime_identity_witness_json"] = witness_record.get("payload")
+            observation["runtime_identity_witness_signature"] = witness_record.get("signature")
+            observation["runtime_identity_continuity"] = (
+                _runtime_witness.observe_process_continuity(witness)
+            )
+    return observation
 
 
 def _runtime_observations(
     lm_url: str,
     hostname: str,
     extra_urls: Optional[List[str]] = None,
+    witness_paths: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     observations = []
+    witnesses = _runtime_witnesses(witness_paths)
     for runtime_url in _configured_runtime_urls(lm_url, extra_urls):
-        observation = _runtime_observation(runtime_url, hostname)
+        normalized = _normalize_runtime_url(runtime_url)
+        observation = _runtime_observation(
+            runtime_url,
+            hostname,
+            witnesses.get(normalized),
+        )
         if observation is not None:
             observations.append(observation)
     return sorted(
@@ -387,6 +462,7 @@ def _runtime_observations(
 def build_report(
     lm_url: str,
     runtime_urls: Optional[List[str]] = None,
+    runtime_witnesses: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     specs = _specs()
     hostname = socket.gethostname()
@@ -399,6 +475,7 @@ def build_report(
             lm_url,
             hostname,
             runtime_urls,
+            runtime_witnesses,
         ),
         "specs": specs,
     }
@@ -435,16 +512,31 @@ def main(argv: Optional[List[str]] = None) -> int:
             "runtimes. FLEET_RUNTIME_URLS may also provide a comma-separated list."
         ),
     )
+    parser.add_argument(
+        "--runtime-witness",
+        action="append",
+        default=[],
+        help=(
+            "Canonical signed runtime-identity witness JSON. Repeat per runtime; "
+            "the detached OpenSSH signature must be beside it as <path>.sig. "
+            "FLEET_RUNTIME_WITNESSES may also provide comma-separated paths."
+        ),
+    )
     parser.add_argument("--interval", type=float, default=30.0)
     args = parser.parse_args(argv)
 
     print(
         f"reporter: router={args.router_url} lmstudio={args.lmstudio_url} "
-        f"extra_runtimes={len(args.runtime_url)} interval={args.interval}s",
+        f"extra_runtimes={len(args.runtime_url)} "
+        f"runtime_witnesses={len(args.runtime_witness)} interval={args.interval}s",
         flush=True,
     )
     while True:
-        report = build_report(args.lmstudio_url, args.runtime_url)
+        report = build_report(
+            args.lmstudio_url,
+            args.runtime_url,
+            args.runtime_witness,
+        )
         ok = post_report(args.router_url, report)
         print(
             f"report {report['hostname']}: library={len(report['library'])} "
