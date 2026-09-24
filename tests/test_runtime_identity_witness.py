@@ -97,6 +97,7 @@ def test_build_witness_binds_canary_model_hash_and_process(monkeypatch, tmp_path
         provider_model="k2-36b",
         model_path=model_path,
         signing_key=key,
+        witness_identity="runtime-witness-operator",
     )
 
     assert built["runtime_url"] == "http://localhost:1235"
@@ -108,6 +109,8 @@ def test_build_witness_binds_canary_model_hash_and_process(monkeypatch, tmp_path
     assert built["model_file_identity"]["size_bytes"] == model_path.stat().st_size
     assert built["process"]["process_start_ticks"] == 12345
     assert built["canary"]["rollback_succeeded"] is True
+    assert built["witness_signer_identity"] == "runtime-witness-operator"
+    assert built["witness_signature_namespace"] == witness.DEFAULT_NAMESPACE
     assert built["admission"]["admitted"] is False
     assert payload == witness._canonical_bytes(built)
 
@@ -170,6 +173,8 @@ def test_signed_witness_round_trip(tmp_path):
             "signing_key_fingerprint": "SHA256:canary",
             "rollback_succeeded": True,
         },
+        "witness_signer_identity": "runtime-witness-operator",
+        "witness_signature_namespace": witness.DEFAULT_NAMESPACE,
         "witness_signing_key_fingerprint": "SHA256:witness",
         "admission": {"admitted": False},
         "created_at_unix": 100,
