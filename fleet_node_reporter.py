@@ -353,7 +353,11 @@ def _runtime_observation(runtime_url: str, hostname: str) -> Optional[Dict[str, 
         "protocol": protocol,
         "base_url": normalized,
         "models": models,
-        "ready": True,
+        # A parseable /models response with no loaded/served models is not a
+        # ready serving runtime. Keep this evidence conservative: readiness is
+        # observational only and never grants admission.
+        "ready": bool(models),
+        "observed_model_count": len(models),
         "observed_at": int(time.time()),
         # Observation is evidence only. Never allow the reporter to mint an
         # admitted RuntimeInstance by implication.
