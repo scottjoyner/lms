@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -62,29 +63,107 @@ def _process_start_ticks(pid: int) -> int:
         raise ValueError(f"unable to parse process start time for pid {pid}") from exc
 
 
-def _process_executable(pid: int) -> Path:
+def _stat_identity(stat: os.stat_result) -> dict[str, int]:
+    return {
+        "device": int(stat.st_dev),
+        "inode": int(stat.st_ino),
+        "size_bytes": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+        "ctime_ns": int(stat.st_ctime_ns),
+    }
+
+
+def _same_file_identity(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
+    try:
+        return all(
+            int(left.get(key)) == int(right.get(key))
+            for key in ("device", "inode", "size_bytes", "mtime_ns", "ctime_ns")
+        )
+    except (TypeError, ValueError):
+        return False
+
+
+def _stable_file_sha256(path: Path, label: str) -> tuple[str, dict[str, int]]:
+    before = _stat_identity(path.stat())
+    digest = _ssh.file_sha256(path)
+    after = _stat_identity(path.stat())
+    if not _same_file_identity(before, after):
+        raise ValueError(f"{label} changed while it was being hashed")
+    return digest, after
+
+
+def _process_executable_path(pid: int) -> Path:
     path = Path(f"/proc/{pid}/exe")
     try:
-        resolved = path.resolve(strict=True)
+        path.stat()
+    except OSError as exc:
+        raise ValueError(f"unable to inspect executable for pid {pid}") from exc
+    return path
+
+
+def _process_executable_basename(pid: int) -> str:
+    try:
+        target = os.readlink(f"/proc/{pid}/exe")
     except OSError as exc:
         raise ValueError(f"unable to resolve executable for pid {pid}") from exc
-    if not resolved.is_file():
-        raise ValueError(f"process executable is not a regular file: {resolved}")
-    return resolved
+    target = target.removesuffix(" (deleted)")
+    name = Path(target).name
+    if not name:
+        raise ValueError(f"unable to determine executable basename for pid {pid}")
+    return name
 
 
-def _process_references_model(pid: int, model_path: Path) -> str:
-    target = str(model_path)
-
-    # A mapped file is the strongest cheap continuity signal available without
-    # repeatedly hashing multi-GB weights. Prefer it over a launch argument,
-    # because a process capable of hot reload may retain an old model path in
-    # argv while serving different bytes.
+def _mapped_file_binding(
+    pid: int,
+    file_identity: Mapping[str, Any],
+) -> bool:
     try:
-        maps = Path(f"/proc/{pid}/maps").read_text(encoding="utf-8", errors="replace")
+        expected_dev = int(file_identity.get("device"))
+        expected_inode = int(file_identity.get("inode"))
+    except (TypeError, ValueError):
+        return False
+    if expected_inode <= 0:
+        return False
+    expected_major = os.major(expected_dev)
+    expected_minor = os.minor(expected_dev)
+    try:
+        lines = Path(f"/proc/{pid}/maps").read_text(
+            encoding="utf-8",
+            errors="replace",
+        ).splitlines()
     except OSError:
-        maps = ""
-    if target in maps:
+        return False
+    for line in lines:
+        fields = line.split(maxsplit=5)
+        if len(fields) < 5:
+            continue
+        device = fields[3]
+        inode = fields[4]
+        try:
+            major_text, minor_text = device.split(":", 1)
+            major = int(major_text, 16)
+            minor = int(minor_text, 16)
+            mapped_inode = int(inode)
+        except (ValueError, TypeError):
+            continue
+        if (
+            major == expected_major
+            and minor == expected_minor
+            and mapped_inode == expected_inode
+        ):
+            return True
+    return False
+
+
+def _process_references_model(
+    pid: int,
+    model_path: Path,
+    model_identity: Mapping[str, Any],
+) -> str:
+    # Strong evidence is device+inode continuity with a file mapped by the
+    # process. Matching a pathname alone is insufficient because the path may
+    # have been atomically replaced after the process mapped the old inode.
+    if _mapped_file_binding(pid, model_identity):
         return "proc_maps"
 
     try:
@@ -93,10 +172,11 @@ def _process_references_model(pid: int, model_path: Path) -> str:
         )
     except OSError:
         cmdline = ""
-    if target in cmdline:
+    if str(model_path) in cmdline:
         return "cmdline"
     raise ValueError(
-        "model path is not bound to the selected process through /proc maps or cmdline"
+        "model file identity is not mapped by the selected process and its path "
+        "is absent from cmdline"
     )
 
 
@@ -113,13 +193,18 @@ def _regular_model(path: Path) -> Path:
 def process_identity(pid: int) -> dict[str, Any]:
     if pid <= 0:
         raise ValueError("pid must be positive")
-    executable = _process_executable(pid)
+    executable = _process_executable_path(pid)
+    executable_sha256, executable_file_identity = _stable_file_sha256(
+        executable,
+        "process executable",
+    )
     return {
         "pid": pid,
         "boot_id": _boot_id(),
         "process_start_ticks": _process_start_ticks(pid),
-        "executable_sha256": _ssh.file_sha256(executable),
-        "executable_basename": executable.name,
+        "executable_sha256": executable_sha256,
+        "executable_basename": _process_executable_basename(pid),
+        "executable_file_identity": executable_file_identity,
     }
 
 
@@ -148,12 +233,15 @@ def build_witness(
         raise ValueError("runtime canary belongs to a different exact loadout")
 
     model = _regular_model(model_path)
-    actual_model_sha = _ssh.file_sha256(model)
+    actual_model_sha, model_file_identity = _stable_file_sha256(
+        model,
+        "live model file",
+    )
     if actual_model_sha != loadout["model"]["content_sha256"]:
         raise ValueError("live model file does not match loadout model.content_sha256")
 
     process = process_identity(pid)
-    binding_method = _process_references_model(pid, model)
+    binding_method = _process_references_model(pid, model, model_file_identity)
     normalized_url = _normalize_runtime_url(runtime_url)
     runtime_kind = str(runtime_kind or "").strip().lower()
     provider_model = str(provider_model or "").strip()
@@ -161,7 +249,6 @@ def build_witness(
         raise ValueError("runtime kind and provider model are required")
 
     signing_key_path = _ssh._require_regular(signing_key, "witness signing key", private=True)  # noqa: SLF001
-    model_stat = model.stat()
     core = {
         "schema_version": SCHEMA_VERSION,
         "node_id": str(loadout["node_id"]),
@@ -171,16 +258,10 @@ def build_witness(
         "loadout_fingerprint": loadout["loadout_fingerprint"],
         "model_id": str(loadout["model"]["id"]),
         "model_content_sha256": loadout["model"]["content_sha256"],
-        "model_size_bytes": int(model_stat.st_size),
+        "model_size_bytes": int(model_file_identity["size_bytes"]),
         "model_path": str(model),
         "model_process_binding": binding_method,
-        "model_file_identity": {
-            "device": int(model_stat.st_dev),
-            "inode": int(model_stat.st_ino),
-            "size_bytes": int(model_stat.st_size),
-            "mtime_ns": int(model_stat.st_mtime_ns),
-            "ctime_ns": int(model_stat.st_ctime_ns),
-        },
+        "model_file_identity": model_file_identity,
         "process": process,
         "canary": {
             "run_id": canary.get("run_id"),
@@ -297,43 +378,63 @@ def verify_witness_bytes(
 def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
     process = witness.get("process")
     if not isinstance(process, Mapping):
-        return {"valid": False, "reason": "witness_process_missing", "checked_at": int(time.time())}
+        return {
+            "valid": False,
+            "reason": "witness_process_missing",
+            "checked_at": int(time.time()),
+        }
     try:
         pid = int(process.get("pid") or 0)
         current_boot_id = _boot_id()
         current_start_ticks = _process_start_ticks(pid)
-        current_executable = _process_executable(pid).name
-    except (OSError, ValueError):
-        return {"valid": False, "reason": "process_not_observable", "checked_at": int(time.time())}
+        current_executable_basename = _process_executable_basename(pid)
+        current_executable_identity = _stat_identity(
+            _process_executable_path(pid).stat()
+        )
+    except (OSError, TypeError, ValueError):
+        return {
+            "valid": False,
+            "reason": "process_not_observable",
+            "checked_at": int(time.time()),
+        }
 
+    expected_executable_identity = process.get("executable_file_identity")
     process_valid = (
         pid > 0
         and current_boot_id == str(process.get("boot_id") or "")
         and current_start_ticks == int(process.get("process_start_ticks") or 0)
-        and current_executable == str(process.get("executable_basename") or "")
+        and current_executable_basename
+        == str(process.get("executable_basename") or "")
+        and isinstance(expected_executable_identity, Mapping)
+        and _same_file_identity(
+            expected_executable_identity,
+            current_executable_identity,
+        )
     )
 
     model_identity = witness.get("model_file_identity")
     model_path = Path(str(witness.get("model_path") or ""))
-    model_binding_valid = False
+    model_binding: str | None = None
     model_file_valid = False
     try:
         if isinstance(model_identity, Mapping):
             current_model = _regular_model(model_path)
-            stat = current_model.stat()
-            model_file_valid = (
-                int(stat.st_dev) == int(model_identity.get("device"))
-                and int(stat.st_ino) == int(model_identity.get("inode"))
-                and int(stat.st_size) == int(model_identity.get("size_bytes"))
-                and int(stat.st_mtime_ns) == int(model_identity.get("mtime_ns"))
-                and int(stat.st_ctime_ns) == int(model_identity.get("ctime_ns"))
+            current_model_identity = _stat_identity(current_model.stat())
+            model_file_valid = _same_file_identity(
+                model_identity,
+                current_model_identity,
             )
-            _process_references_model(pid, current_model)
-            model_binding_valid = True
+            if model_file_valid:
+                model_binding = _process_references_model(
+                    pid,
+                    current_model,
+                    current_model_identity,
+                )
     except (OSError, TypeError, ValueError):
         model_file_valid = False
-        model_binding_valid = False
+        model_binding = None
 
+    model_binding_valid = model_binding is not None
     valid = process_valid and model_file_valid and model_binding_valid
     if valid:
         reason = "match"
@@ -350,14 +451,17 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
         "pid": pid,
         "boot_id": current_boot_id,
         "process_start_ticks": current_start_ticks,
-        "executable_basename": current_executable,
+        "executable_basename": current_executable_basename,
+        "executable_file_valid": (
+            isinstance(expected_executable_identity, Mapping)
+            and _same_file_identity(
+                expected_executable_identity,
+                current_executable_identity,
+            )
+        ),
         "model_file_valid": model_file_valid,
         "model_process_binding_valid": model_binding_valid,
-        "model_process_binding": (
-            _process_references_model(pid, _regular_model(model_path))
-            if valid
-            else None
-        ),
+        "model_process_binding": model_binding,
     }
 
 
