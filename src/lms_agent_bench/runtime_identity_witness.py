@@ -491,7 +491,7 @@ def observe_process_continuity(witness: Mapping[str, Any]) -> dict[str, Any]:
 def build_continuity_attestation(
     witness: Mapping[str, Any],
     *,
-    runtime_observation_id: str,
+    runtime_observation: Mapping[str, Any],
     signing_key: Path,
     signer_identity: str,
     namespace: str = CONTINUITY_NAMESPACE,
@@ -501,9 +501,42 @@ def build_continuity_attestation(
     witness_fingerprint = str(witness.get("witness_fingerprint") or "")
     if not witness_fingerprint.startswith("sha256:"):
         raise ValueError("runtime witness fingerprint is missing")
-    observation_id = str(runtime_observation_id or "").strip()
+    observation_id = str(
+        runtime_observation.get("runtime_observation_id") or ""
+    ).strip()
     if not observation_id:
         raise ValueError("runtime observation ID is required")
+    observed_models = sorted(
+        {
+            str(model).strip()
+            for model in (runtime_observation.get("models") or [])
+            if str(model).strip()
+        },
+        key=str.casefold,
+    )
+    try:
+        observed_at = int(runtime_observation.get("observed_at") or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("runtime observation timestamp is invalid") from exc
+    observation_evidence = {
+        "runtime_observation_id": observation_id,
+        "observed_at": observed_at,
+        "runtime_kind": str(runtime_observation.get("runtime_kind") or ""),
+        "protocol": str(runtime_observation.get("protocol") or ""),
+        "base_url": str(runtime_observation.get("base_url") or "").rstrip("/"),
+        "models": observed_models,
+        "ready": bool(runtime_observation.get("ready")) and bool(observed_models),
+        "observed_model_count": len(observed_models),
+    }
+    if not all(
+        (
+            observation_evidence["runtime_kind"],
+            observation_evidence["protocol"],
+            observation_evidence["base_url"],
+            observed_at > 0,
+        )
+    ):
+        raise ValueError("runtime observation evidence is incomplete")
     signer_identity = _ssh._identity(signer_identity)  # noqa: SLF001
     namespace = _ssh._namespace(namespace)  # noqa: SLF001
     if signer_identity != str(witness.get("node_id") or ""):
@@ -519,6 +552,7 @@ def build_continuity_attestation(
         "schema_version": CONTINUITY_SCHEMA_VERSION,
         "node_id": str(witness.get("node_id") or ""),
         "runtime_observation_id": observation_id,
+        "observation": observation_evidence,
         "witness_fingerprint": witness_fingerprint,
         "runtime_url": str(witness.get("runtime_url") or ""),
         "runtime_kind": str(witness.get("runtime_kind") or ""),
