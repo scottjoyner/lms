@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -21,9 +22,22 @@ import socket
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+
+try:
+    from lms_agent_bench import runtime_identity_witness as _runtime_witness
+except ModuleNotFoundError:
+    # Preserve the historical direct-from-clone invocation:
+    #   python3 fleet_node_reporter.py ...
+    # without requiring an editable/package install first.
+    _src = Path(__file__).resolve().parent / "src"
+    if str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
+    from lms_agent_bench import runtime_identity_witness as _runtime_witness
 
 
 LM_PORT = 1234
@@ -255,10 +269,243 @@ def _library(lm_url: str) -> List[Dict[str, Any]]:
     return out
 
 
+def _normalize_runtime_url(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if "://" not in raw:
+        raw = "http://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return ""
+    path = parsed.path.rstrip("/")
+    if path == "/v1":
+        path = ""
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            path,
+            "",
+            "",
+            "",
+        )
+    ).rstrip("/")
+
+
+def _configured_runtime_urls(
+    lm_url: str,
+    extra_urls: Optional[List[str]] = None,
+) -> List[str]:
+    candidates = [lm_url]
+    candidates.extend(extra_urls or [])
+    candidates.extend(
+        item.strip()
+        for item in os.getenv("FLEET_RUNTIME_URLS", "").split(",")
+        if item.strip()
+    )
+    out: List[str] = []
+    seen = set()
+    for candidate in candidates:
+        normalized = _normalize_runtime_url(candidate)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            out.append(normalized)
+    return out
+
+
+
+def _configured_runtime_witness_paths(
+    extra_paths: Optional[List[str]] = None,
+) -> List[str]:
+    candidates = list(extra_paths or [])
+    candidates.extend(
+        item.strip()
+        for item in os.getenv("FLEET_RUNTIME_WITNESSES", "").split(",")
+        if item.strip()
+    )
+    out: List[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        resolved = str(Path(candidate).expanduser().resolve())
+        if resolved not in seen:
+            seen.add(resolved)
+            out.append(resolved)
+    return out
+
+
+def _runtime_witnesses(
+    extra_paths: Optional[List[str]] = None,
+) -> Dict[str, Dict[str, Any]]:
+    out: Dict[str, Dict[str, Any]] = {}
+    for raw_path in _configured_runtime_witness_paths(extra_paths):
+        path = Path(raw_path)
+        signature_path = Path(str(path) + ".sig")
+        try:
+            payload = path.read_bytes()
+            if len(payload) > 16 * 1024:
+                continue
+            witness = json.loads(payload.decode("utf-8"))
+            if not isinstance(witness, dict):
+                continue
+            if witness.get("schema_version") != _runtime_witness.SCHEMA_VERSION:
+                continue
+            if _runtime_witness._canonical_bytes(witness) != payload:  # noqa: SLF001
+                continue
+            signature = signature_path.read_text(encoding="utf-8")
+            if len(signature) > 8 * 1024 or "BEGIN SSH SIGNATURE" not in signature:
+                continue
+            runtime_url = _normalize_runtime_url(str(witness.get("runtime_url") or ""))
+            if not runtime_url or runtime_url in out:
+                continue
+            out[runtime_url] = {
+                "witness": witness,
+                "payload": payload.decode("utf-8"),
+                "signature": signature,
+            }
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+            continue
+    return out
+
+def _openai_models(runtime_url: str) -> Optional[List[str]]:
+    data = _http_get_json(f"{runtime_url.rstrip('/')}/v1/models")
+    if not isinstance(data, dict):
+        return None
+    items = data.get("data")
+    if not isinstance(items, list):
+        return None
+    return sorted(
+        {
+            str(item.get("id")).strip()
+            for item in items
+            if isinstance(item, dict) and str(item.get("id") or "").strip()
+        }
+    )
+
+
+def _runtime_observation(
+    runtime_url: str,
+    hostname: str,
+    witness_record: Optional[Dict[str, Any]] = None,
+    continuity_signing_key: Optional[str] = None,
+    continuity_identity: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """Observe one serving process without granting it admission authority.
+
+    This intentionally separates *discovery* from the approved AssistX runtime
+    projection. A reachable process can become visible immediately, while
+    artifact identity / capacity / access-path evidence still has to pass the
+    existing operator-reviewed admission gates before Auto-Router may use it.
+    """
+
+    normalized = _normalize_runtime_url(runtime_url)
+    if not normalized:
+        return None
+
+    native = _http_get_json(f"{normalized}/api/v1/models")
+    if isinstance(native, dict) and isinstance(native.get("models"), list):
+        runtime_kind = "lmstudio"
+        models = sorted(set(_loaded_models(normalized)))
+        protocol = "lmstudio-native"
+    else:
+        generic_models = _openai_models(normalized)
+        if generic_models is None:
+            return None
+        runtime_kind = "openai_compatible"
+        models = generic_models
+        protocol = "openai-compatible"
+
+    seed = f"{hostname}|{normalized}|{runtime_kind}"
+    observation_id = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:24]
+    observation = {
+        "observation_schema": "fleet-runtime-observation.v1",
+        "runtime_observation_id": f"runtime-observation:{observation_id}",
+        "runtime_kind": runtime_kind,
+        "protocol": protocol,
+        "base_url": normalized,
+        "models": models,
+        # A parseable /models response with no loaded/served models is not a
+        # ready serving runtime. Keep this evidence conservative: readiness is
+        # observational only and never grants admission.
+        "ready": bool(models),
+        "observed_model_count": len(models),
+        "observed_at": int(time.time()),
+        # Observation is evidence only. Never allow the reporter to mint an
+        # admitted RuntimeInstance by implication.
+        "admitted": False,
+    }
+    if witness_record is not None:
+        witness = witness_record.get("witness")
+        if isinstance(witness, dict):
+            observation["runtime_identity_witness_json"] = witness_record.get("payload")
+            observation["runtime_identity_witness_signature"] = witness_record.get("signature")
+            observation["runtime_identity_continuity"] = (
+                _runtime_witness.observe_process_continuity(witness)
+            )
+            if continuity_signing_key:
+                signer_identity = (
+                    str(continuity_identity or "").strip()
+                    or str(witness.get("node_id") or "").strip()
+                    or hostname
+                )
+                try:
+                    _attestation, continuity_payload, continuity_signature = (
+                        _runtime_witness.build_continuity_attestation(
+                            witness,
+                            runtime_observation=observation,
+                            signing_key=Path(continuity_signing_key),
+                            signer_identity=signer_identity,
+                        )
+                    )
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    pass
+                else:
+                    observation["runtime_identity_continuity_json"] = (
+                        continuity_payload.decode("utf-8")
+                    )
+                    observation["runtime_identity_continuity_signature"] = (
+                        continuity_signature.decode("utf-8")
+                    )
+    return observation
+
+
+def _runtime_observations(
+    lm_url: str,
+    hostname: str,
+    extra_urls: Optional[List[str]] = None,
+    witness_paths: Optional[List[str]] = None,
+    continuity_signing_key: Optional[str] = None,
+    continuity_identity: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    observations = []
+    witnesses = _runtime_witnesses(witness_paths)
+    for runtime_url in _configured_runtime_urls(lm_url, extra_urls):
+        normalized = _normalize_runtime_url(runtime_url)
+        observation = _runtime_observation(
+            runtime_url,
+            hostname,
+            witnesses.get(normalized),
+            continuity_signing_key,
+            continuity_identity,
+        )
+        if observation is not None:
+            observations.append(observation)
+    return sorted(
+        observations,
+        key=lambda item: (str(item["runtime_kind"]), str(item["base_url"])),
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Report + loop
 # --------------------------------------------------------------------------- #
-def build_report(lm_url: str) -> Dict[str, Any]:
+def build_report(
+    lm_url: str,
+    runtime_urls: Optional[List[str]] = None,
+    runtime_witnesses: Optional[List[str]] = None,
+    runtime_continuity_signing_key: Optional[str] = None,
+    runtime_continuity_identity: Optional[str] = None,
+) -> Dict[str, Any]:
     specs = _specs()
     hostname = socket.gethostname()
     return {
@@ -266,6 +513,14 @@ def build_report(lm_url: str) -> Dict[str, Any]:
         "host_name": hostname,
         "library": _library(lm_url),
         "loaded": _loaded_models(lm_url),
+        "runtimes": _runtime_observations(
+            lm_url,
+            hostname,
+            runtime_urls,
+            runtime_witnesses,
+            runtime_continuity_signing_key,
+            runtime_continuity_identity,
+        ),
         "specs": specs,
     }
 
@@ -291,20 +546,66 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Fleet node reporter")
     parser.add_argument("--router-url", default="http://100.64.43.123:8088")
     parser.add_argument("--lmstudio-url", default=f"http://localhost:{LM_PORT}")
+    parser.add_argument(
+        "--runtime-url",
+        action="append",
+        default=[],
+        help=(
+            "Additional local inference runtime root URL. Repeat for llama.cpp, "
+            "SGLang, vLLM, secondary LM Studio servers, or other OpenAI-compatible "
+            "runtimes. FLEET_RUNTIME_URLS may also provide a comma-separated list."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-witness",
+        action="append",
+        default=[],
+        help=(
+            "Canonical signed runtime-identity witness JSON. Repeat per runtime; "
+            "the detached OpenSSH signature must be beside it as <path>.sig. "
+            "FLEET_RUNTIME_WITNESSES may also provide comma-separated paths."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-continuity-signing-key",
+        default=os.getenv("FLEET_RUNTIME_CONTINUITY_SIGNING_KEY", ""),
+        help=(
+            "Node-local private OpenSSH key used only to attest fresh runtime "
+            "continuity. May also be set with FLEET_RUNTIME_CONTINUITY_SIGNING_KEY."
+        ),
+    )
+    parser.add_argument(
+        "--runtime-continuity-identity",
+        default=os.getenv("FLEET_RUNTIME_CONTINUITY_IDENTITY", ""),
+        help=(
+            "Allowed-signers principal for node continuity attestation. Defaults "
+            "to the witness node_id when omitted."
+        ),
+    )
     parser.add_argument("--interval", type=float, default=30.0)
     args = parser.parse_args(argv)
 
     print(
         f"reporter: router={args.router_url} lmstudio={args.lmstudio_url} "
+        f"extra_runtimes={len(args.runtime_url)} "
+        f"runtime_witnesses={len(args.runtime_witness)} "
+        f"continuity_attestation={bool(args.runtime_continuity_signing_key)} "
         f"interval={args.interval}s",
         flush=True,
     )
     while True:
-        report = build_report(args.lmstudio_url)
+        report = build_report(
+            args.lmstudio_url,
+            args.runtime_url,
+            args.runtime_witness,
+            args.runtime_continuity_signing_key or None,
+            args.runtime_continuity_identity or None,
+        )
         ok = post_report(args.router_url, report)
         print(
             f"report {report['hostname']}: library={len(report['library'])} "
-            f"loaded={len(report['loaded'])} ram={report['specs'].get('system_ram_gib')} "
+            f"loaded={len(report['loaded'])} runtimes={len(report['runtimes'])} "
+            f"ram={report['specs'].get('system_ram_gib')} "
             f"avail={report['specs'].get('available_ram_gib')} posted={ok}",
             flush=True,
         )
