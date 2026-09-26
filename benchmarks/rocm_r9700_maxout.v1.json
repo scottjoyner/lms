@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "experiment_id": "rocm-r9700-maxout-v1",
+  "goal": "Find the highest-throughput stable llama.cpp ROCm configuration while preserving the largest practical context on a single 32 GiB Radeon-class GPU.",
+  "hard_requirements": {
+    "backend": "ROCm/HIP",
+    "gpu_count": 1,
+    "vram_gib": 32,
+    "flash_attention": true,
+    "gpu_offload": "all-model-layers-when-fit",
+    "raw_results": "jsonl-or-json",
+    "repetitions": 5
+  },
+  "models": [
+    {
+      "id": "ornith-1.0-35b",
+      "path_env": "ORNITH_MODEL",
+      "required": true,
+      "notes": "Use the exact local GGUF selected for the experiment and record SHA256, quantization and embedded context metadata."
+    },
+    {
+      "id": "qwen3.8-27b",
+      "path_env": "QWEN38_MODEL",
+      "required": false,
+      "notes": "Run only after a real upstream-derived artifact exists locally. Never treat placeholder Hugging Face repos as weights."
+    }
+  ],
+  "microbench": {
+    "prompt_tokens": [512, 2048, 8192, 32768],
+    "generation_tokens": [128, 512],
+    "batch_sizes": [512, 1024, 2048],
+    "ubatch_sizes": [256, 512, 1024],
+    "kv_types": ["f16", "q8_0", "q4_0"],
+    "context_depths": [0, 8192, 32768, 65536, 131072],
+    "repetitions": 5
+  },
+  "server_sweeps": {
+    "contexts": [8192, 16384, 32768, 65536, 131072, 262144],
+    "parallel_slots": [1, 2, 4],
+    "batch_sizes": [1024, 2048],
+    "ubatch_sizes": [256, 512, 1024],
+    "kv_pairs": [
+      ["f16", "f16"],
+      ["q8_0", "q8_0"],
+      ["q4_0", "q4_0"]
+    ],
+    "speculative_modes": [
+      "none",
+      "ngram-mod",
+      "draft-simple-if-compatible-draft-is-provided",
+      "draft-mtp-if-model-and-build-advertise-support"
+    ]
+  },
+  "acceptance": {
+    "must_not_oom": true,
+    "must_pass_health_probe": true,
+    "must_finish_three_consecutive_generation_runs": true,
+    "max_generation_tps_cv": 0.05,
+    "selection_order": [
+      "stable",
+      "requested_context_fits",
+      "aggregate_generation_tokens_per_second",
+      "prompt_processing_tokens_per_second",
+      "time_to_first_token",
+      "lower_vram_headroom_cost"
+    ]
+  }
+}

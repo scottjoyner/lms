@@ -1,0 +1,11 @@
+lane	model_id	family	generation	variant	status	model_env	primary_question	minimum_runtime
+native-32g	muse-glimmer-30b-gguf	meta-muse	glimmer	30b	ready-if-artifact-present	MUSE_GLIMMER_30B_MODEL	consumer-hardware agent ceiling and DFlash benefit	llama.cpp b10353+
+native-32g	nemotron-3.5-lightning-30b-a3b	nemotron	3.5	30b-a3b-nvfp4	ready-if-compatible-artifact	NEMOTRON35_LIGHTNING_MODEL	Mamba+MoE hybrid efficiency on ROCm	verify llama.cpp architecture support
+native-32g	nemotron-3.5-lightning-dflash	nemotron	3.5	dflash-drafter	ready-if-compatible-artifact	NEMOTRON35_DFLASH_MODEL	native speculative decode versus MTP/ngram	verify target support
+frontier-moe	minimax-m3-heavy	minimax	3	427b-a23b-heavy-quant	ready-for-quant-research	MINIMAX_M3_MODEL	1M sparse-attention large-MoE quality/placement frontier	verify llama.cpp/GGUF support
+extreme	kimi-k3	kimi	3	2.8t-moe	guarded-research	KIMI_K3_MODEL	compression/pruning feasibility before inference	verify llama.cpp architecture support
+frontier-moe	glm-5.3	glm	5.3	frontier	guarded-until-public-weights	GLM53_MODEL	generation efficiency versus GLM-4.x	weights+license+runtime support required
+control	gpt-oss-120b	gpt-oss	1	120b	ready-if-artifact-present	GPT_OSS_120B_MODEL	architecture-scaled capability/memory control	verify local artifact
+control	gpt-oss-20b	gpt-oss	1	20b	ready-if-artifact-present	GPT_OSS_20B_MODEL	small reference and host-drift sentinel	verify local artifact
+control	current-mistral	mistral	current	verified-local	guarded-local	MISTRAL_CONTROL_MODEL	dense/alternative-architecture control	verified artifact required
+control	current-gemma	gemma	current	verified-local	guarded-local	GEMMA_CONTROL_MODEL	dense/alternative-architecture control	verified artifact required
