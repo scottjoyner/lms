@@ -240,6 +240,7 @@ def build_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
         "sources": state.get("sources"),
         "inputs": state.get("inputs"),
         "qualification_fingerprint": state.get("qualification_fingerprint"),
+        "decision_metrics": state.get("decision_metrics"),
         "artifacts": _artifact_records(root),
         "admission": {"admitted": False},
     }
@@ -295,6 +296,7 @@ def verify_manifest(root: Path, *, require_success: bool = False) -> Dict[str, A
             "loadout_fingerprint"
         ),
         "qualification_fingerprint": report.get("qualification_fingerprint"),
+        "decision_metrics": report.get("decision_metrics"),
         "manifest_fingerprint": report.get("manifest_fingerprint"),
         "artifact_count": len(report.get("artifacts", [])),
         "admission": {"admitted": False},
@@ -574,6 +576,7 @@ def run_qualification(args: argparse.Namespace) -> int:
             raise ValueError("qualification output is not a JSON object")
         verified = verify_qualification(qualification_raw, loadout)
         state["qualification_fingerprint"] = verified["fingerprint"]
+        state["decision_metrics"] = verified.get("decision_metrics")
 
         postflight_probe = endpoint_probe(
             endpoint,
