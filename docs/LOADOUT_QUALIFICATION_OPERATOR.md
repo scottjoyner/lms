@@ -123,6 +123,14 @@ The exact model file is not copied because it can be very large. Its absolute
 path, size, and full SHA-256 are recorded, and its SHA-256 is checked before and
 after the complete run.
 
+For successful runs, the operator also copies the verified qualification's
+`loadout_decision_metrics.v1` summary into both `qualification-state.json`
+and the immutable `qualification-run-manifest.json`. The manifest therefore
+keeps exact LMS/Hermes source provenance, input/model hashes, qualification
+fingerprint, artifact hashes, and the normalized performance/capability summary
+together. Unmeasured PP/device-memory/RSS fields stay null rather than being
+inferred from unrelated timing counters.
+
 ## Reliability rules
 
 - The endpoint must be loopback-local.
