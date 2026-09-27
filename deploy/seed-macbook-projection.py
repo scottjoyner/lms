@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """Seed macbook-air runtime evidence into AssistX projection."""
-import time
+import os, time
 from neo4j import GraphDatabase
 
 NOW = int(time.time() * 1000)
 EXP = NOW + 7 * 24 * 3600 * 1000
 ALIAS = "qwen3.5-0.8b-claude-4.6-opus-reasoning-distilled"
 
-drv = GraphDatabase.driver("bolt://100.64.43.123:7687", auth=("neo4j", "knowledge_graph_2026"))
+# The password is a shared agent credential, deliberately committed. It is read
+# from the environment so a rotation or a per-machine value does not require
+# editing source, with the committed default preserved for unattended runs.
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "knowledge_graph_2026")
+drv = GraphDatabase.driver(
+    "bolt://100.64.43.123:7687", auth=("neo4j", NEO4J_PASSWORD)
+)
 with drv.session(database="assistx") as s:
     s.run("""MERGE (r:RuntimeInstance {runtime_instance_id:'lmstudio-macbook-air'})
       SET r.node_id='scotts-macbook-air', r.runtime_kind='lmstudio',
