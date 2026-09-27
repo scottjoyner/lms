@@ -252,7 +252,13 @@ def test_proc_maps_binding_is_inode_based_not_path_based(tmp_path):
         mapping = mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ)
         try:
             old_identity = witness._stat_identity(model.stat())
-            assert witness._mapped_file_binding(os.getpid(), old_identity) is True
+            # `file_path` is required on darwin: without it the platform branch returns
+            # False before consulting vmmap/lsof, so this test could only ever pass on
+            # Linux. The single production caller passes the model path, so passing it
+            # here matches how the function is actually used.
+            assert (
+                witness._mapped_file_binding(os.getpid(), old_identity, model) is True
+            ), "the freshly mapped file must be reported as bound"
 
             replacement = tmp_path / "replacement.gguf"
             replacement.write_bytes(b"different-model")
@@ -260,8 +266,12 @@ def test_proc_maps_binding_is_inode_based_not_path_based(tmp_path):
             new_identity = witness._stat_identity(model.stat())
 
             assert new_identity["inode"] != old_identity["inode"]
-            assert witness._mapped_file_binding(os.getpid(), old_identity) is True
-            assert witness._mapped_file_binding(os.getpid(), new_identity) is False
+            # The mapping survives the rename, so the *old* inode stays bound while the
+            # *new* one does not. That is the point: binding is tracked by device and
+            # inode, never by path, so swapping the file cannot make a replaced model
+            # look continuous.
+            assert witness._mapped_file_binding(os.getpid(), old_identity, model) is True
+            assert witness._mapped_file_binding(os.getpid(), new_identity, model) is False
         finally:
             mapping.close()
 
