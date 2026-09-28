@@ -34,13 +34,19 @@ notify() {
 }
 
 python3 - "$MIN_SAMPLE" "$FAIL_RATIO_PCT" <<'PY' || notify "$(cat $REPORT)"
-import sys, time
+import os, sys, time
 from neo4j import GraphDatabase
 
 min_sample = int(sys.argv[1]); max_fail_pct = int(sys.argv[2])
 now = int(time.time() * 1000)
 cutoff = now - 15 * 60 * 1000
-drv = GraphDatabase.driver("bolt://100.64.43.123:7687", auth=("neo4j", "knowledge_graph_2026"))
+# The password is a shared agent credential, deliberately committed. It is read
+# from the environment so a rotation or a per-machine value does not require
+# editing source, with the committed default preserved for unattended runs.
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD", "knowledge_graph_2026")
+drv = GraphDatabase.driver(
+    "bolt://100.64.43.123:7687", auth=("neo4j", NEO4J_PASSWORD)
+)
 with drv.session(database="assistx") as s:
     done = s.run("MATCH (t:Task {status:'DONE'}) WHERE t.updated_at_ts > $c RETURN count(t) AS c", c=cutoff).single()["c"]
     failed = s.run("MATCH (t:Task {status:'FAILED'}) WHERE t.updated_at_ts > $c RETURN count(t) AS c", c=cutoff).single()["c"]
