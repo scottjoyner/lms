@@ -36,7 +36,16 @@ systemctl --user enable --now fleet-graph-sync.service
 systemctl --user enable --now fleet-session-sync.timer
 ```
 
-Set `NEO4J_PASSWORD=knowledge_graph_2026` in the unit Environment (already done).
+`NEO4J_PASSWORD` defaults to the committed agent credential, so the scripts run
+unattended with no setup. To use a different value — after a rotation, or on a
+machine that should not rely on the default — export it before running:
+
+```
+export NEO4J_PASSWORD=...
+```
+
+Both `deploy/seed-macbook-projection.py` and `deploy/fleet-gen-health.sh` read it
+from the environment, falling back to the committed default.
 
 ## Common commands
 
