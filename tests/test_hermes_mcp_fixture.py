@@ -110,6 +110,53 @@ def test_bad_queries_fail_closed_without_canned_success(
     assert '"is_error": true' in fixture.calls_path.read_text()
 
 
+# All six adversarial examples below were accepted by the original PR #16
+# regex preflight yet rejected by Neo4j 5.26.26 via EXPLAIN. Source:
+# knowledge/50-Research/model-evaluation/results/
+# beelink-lfm25-hermes-real-cypher-2026-10-13/real_bolt_v16_receipt.json.
+@pytest.mark.parametrize(
+    "query",
+    [
+        OWNER_QUERY.replace("t.name AS owner", "nonexist AS owner"),
+        OWNER_QUERY + " nonsense",
+        OWNER_QUERY.replace("RETURN", "WHERE ALSO RETURN"),
+        OWNER_QUERY.replace("t.name AS owner", "not_bound.name AS owner"),
+        OWNER_QUERY.replace("RETURN", "MATCH RETURN"),
+        OWNER_QUERY.replace("RETURN", "WHERE s.region = RETURN"),
+    ],
+)
+def test_actual_neo4j_parser_counterexamples_fail_closed(tmp_path, query):
+    params = {"service": "router-api"}
+    accepted, reason = validate_read_only_benchmark_cypher(
+        query, params, "service_owner_lookup"
+    )
+    assert not accepted, (query, reason)
+    fixture = Fixture(tmp_path / "state", tmp_path / "workspace", "service_owner_lookup")
+    response, is_error = fixture.call(
+        "graph_query", {"query": query, "parameters": params, "read_only": True}
+    )
+    assert is_error and response.get("retryable") is False
+    assert "records" not in response and "columns" not in response
+
+
+def test_only_supported_synthetic_query_template_and_bound_keys_are_accepted(tmp_path):
+    good, reason = validate_read_only_benchmark_cypher(
+        "  " + OWNER_QUERY.replace("MATCH", "match", 1) + "\n",
+        {"service": "router-api"}, "service_owner_lookup"
+    )
+    assert good, reason
+    for query, params in [
+        (OWNER_QUERY, {"service": "router-api", "extra": "ignored"}),
+        (OWNER_QUERY, {"service": "unrelated"}),
+        (OWNER_QUERY.replace("OWNED_BY", "DEPENDS_ON"), {"service": "router-api"}),
+        (OWNER_QUERY.replace("t.name AS owner", "s.name AS owner"), {"service": "router-api"}),
+    ]:
+        valid, why = validate_read_only_benchmark_cypher(
+            query, params, "service_owner_lookup"
+        )
+        assert not valid, (query, why)
+
+
 def test_write_flags_and_missing_bindings_are_denied(tmp_path):
     fixture = Fixture(tmp_path / "state", tmp_path / "workspace", "service_owner_lookup")
     for q, params in ((OWNER_QUERY, {"service": "router-api"}),
