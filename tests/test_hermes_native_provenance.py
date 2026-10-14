@@ -298,7 +298,13 @@ def test_posthoc_three_replays_with_same_container_are_not_physical_acceptance(
     import shutil
     import subprocess
 
-    from scripts.hermes_native_posthoc_rescore import score_existing_run
+    from pathlib import Path
+    from runpy import run_path
+
+    script = run_path(str(
+        Path(__file__).resolve().parents[1] / "scripts/hermes_native_posthoc_rescore.py"
+    ))
+    score_existing_run = script["score_existing_run"]
 
     original = tmp_path / "native-experiment"
     originals = []
