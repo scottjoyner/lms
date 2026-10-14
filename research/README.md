@@ -118,3 +118,21 @@ with semantic competence. Saved Markdown under `~/knowledge`:
 `EXPERIMENT-027-YARN-COMPONENTS.md`, SHA256
 `d37b5e4babfc3db23ba2a02745e15f987a1552e82404741ef9bfb41f8a797ff2`.
 Regression: `tests/test_k2_yarn_components.py`. No JSON results.
+
+## EXP028 analytic phase and context gap controls
+
+`research/k2_rotary_phase.py` imports only the pinned native K2
+rotary classes and compares frequency-channel unit-circle phase
+geometry across token distances without model inference. Its central
+Markdown `EXPERIMENT-028A-ROTARY-PHASE.md` has SHA256
+`3612d1e0012e79233fc4f25ec03884480cdc4fbc415bb6e57047dc477d29404b`.
+
+`research/k2_context_gap.py` and `tests/test_k2_context_gap.py`
+are a separately preregistered, bounded **EXP028 research-only** pilot
+using 2 published EXP027 source groups with both reversed states,
+actor/recipient, factual/neutral and both answer choices. Per paired
+prompt, filler contents and total token lengths (within 4 tokens)
+are matched but filler placement changes fact-question separation.
+Tests and source fixture SHA are pinned before inference; a result
+report should be accepted **only after all 256 real model forwards
+complete**, and must remain described as a tiny synthetic pilot.
