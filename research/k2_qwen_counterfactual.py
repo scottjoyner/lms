@@ -52,6 +52,9 @@ def counterfactuals(rows,candidates,selected):
             context,question=choices[mode]
             records.append({'index':i,'mode':mode,'prompt':priorguard.verdict_prompt(context,question,candidate)})
     if len(records)!=3*len(selected):raise RuntimeError('Incomplete controlled 3-way prompt triplets')
+    # Group by condition so original source prompts retain EXP032D's identical
+    # two-candidate Qwen batching rather than mixing in swapped-length rows.
+    records.sort(key=lambda row:CONDITIONS.index(row['mode']))
     return records,fallback
 
 def summarize(paired,fallback,receipt):
