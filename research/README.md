@@ -228,3 +228,21 @@ Tests `tests/test_k2_human_output_contract.py` and
 `tests/test_k2_human_output_comparison.py` verify all counts and fail-closed
 on tampered source. No original source weights, training, NAS or services
 changed. This study DOES NOT solve UNKNOWN abstention or authorize promotion.
+
+## EXP031 native EOS/alternative terminator witness
+
+`research/k2_termination_audit.py` replays eight exact short EXP029 SQuAD2
+human-annotated QA prompts (first four distinct source article groups) with
+frozen K2 mOPD weights, greedy 32 tokens and **unchanged native EOS=1**.
+It counts five other official tokenizer boundary markers and native EOS
+without saving any raw generations or input passages. Tokenizer, model
+config and native generation config agree on EOS `<|endoftext|>` ID 1.
+A real `<|ifm|im_end|>` (ID 64019) occurred in 1/8 outputs at position
+13; only one native EOS occurred and 7/8 hit the output cap without EOS.
+This identifies **possible harness stop ambiguity**, not validated alternate
+answer-termination semantics or production permission to alter EOS.
+
+Central Markdown `EXPERIMENT-031-TERMINATORS.md` SHA256:
+`a0e7db3d681eb81cc3880715aab9f9542948a4008b1e61516ad7e8c1499beb50`.
+Regression: `tests/test_k2_termination_audit.py`. Original data and
+model service state untouched.
