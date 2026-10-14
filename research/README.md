@@ -311,3 +311,26 @@ Central `EXPERIMENT-032D-QWEN-VERIFIER.md` SHA256
 Preregistration: `EXPERIMENT-032D-QWEN-VERIFIER-PROTOCOL.md`.
 Regression: `tests/test_k2_qwen_candidate_guard.py`. No source
 passages, gold, raw generations or candidates were retained.
+
+## EXP032E original-versus-counterfactual Qwen verdicts
+
+`research/k2_qwen_counterfactual.py` replays the frozen EXP032D
+candidate pool (11 eligible candidates from the same 16 SQuAD2 questions)
+and uses the **unchanged** Qwen native-chat YES/NO verifier on three
+conditions per candidate: original passage/question, candidate-absent
+different passage, and original passage/swapped article question.
+Original 10 YES/1 NO/0 malformed must replay exactly or no accepted
+report is created. Model weights, prompting and YES/NO parser unchanged.
+
+Measured: original 10 YES/1 NO; different passage **0 YES/11 NO**,
+with 2 fixed empty-evidence donor fallbacks; different question
+**1 YES/10 NO**. This argues against universal Qwen YES bias, but
+the original EXP032D **3/8 accepted human-unanswerable answers remain**
+a NO-GO for trusted verification. The swapped question is not
+human-adjudicated for compatibility and the subset is previously exposed.
+
+Central `EXPERIMENT-032E-COUNTERFACTUAL-JUDGE.md`, SHA256
+`3333b2e05361e4626a9790e5e2f1c1b106c160b13d52e91bfa79f6567cb33966`.
+Central `EXPERIMENT-032D-E-RECONCILIATION.md` consolidates the safety
+interpretation. Regressions: `tests/test_k2_qwen_counterfactual.py`
+and `tests/test_k2_qwen_candidate_guard.py`. No production effects.

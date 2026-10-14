@@ -50,3 +50,17 @@ class CounterfactualVerifierTests(unittest.TestCase):
    self.assertIn(exp.PROTOCOL,doc)
    self.assertIn(exp.PARENT,doc)
    for mode in exp.CONDITIONS:self.assertIn('| '+mode+' |',doc)
+
+ def test_exact_completed_counterfactual_result(self):
+  path=R/'EXPERIMENT-032E-COUNTERFACTUAL-JUDGE.md'
+  self.assertEqual(exp.sha(path),'3333b2e05361e4626a9790e5e2f1c1b106c160b13d52e91bfa79f6567cb33966')
+  doc=path.read_text()
+  for snippet in (
+      '| original | 10 | 1 | 0 |',
+      '| evidence_swap | 0 | 11 | 0 |',
+      '| question_swap | 1 | 10 | 0 |',
+      'Original-YES→evidence_swap-NO: **10/10**.',
+      'Original-YES→question_swap-NO: **9/10**.',
+      'fixed digits-only empty-evidence fallback count: **2/11**.',
+      exp.PROTOCOL,exp.PARENT):
+   self.assertIn(snippet,doc)
