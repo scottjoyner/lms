@@ -77,3 +77,39 @@ class ContextReportFormatting(unittest.TestCase):
   self.assertIn(e.PROTOCOL_SHA,doc)
   self.assertIn(e.DERIVED_SHA,doc)
   self.assertEqual(doc,e.report(receipt,rows,fake,'7bf45b3582c2e0348c2cde47d5366588c357e771',26))
+
+class MeasuredContextPilotAcceptance(unittest.TestCase):
+ REPORT=R/'EXPERIMENT-028-CONTEXT-GAP.md'
+ SHA='97adff195b2d50b5a57877434db4313994ef1a700920517f9d98f0ea7a65eeec'
+ def test_exact_measured_shas_and_record_counts(self):
+  self.assertTrue(self.REPORT.is_file())
+  self.assertEqual(e.sha(self.REPORT),self.SHA)
+  s=self.REPORT.read_text()
+  self.assertIn('two frozen name-group IDs (0, 8)',s)
+  self.assertIn(e.DERIVED_SHA,s)
+  self.assertIn(e.PROTOCOL_SHA,s)
+  self.assertIn('two name groups, 16 factual answers per cell',s)
+  self.assertIn('| 128 | prefix | 180–182 | 14–16 |',s)
+  self.assertIn('| 128 | gap | 180–182 | 142–144 |',s)
+  self.assertIn('| 384 | prefix | 436–438 | 14–16 |',s)
+  self.assertIn('| 384 | gap | 436–438 | 398–400 |',s)
+ def test_all_eight_real_model_cells_complete(self):
+  s=self.REPORT.read_text()
+  expected={
+   (128,'prefix','default'):(9,1,8,8,0),
+   (128,'prefix','yarn'):(9,1,6,8,0),
+   (128,'gap','default'):(11,3,7,8,0),
+   (128,'gap','yarn'):(9,1,6,7,0),
+   (384,'prefix','default'):(10,2,5,8,0),
+   (384,'prefix','yarn'):(8,0,7,7,0),
+   (384,'gap','default'):(10,2,7,7,0),
+   (384,'gap','yarn'):(10,2,7,7,0),
+  }
+  self.assertEqual(len(expected),8)
+  for (filler,place,freq),out in expected.items():
+   self.assertIn('| '+str(filler)+' | '+place+' | '+freq+' | '+' | '.join(map(str,out))+' |',s)
+  self.assertIn('## Controlled paired frequency contrasts',s)
+ def test_no_generalization_assertion(self):
+  s=self.REPORT.read_text()
+  self.assertIn('not independently held-out gold',s)
+  self.assertIn('No claim about actual 128K-token capability',s)

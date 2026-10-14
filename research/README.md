@@ -133,6 +133,9 @@ using 2 published EXP027 source groups with both reversed states,
 actor/recipient, factual/neutral and both answer choices. Per paired
 prompt, filler contents and total token lengths (within 4 tokens)
 are matched but filler placement changes fact-question separation.
-Tests and source fixture SHA are pinned before inference; a result
-report should be accepted **only after all 256 real model forwards
-complete**, and must remain described as a tiny synthetic pilot.
+Tests and source SHA are pinned before inference. **All 256 model
+forwards completed and the eight cells passed an exact-result regression
+check.** Central measured Markdown `EXPERIMENT-028-CONTEXT-GAP.md`
+SHA256 `97adff195b2d50b5a57877434db4313994ef1a700920517f9d98f0ea7a65eeec`. Frequency-only switching did not produce a
+consistent improvement across these four small, placement-matched cells.
+The two-source-group pilot remains **too small for generalization**.
