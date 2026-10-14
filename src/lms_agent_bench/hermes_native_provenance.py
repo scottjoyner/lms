@@ -87,6 +87,38 @@ def _assistant_args(message: Any, call_id: str) -> Any:
     return None
 
 
+def _engine_witness_verified(path: Path, *, call_id: int | str,
+                             query: str, container_id: str,
+                             result_digest: str, latest_ns: int) -> bool:
+    """A physical cypher-shell exit/readback is a stronger gate than MCP text.
+
+    Older archived native runs lack this separate receipt. Their HTTP bridge
+    correlation may be scored for research, but cannot pass this newer gate.
+    """
+    if not path.is_file():
+        return False
+    rows = _read_jsonl(path)
+    matches = [row for row in rows if row.get("mcp_request_id") == call_id]
+    if len(matches) != 1 or len(rows) != 1:
+        raise ValueError("Neo4j engine witness absent, duplicate or ambiguous")
+    receipt = matches[0]
+    stamp = receipt.get("timestamp_unix_ns")
+    if (receipt.get("schema") != "lms-hermes-neo4j-engine-witness.v2"
+            or receipt.get("accepted") is not True
+            or type(receipt.get("execution_exit_code")) is not int
+            or receipt["execution_exit_code"] != 0
+            or receipt.get("query") != query
+            or receipt.get("exact_container_id") != container_id
+            or receipt.get("mcp_result_sha256") != result_digest
+            or not isinstance(receipt.get("cypher_shell_stdout_sha256"), str)
+            or not CID.fullmatch(receipt["cypher_shell_stdout_sha256"])
+            or receipt.get("columns") not in (["owner"], ["s.owner"], ["n.owner"], ["t.name"])
+            or receipt.get("records") != [[OWNER]]
+            or type(stamp) is not int or not 0 < stamp < latest_ns):
+        raise ValueError("Neo4j engine witness failed independent custody/readback check")
+    return True
+
+
 def _verify_native(trial: Path) -> dict[str, Any]:
     files = {
         "trial": trial / "trial-report.json",
@@ -209,8 +241,19 @@ def _verify_native(trial: Path) -> dict[str, Any]:
     )
     if not verify_final_answer(witness, final):
         raise ValueError("native final answer not correctly attributable")
+    engine_path = trial / "fixture-state" / "neo4j-engine-witnesses.jsonl"
+    engine_verified = _engine_witness_verified(
+        engine_path, call_id=call_id, query=args["query"],
+        container_id=container, result_digest=_hash_json(result),
+        latest_ns=response["timestamp_unix_ns"],
+    )
+    if engine_verified:
+        files["neo4j_engine"] = engine_path
     return {
         "native_transcript_http_correlated": True,
+        "neo4j_engine_witness_verified": engine_verified,
+        "native_complete_source_provenance": engine_verified,
+        "legacy_http_only": not engine_verified,
         "model_id": model_id,
         "model_content_sha256": loadout["model"]["content_sha256"],
         "mcp_request_id": call_id,
@@ -232,6 +275,9 @@ def audit_native_trial(
     output = {
         "schema": "lms-hermes-native-http-provenance.v1",
         "native_transcript_http_correlated": False,
+        "neo4j_engine_witness_verified": False,
+        "native_complete_source_provenance": False,
+        "legacy_http_only": False,
         "teardown_verified": False,
         "qualification_authorized": False,
         "release_authorized": False,

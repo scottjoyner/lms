@@ -121,6 +121,13 @@ def score_existing_run(root: Path) -> dict:
         trial["native_evidence"]["native_transcript_http_correlated"] is True
         for trial in outcome["trials"]
     )
+    # The historical 1/3 correlation remains valid transport evidence, but
+    # cannot be upgraded to engine-backed acceptance without an actual
+    # separately captured cypher-shell witness in each original trial.
+    outcome["posthoc_engine_witness_count"] = sum(
+        trial["native_evidence"].get("native_complete_source_provenance") is True
+        for trial in outcome["trials"]
+    )
     # Historical v1 timeouts lack per-trial exact-ID custody receipts.
     # Count observable native successes without rewriting that history, but
     # NEVER claim 3/3 physical acceptance without three separate, matching,
@@ -144,6 +151,7 @@ def score_existing_run(root: Path) -> dict:
     outcome["physical_source_custody_verified"] = bool(custody)
     outcome["physical_three_trial_acceptance"] = (
         outcome["posthoc_native_success_count"] == 3
+        and outcome["posthoc_engine_witness_count"] == 3
         and outcome["model_server_teardown_reported"]
         and custody
     )

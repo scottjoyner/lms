@@ -99,6 +99,22 @@ def _verify_exact_container_removed(container_id: str) -> dict:
             "exact_container_absent": True}
 
 
+def _research_three_trial_accepted(state: dict) -> bool:
+    """Evidence-only gate. Never authorizes release, deployment or promotion."""
+    identities = state.get("owned_container_ids", [])
+    trials = state.get("trials", [])
+    return (len(trials) == 3
+            and len(identities) == 3
+            and len(set(identities)) == 3
+            and state.get("native_correlated_count") == 3
+            and state.get("engine_provenance_count") == 3
+            and state.get("model_server_removed") is True
+            and all(t.get("teardown_verified") is True
+                    and t.get("exact_container_removed") is True
+                    and t.get("native_complete_source_provenance") is True
+                    for t in trials))
+
+
 def _die(_signal, _frame):
     raise RuntimeError("native research interrupted; attempt bounded teardown")
 
@@ -235,12 +251,11 @@ def main(argv=None):
             item.get("native_transcript_http_correlated") is True
             for item in state["trials"]
         )
-        state["all_three_qualified"] = (
-            len(state["trials"]) == 3
-            and state["native_correlated_count"] == 3
-            and state["model_server_removed"]
-            and all(t.get("exact_container_removed") for t in state["trials"])
+        state["engine_provenance_count"] = sum(
+            item.get("native_complete_source_provenance") is True
+            for item in state["trials"]
         )
+        state["all_three_qualified"] = _research_three_trial_accepted(state)
         state["qualification_authorized"] = False
         state["release_authorized"] = False
         (output / "native-research-summary.json").write_text(
@@ -250,6 +265,7 @@ def main(argv=None):
             "trials": len(state["trials"]), "native_correlated": state["native_correlated_count"],
             "model_server_removed": state["model_server_removed"],
             "all_three_qualified": state["all_three_qualified"],
+            "engine_provenance_count": state["engine_provenance_count"],
             "denial": state.get("denial"),
         }), flush=True)
     return 0 if state["all_three_qualified"] else 3
