@@ -75,6 +75,8 @@ def score_archived_trial(folder: Path, gate: ScratchCypherGate) -> dict[str, Any
         "graph_attempt_count": len(results),
         "real_owner_query_count": valid_queries,
         "real_graph_and_final_answer_pass": completed,
+        "native_end_to_end_verified": False,
+        "archived_replay_only": True,
         "real_proof_results": results,
         "source_sha256": {
             "trial_report": hashlib.sha256(original_bytes).hexdigest(),
@@ -95,7 +97,9 @@ def score_archived_case(root: Path, gate: ScratchCypherGate) -> dict[str, Any]:
         "case_key": CASE_KEY,
         "trial_count": len(trials),
         "real_end_to_end_pass_count": accepted,
-        "case_gate_passed": accepted == len(trials),
+        "case_gate_passed": False,  # archived replay cannot prove model saw Neo4j output
+        "archived_replay_all_passed": accepted == len(trials),
+        "native_end_to_end_verified": False,
         "release_authorized": False,
         "trials": trials,
     }

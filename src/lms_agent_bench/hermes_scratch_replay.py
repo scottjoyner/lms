@@ -135,9 +135,9 @@ class ScratchHermesArchive:
         gate = ScratchCypherGate(
             expected_container_id=self.container_id, command_runner=self.runner,
         )
-        gate._checked_container()
+        gate._checked_container(require_running=False)
         self._execute(
-            ["docker", "rm", "-f", CONTAINER_NAME], timeout=25
+            ["docker", "rm", "-f", self.container_id], timeout=25
         )
         self.destroyed = True
         check = self.runner(
@@ -193,7 +193,7 @@ def main():
     print("REAL_CYPHER_RESEARCH", report["real_end_to_end_pass_count"],
           "/", report["trial_count"], "HOLD", not report["case_gate_passed"])
     # Operator/CI must never equate research completion with model admission.
-    return 0 if report["case_gate_passed"] else 3
+    return 3  # archived replays are diagnostic and never native qualification
 
 
 if __name__ == "__main__":

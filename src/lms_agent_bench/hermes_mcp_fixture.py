@@ -8,6 +8,7 @@ all calls are recorded as JSON Lines for path-independent effect scoring.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import os
@@ -153,6 +154,8 @@ def validate_arguments(tool: Mapping[str, Any], arguments: Any) -> tuple[bool, s
             return False, "unexpected arguments: " + ", ".join(extras)
     for key, value in arguments.items():
         spec = properties.get(key)
+        if isinstance(spec, dict) and "const" in spec and value != spec["const"]:
+            return False, f"argument {key} must equal its declared constant"
         if isinstance(spec, dict) and not _json_type_ok(value, str(spec.get("type") or "")):
             return False, f"argument {key} has wrong type"
         if isinstance(spec, dict) and spec.get("minLength") and isinstance(value, str):
@@ -221,6 +224,8 @@ class Fixture:
             "result": result,
             "timestamp_unix": time.time(),
         }
+        if hasattr(self, "_mcp_request_id"):
+            record["mcp_request_id"] = self._mcp_request_id
         with self.calls_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, sort_keys=True) + "\n")
 
@@ -284,7 +289,7 @@ class Fixture:
         return {"columns": [], "records": [], "summary": {"read_only": True, "records": 0}}, False
 
     def call(self, name: str, arguments: Any) -> tuple[Any, bool]:
-        tool = next((item for item in TOOLS if item["name"] == name), None)
+        tool = next((item for item in getattr(self, "tools", TOOLS) if item["name"] == name), None)
         if tool is None:
             result = {"error": f"unknown tool: {name}"}
             self._record(name, arguments, False, result, True)
@@ -385,12 +390,16 @@ def serve(fixture: Fixture) -> int:
         elif method == "ping":
             output = response_result(request_id, {})
         elif method == "tools/list":
-            output = response_result(request_id, {"tools": TOOLS})
+            output = response_result(request_id, {"tools": getattr(fixture, "tools", TOOLS)})
         elif method == "tools/call":
             params = message.get("params") if isinstance(message.get("params"), dict) else {}
             name = str(params.get("name") or "")
             arguments = params.get("arguments") if "arguments" in params else {}
-            result, is_error = fixture.call(name, arguments)
+            fixture._mcp_request_id = request_id
+            try:
+                result, is_error = fixture.call(name, arguments)
+            finally:
+                del fixture._mcp_request_id
             output = response_result(
                 request_id,
                 {
@@ -403,6 +412,21 @@ def serve(fixture: Fixture) -> int:
             output = response_error(request_id, -32601, f"method not found: {method}")
         sys.stdout.write(json.dumps(output, separators=(",", ":")) + "\n")
         sys.stdout.flush()
+        if method == "tools/call":
+            # Proves local stdout flush, NOT consumption by Hermes or the model.
+            # Independent native scoring additionally requires a model HTTP receipt.
+            result_bytes = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+            wire = {
+                "mcp_request_id": request_id,
+                "result_sha256": hashlib.sha256(result_bytes).hexdigest(),
+                "is_error": is_error,
+                "timestamp_unix_ns": time.time_ns(),
+                "kind": "mcp_stdout_flushed_only",
+            }
+            with (fixture.state_dir / "mcp-wire-responses.jsonl").open(
+                "a", encoding="utf-8"
+            ) as handle:
+                handle.write(json.dumps(wire, sort_keys=True) + "\n")
     return 0
 
 
