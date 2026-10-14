@@ -39,3 +39,19 @@ machine evidence. The original HF weights must be independently
 restaged at the pinned revisions for fresh neural measurements.
 No auto-download, NAS operation, production service effect,
 fine-tuning, graph mutation or model-promotion authority.
+
+## EXP023 direct weight-drift analysis
+
+`research/k2_weight_drift.py` reads all 252 transformer tensors per
+checkpoint transition and writes only the central human-readable
+`EXPERIMENT-023-WEIGHT-DRIFT.md`. It computes parameter-weighted
+cosine, L2 drift, elementwise BF16 change fraction, layer and module
+contributions; identifies each model shard by SHA256. It preserves
+weights and never outputs parameters. Synthetic Safetensors regression
+checks live in `tests/test_k2_weight_drift.py`; twelve combined LMS
+research unit tests passed on x1-370 with pinned frozen-model venv.
+
+Canonical report SHA256:
+`56c4b353462ced77cec1637aa675cb2edd4e1c1190b7f7f2bbe47cec142a69a4`.
+This confirms weight continuity, **not** causal RL change or any
+common Qwen3.5 weight ancestry. Beware default-RoPE↔YaRN confound.
