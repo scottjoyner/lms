@@ -157,6 +157,9 @@ def test_final_answer_requires_real_evidence_and_completion():
                                  command_runner=FakeDocker()).check(GOOD_QUERY, read_only=True)
     assert not verify_final_answer(witness, "The owner is team-atlas.")
     assert not verify_final_answer(witness, "The owner of router-api is team-beta.")
+    assert not verify_final_answer(witness, "The owner of router-api is NOT team-atlas.")
+    assert not verify_final_answer(witness, "router-api might be owned by team-atlas.")
+    assert verify_final_answer(witness, "The owner of router-api is **team-atlas** (in us-east-1).")
     assert not verify_final_answer(witness, "router-api is team-atlas", timed_out=True)
     assert not verify_final_answer(witness, "")
     assert not verify_final_answer(

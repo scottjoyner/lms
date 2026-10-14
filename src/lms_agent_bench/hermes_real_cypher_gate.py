@@ -190,7 +190,12 @@ def verify_final_answer(witness: OwnerWitness, final_response: str,
     """Require independent owner result AND complete attributed final answer."""
     if not witness.accepted or timed_out or not isinstance(final_response, str):
         return False
-    def contains(value: str) -> bool:
-        return re.search(r"(?<![A-Za-z0-9_-])" + re.escape(value) +
-                         r"(?![A-Za-z0-9_-])", final_response) is not None
-    return contains(SERVICE) and contains(OWNER) and not contains("team-beta")
+    # A deliberately small positive answer grammar. Literal co-occurrence is
+    # inadequate: "router-api is NOT owned by team-atlas" must never pass.
+    normalized = re.sub(r"\*+", "", final_response).strip()
+    return re.fullmatch(
+        r"The\s+owner\s+of\s+router-api\s+is\s+team-atlas"
+        r"(?:\s*\([^()\n]*\))?\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    ) is not None
