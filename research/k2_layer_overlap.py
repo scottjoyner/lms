@@ -137,6 +137,25 @@ def report(evidence):
     lines += ["","EXP021 generation is capped at 12 tokens and plain runs truncate heavily.",
        "Native-chat Qwen is not comparable with an invented K2 chat wrapper.",
        "",
+       "## Transition synopsis: geometry versus behavior","",
+       "| K2 transition | Mean depth diagonal CKA | Last-token depth diagonal CKA | Final-layer mean CKA | Final-layer last CKA | Mutual mean-depth matches |",
+       "|---|---:|---:|---:|---:|---:|"]
+    for left,right in zip(STAGES,STAGES[1:]):
+        cells=exp["adjacent_layerwise_CKA"][left+"__to__"+right]
+        dm=depth_diagnostics(grid(cells,"mean","whole_CKA"))
+        dl=depth_diagnostics(grid(cells,"last","whole_CKA"))
+        lines.append(f"| {left} → {right} | {fmt(dm['diag_mean'])} | "
+                     f"{fmt(dl['diag_mean'])} | {fmt(dm['final'])} | "
+                     f"{fmt(dl['final'])} | {len(dm['mutual'])}/5 |")
+    lines += ["",
+       "**Interpretation:** the mid2→RL transition retains high masked-mean",
+       "overlap but much lower last-token correspondence, despite a large",
+       "A/B response-format improvement. RL→mOPD has near-identical",
+       "mean and last-token geometry with much smaller behavior changes.",
+       "A blank/undefined embedding-last cell is not zero or a failed model.",
+       "None of these observational correlations identifies causal training",
+       "effects or rules out attention/rotary/prompt confounds.",
+       "",
        "## Adjacent K2 layer overlap: complete matrices","",
        "Each matrix is **all 25** layer-pair CKA measurements.",
        "The best one-to-one alignment enumerates 5! possible assignments,",

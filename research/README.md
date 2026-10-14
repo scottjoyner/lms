@@ -29,7 +29,7 @@ sha256sum "$R/EXPERIMENT-022-LAYER-OVERLAP.md"
 ```
 
 Expected report SHA256:
-`7dac71cec7e8c799226af59b39f133d77a5579f25c2eed652963964da3527c27`.
+`4cbdbdf96a597097b2ef8be66d6b82ec502a16ad316abdc10ac19a32c48bbaf0`.
 
 This code uses **previously executed** frozen model runs;
 it does not load a model, generate embeddings or reexecute experiments.
