@@ -33,6 +33,61 @@ def _tool_messages(payload):
     return result
 
 
+def _request_surface(body):
+    """Observe the actual model-facing envelope, excluding all message bodies.
+
+    Stable field-level hashes make bridge-vs-direct comparison reproducible
+    without storing the user's prompt, assistant responses or API headers.
+    """
+    messages = body.get("messages") or []
+    tools = body.get("tools") or []
+    if not isinstance(messages, list) or not isinstance(tools, list):
+        raise ValueError("invalid outbound model request shape")
+    def content_digest(message):
+        raw = json.dumps(message.get("content"), sort_keys=True,
+                         ensure_ascii=False, separators=(",", ":"))
+        return hashlib.sha256(raw.encode()).hexdigest(), len(raw)
+    roles = []
+    system, user = [], []
+    for message in messages:
+        if not isinstance(message, dict):
+            raise ValueError("invalid model message")
+        role = message.get("role")
+        roles.append(role)
+        if role == "system":
+            system.append(content_digest(message))
+        elif role == "user":
+            user.append(content_digest(message))
+    tool_contracts = []
+    for item in tools:
+        if not isinstance(item, dict) or not isinstance(item.get("function"), dict):
+            raise ValueError("invalid tool definition")
+        function = item["function"]
+        contract = function.get("parameters") or {}
+        encoded = json.dumps(contract, sort_keys=True, separators=(",", ":"))
+        tool_contracts.append({
+            "name": function.get("name"),
+            "parameters_sha256": hashlib.sha256(encoded.encode()).hexdigest(),
+            "description_sha256": hashlib.sha256(str(function.get("description", "")).encode()).hexdigest(),
+            "property_keys": sorted((contract.get("properties") or {}).keys()),
+        })
+    return {
+        "advertised_tool_contracts": tool_contracts,
+        "advertised_tool_count": len(tool_contracts),
+        "model_message_roles": roles,
+        "system_content_sha256": [x[0] for x in system],
+        "system_content_chars": [x[1] for x in system],
+        "user_content_sha256": [x[0] for x in user],
+        "generation": {k: body[k] for k in (
+            "stream", "temperature", "seed", "max_tokens", "tool_choice",
+        ) if k in body},
+        "all_other_options_sha256": hashlib.sha256(json.dumps(
+            {k: v for k, v in body.items() if k not in ("messages", "tools")},
+            sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        ).encode()).hexdigest(),
+    }
+
+
 @contextmanager
 def observe_loopback_http(path: Path, *, endpoint: str) -> Iterator[None]:
     """Record successful HTTP sends containing exact model-facing tool messages.
@@ -67,6 +122,7 @@ def observe_loopback_http(path: Path, *, endpoint: str) -> Iterator[None]:
                             m.get("role") for m in body.get("messages", []) if isinstance(m, dict)
                         ],
                         "tool_messages": _tool_messages(body),
+                        "wire_surface": _request_surface(body),
                     }
             except (ValueError, TypeError, RuntimeError, AttributeError):
                 pass

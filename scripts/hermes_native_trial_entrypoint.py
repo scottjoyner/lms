@@ -83,7 +83,43 @@ def scoped_trial(args):
             (state / "preflight-tool-inventory.json").write_text(
                 json.dumps({"tools": sorted(visible), "passed": True}, indent=2) + "\n"
             )
-            return _ORIGINAL_TRIAL(args)
+            mode = os.environ.get("LMS_HERMES_PREAMBLE_ABLATION_RESEARCH")
+            original_builder = None
+            helpers = None
+            if mode is not None:
+                # This optional model-facing intervention is ONLY for a
+                # physically bounded, scratch-scoped A/B research experiment.
+                # Never patch an installed Hermes source file or shared config.
+                if mode not in {"control", "minimal"}:
+                    raise RuntimeError("invalid isolated preamble-ablation mode")
+                if os.environ.get("LMS_HERMES_NATIVE_PROVENANCE_RESEARCH") != "1":
+                    raise RuntimeError("native provenance gating required")
+                from lms_agent_bench.hermes_native_request_ablation import (
+                    build_ablation_request,
+                )
+                from agent import chat_completion_helpers as helpers
+
+                original_builder = helpers.build_api_kwargs
+                case = bench.load_json(Path(args.case))
+                canonical = case.get("system")
+
+                def scoped_build(agent, messages):
+                    original = original_builder(agent, messages)
+                    effective, receipt = build_ablation_request(
+                        original, mode=mode, canonical_system=canonical,
+                    )
+                    with (state / "model-request-ablation.jsonl").open(
+                        "a", encoding="utf-8"
+                    ) as output:
+                        output.write(json.dumps(receipt, sort_keys=True) + "\n")
+                    return effective
+
+                helpers.build_api_kwargs = scoped_build
+            try:
+                return _ORIGINAL_TRIAL(args)
+            finally:
+                if helpers is not None and original_builder is not None:
+                    helpers.build_api_kwargs = original_builder
         finally:
             shutdown_mcp_servers()
     finally:
