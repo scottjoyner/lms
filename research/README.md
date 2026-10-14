@@ -158,3 +158,24 @@ source dataset must be staged locally with original CC BY-SA 4.0 attribution.
 Each model requires an independently complete resource-gated 48-prompt
 pass before any outcome is added to the canonical Markdown evidence.
 K2 is not assigned a fictitious chat template. Nothing deployed.
+
+## EXP029 measured comparison — SQuAD2 public human-gold dev
+
+Both 48-prompt generation passes completed, K2 mOPD plain (443.5 seconds)
+and Qwen3.5-0.8B native chat (268.8 seconds), on the same eight article
+sources and three near-length-matched placements. Human-gold selection
+SHA256 `aad6e578544e2a3f100ab4b5c93d7ee6158fbfbe14bd426b8bffd9f9d1cde23b`.
+K2 measured Markdown SHA256 `0ab5ac2d744362969b97618b32ce9ad536ae32bda820a4bfac79410cc7c17c71`;
+Qwen measured SHA256 `a166f1727620bc2cc162f07c388584a97201bf2064e233cb92c87c2d3d60cd85`.
+`research/k2_human_qa_compare.py` consumes only those two SHA-pinned
+Markdown reports and emits the aggregate-only central
+`EXPERIMENT-029-COMPARISON.md` (SHA256
+`6d78895839a4efd9c6962c7942a4b75cc69f8a70f0afa6d81a7fd4535ae44a1e`).
+No raw source data or model generations are saved or committed.
+Native chat versus K2 plain is **not** an architecture-isolated comparison.
+Tests: `tests/test_k2_human_grounded_qa.py` and
+`tests/test_k2_human_qa_compare.py`, with deterministic source/score
+parity and corrupt-input rejection. The 36GiB initial memory floor
+was prospectively registered before inference; 22GiB in-run stop retained.
+
+Grounded K2 output-format and abstention remain NO-GO on this pilot.

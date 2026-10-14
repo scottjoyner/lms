@@ -82,6 +82,24 @@ class HumanQA(unittest.TestCase):
    self.assertEqual(s['answerable_exact'],8)
    self.assertEqual(s['unanswerable_UNKNOWN'],8)
    self.assertEqual(s['token_caps'],0)
+ def test_completed_k2_report_exact_custody(self):
+  p=EVIDENCE/'EXPERIMENT-029-K2-HUMAN-QA.md'
+  self.assertEqual(m.sha(p),'0ab5ac2d744362969b97618b32ce9ad536ae32bda820a4bfac79410cc7c17c71')
+  doc=p.read_text()
+  self.assertIn('| short | 164–307 | 0 | 7 | 0 | 8 | 0 | 9 |',doc)
+  self.assertIn('| prefix | 933–1076 | 0 | 8 | 0 | 8 | 0 | 11 |',doc)
+  self.assertIn('| gap | 933–1076 | 0 | 6 | 0 | 8 | 0 | 14 |',doc)
+  self.assertIn('Published native chat template used: **False**',doc)
+  self.assertIn(m.PROTOCOL_SHA,doc)
+ def test_completed_qwen_report_exact_custody(self):
+  p=EVIDENCE/'EXPERIMENT-029-QWEN-HUMAN-QA.md'
+  self.assertEqual(m.sha(p),'a166f1727620bc2cc162f07c388584a97201bf2064e233cb92c87c2d3d60cd85')
+  doc=p.read_text()
+  self.assertIn('| short | 173–310 | 5 | 6 | 2 | 6 | 0 | 1 |',doc)
+  self.assertIn('| prefix | 942–1079 | 5 | 6 | 6 | 2 | 1 | 0 |',doc)
+  self.assertIn('| gap | 942–1079 | 5 | 6 | 6 | 2 | 1 | 0 |',doc)
+  self.assertIn('Published native chat template used: **True**',doc)
+  self.assertIn(m.PROTOCOL_SHA,doc)
  def test_result_if_present(self):
   for tag in ('K2','QWEN'):
    p=EVIDENCE/f'EXPERIMENT-029-{tag}-HUMAN-QA.md'
