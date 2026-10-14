@@ -179,3 +179,18 @@ parity and corrupt-input rejection. The 36GiB initial memory floor
 was prospectively registered before inference; 22GiB in-run stop retained.
 
 Grounded K2 output-format and abstention remain NO-GO on this pilot.
+
+## EXP030 K2 answer-output contract and budget (research-only)
+
+`research/k2_human_output_contract.py` compares two **separate one-factor**
+changes against the exact 32-token EXP029 human-gold K2 report:
+`strict32` changes only the leading answer/UNKNOWN instruction;
+`budget64` keeps every original input token and increases only the
+number of generated tokens from 32 to 64. 16 human-annotated SQuAD2
+questions repeated as short and long-gap (32 outputs per arm). Source
+selection, original prompts and measured baseline require fixed SHA256.
+All 6 pre-inference `tests/test_k2_human_output_contract.py` tests passed.
+Strict exact answers, lenient gold spans, first lexical answer word,
+exact/first UNKNOWN and EOS/token cap are separately counted. A correct
+first word is **not** a strictly valid complete response. Human-gold
+source/predictions are never committed or logged. No model promotion.
