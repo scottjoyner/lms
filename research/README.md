@@ -89,3 +89,16 @@ exported. Observations only in central `~/knowledge` as
 `EXPERIMENT-025-FULL-WEIGHT-DRIFT.md`; checksum
 `169507cd918359b189abf208c5708af5a301a8017096b23642864f455f86821a`.
 Tests: `tests/test_k2_full_weight_lineage.py`.
+
+## EXP026 fact-neutral RoPE factorial
+
+`research/k2_rope_fact_control.py` evaluates the fixed frozen K2 2×2
+weight-stage and default/YaRN RoPE intervention on all 512 EXP019
+factual and neutral prompt rows. Enforces pinned original EXP019 and
+fixture SHA256, native baseline counts, fixed checkpoint sources,
+greedy answer-label metrics and representative tensor identity.
+Outputs only central Markdown, with a paired 32-source-group 2000-draw
+descriptive bootstrap for five factorial contrasts. Result SHA256:
+`4452696eb2b567332112b392baac941a403c718053ccb33377dbe6cca020653c`.
+Regression: `tests/test_k2_rope_fact_control.py` (27 LMS scientific
+source/evidence tests passing for EXP022–026).
