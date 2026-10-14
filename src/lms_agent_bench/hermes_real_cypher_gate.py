@@ -8,6 +8,7 @@ networkless container identified by an exact, pinned Docker ID.
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import re
@@ -43,6 +44,7 @@ class OwnerWitness:
     records: tuple[tuple[str, ...], ...] = ()
     container_id: str = ""
     execution_exit_code: int | None = None
+    engine_stdout_sha256: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -50,6 +52,7 @@ class OwnerWitness:
             "columns": list(self.columns), "records": [list(r) for r in self.records],
             "container_id": self.container_id,
             "execution_exit_code": self.execution_exit_code,
+            "engine_stdout_sha256": self.engine_stdout_sha256,
         }
 
 
@@ -182,6 +185,7 @@ class ScratchCypherGate:
         return OwnerWitness(
             good, "verified owner" if good else "missing, ambiguous or incorrect owner",
             query, tuple(header), tuple(records), container_id, result.returncode,
+            hashlib.sha256(result.stdout.encode("utf-8")).hexdigest(),
         )
 
 

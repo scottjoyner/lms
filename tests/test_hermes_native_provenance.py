@@ -291,6 +291,80 @@ def test_scoped_container_id_must_match_native_owner_witness(trial):
     assert "different scoped research container" in rejected["denial"]
 
 
+def _engine_receipt_for(trial):
+    state = trial / "fixture-state"
+    record = json.loads((state / "calls.jsonl").read_text())
+    wire = json.loads((state / "mcp-wire-responses.jsonl").read_text())
+    return {
+        "schema": "lms-hermes-neo4j-engine-witness.v2",
+        "mcp_request_id": record["mcp_request_id"],
+        "query": record["arguments"]["query"],
+        "accepted": True,
+        "execution_exit_code": 0,
+        "cypher_shell_stdout_sha256": "d" * 64,
+        "columns": ["owner"],
+        "records": [["team-atlas"]],
+        "exact_container_id": CID,
+        "mcp_result_sha256": _hash_json(record["result"]),
+        "timestamp_unix_ns": wire["timestamp_unix_ns"] - 1,
+    }
+
+
+def test_engine_witness_strengthens_native_provenance(trial):
+    assert audit_native_trial(trial)["legacy_http_only"] is True
+    _jsonl(trial / "fixture-state" / "neo4j-engine-witnesses.jsonl", [
+        _engine_receipt_for(trial),
+    ])
+    output = audit_native_trial(trial)
+    assert output["native_transcript_http_correlated"] is True
+    assert output["neo4j_engine_witness_verified"] is True
+    assert output["native_complete_source_provenance"] is True
+    assert output["legacy_http_only"] is False
+    assert "neo4j_engine" in output["source_sha256"]
+    assert output["qualification_authorized"] is False
+
+
+@pytest.mark.parametrize("field, bad_value", [
+    ("schema", "other-schema"),
+    ("mcp_request_id", 99),
+    ("query", "MATCH (n) RETURN n"),
+    ("accepted", False),
+    ("execution_exit_code", 1),
+    ("execution_exit_code", True),
+    ("cypher_shell_stdout_sha256", "not-a-digest"),
+    ("columns", ["name"]),
+    ("records", [["wrong-owner"]]),
+    ("records", [["team-atlas"], ["team-atlas"]]),
+    ("exact_container_id", "c" * 64),
+    ("mcp_result_sha256", "f" * 64),
+    ("timestamp_unix_ns", 101),
+])
+def test_bad_engine_witness_never_passes(trial, field, bad_value):
+    record = _engine_receipt_for(trial)
+    record[field] = bad_value
+    _jsonl(trial / "fixture-state" / "neo4j-engine-witnesses.jsonl", [record])
+    output = audit_native_trial(trial)
+    assert output["native_complete_source_provenance"] is False
+    assert output["native_transcript_http_correlated"] is False
+    assert "Neo4j engine witness" in output["denial"]
+
+
+def test_duplicate_engine_receipt_is_denied(trial):
+    record = _engine_receipt_for(trial)
+    _jsonl(trial / "fixture-state" / "neo4j-engine-witnesses.jsonl", [record, record])
+    output = audit_native_trial(trial)
+    assert output["native_complete_source_provenance"] is False
+    assert "Neo4j engine witness" in output["denial"]
+
+
+def test_legacy_native_run_remains_nonpromotable_without_engine_receipt(trial):
+    output = audit_native_trial(trial)
+    assert output["native_transcript_http_correlated"] is True
+    assert output["native_complete_source_provenance"] is False
+    assert output["neo4j_engine_witness_verified"] is False
+    assert output["qualification_authorized"] is False
+
+
 def test_posthoc_three_replays_with_same_container_are_not_physical_acceptance(
     trial, tmp_path, monkeypatch,
 ):

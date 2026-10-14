@@ -63,3 +63,41 @@ def test_bad_container_identifier_refused_before_docker(monkeypatch):
     monkeypatch.setattr(subprocess, "run", bad)
     with pytest.raises(RuntimeError, match="invalid exact"):
         _verify_exact_container_removed("unsafe-name")
+
+
+def test_three_trial_acceptance_requires_independent_engine_and_custody():
+    _research_three_trial_accepted = _VERIFY["_research_three_trial_accepted"]
+
+    def source_trial():
+        return {
+            "native_complete_source_provenance": True,
+            "teardown_verified": True,
+            "exact_container_removed": True,
+        }
+
+    good = {
+        "trials": [source_trial() for _ in range(3)],
+        "owned_container_ids": ["a" * 64, "b" * 64, "c" * 64],
+        "native_correlated_count": 3,
+        "engine_provenance_count": 3,
+        "model_server_removed": True,
+    }
+    assert _research_three_trial_accepted(good)
+    from copy import deepcopy
+
+    missing_engine = deepcopy(good)
+    missing_engine["engine_provenance_count"] = 2
+    assert not _research_three_trial_accepted(missing_engine)
+    swapped_graph = deepcopy(good)
+    swapped_graph["owned_container_ids"][1] = "a" * 64
+    assert not _research_three_trial_accepted(swapped_graph)
+    unverified_teardown = deepcopy(good)
+    unverified_teardown["trials"][0]["teardown_verified"] = False
+    assert not _research_three_trial_accepted(unverified_teardown)
+    legacy_only = deepcopy(good)
+    legacy_only["trials"][1]["native_complete_source_provenance"] = False
+    assert not _research_three_trial_accepted(legacy_only)
+    remaining_server = deepcopy(good)
+    remaining_server["model_server_removed"] = False
+    assert not _research_three_trial_accepted(remaining_server)
+    assert not _research_three_trial_accepted({**good, "trials": good["trials"][:2]})
