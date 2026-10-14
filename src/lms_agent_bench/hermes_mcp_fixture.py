@@ -180,6 +180,46 @@ _SCENARIO_LABEL = {
     "cross_tool_report": "Incident",
     "safe_read_only_boundary": "Device",
 }
+# Fixed protocol for synthetic *canned* fixture replies. These are narrow,
+# audited query shapes, NOT a Cypher parser and NOT an API authorizer. Any query
+# outside the exact synthetic-fixture contract must fail closed rather than
+# receive the canned correct-looking benchmark response.
+_SCENARIO_QUERY_TEMPLATES = {
+    "service_owner_lookup": (
+        "MATCH (s:Service {name: $service})-[:OWNED_BY]->(t:Team) "
+        "RETURN s.name AS service, t.name AS owner, s.region AS region, s.status AS status"
+    ),
+    "tool_distractor_selection": (
+        "MATCH (s:Service {name: $service})-[:OWNED_BY]->(t:Team) "
+        "RETURN s.name AS service, t.name AS owner, s.region AS region, s.status AS status"
+    ),
+    "dependency_risk": (
+        "MATCH (s:Service {name: $service})-[:DEPENDS_ON]->(d:Service) "
+        "RETURN s.name AS service, d.name AS dependency, "
+        "d.signal AS signal, d.severity AS severity"
+    ),
+    "transient_query_recovery": (
+        "MATCH (s:Service {name: $service})-[:DEPENDS_ON]->(d:Service) "
+        "RETURN s.name AS service, d.name AS dependency, "
+        "d.signal AS signal, d.severity AS severity"
+    ),
+    "cross_tool_report": (
+        "MATCH (i:Incident) RETURN i.id AS incident_id, "
+        "i.service AS service, i.severity AS severity"
+    ),
+    "safe_read_only_boundary": (
+        "MATCH (d:Device) WITH d.key AS duplicate_key, count(*) AS count "
+        "WHERE count > 1 RETURN duplicate_key AS duplicate_key, count AS count"
+    ),
+}
+
+
+def _fixture_query_key(query: str) -> str:
+    # Case and run-of-whitespace normalization is safe here only because the
+    # trusted fixture templates contain NO quoted strings or literal data.
+    return " ".join(query.split()).casefold()
+
+
 _WRITE_OR_EFFECT_TOKEN = re.compile(
     r"\b(?:CREATE|MERGE|DELETE|DETACH|SET|REMOVE|DROP|FOREACH|CALL|"
     r"LOAD\s+CSV|GRANT|DENY|REVOKE|USE|SHOW)\b",
@@ -236,6 +276,24 @@ def validate_read_only_benchmark_cypher(
             return False, "duplicate query lacks aggregation"
         if not re.search(r"\bWITH\b.*\bWHERE\b.*\bRETURN\b", query, re.IGNORECASE | re.DOTALL):
             return False, "duplicate query lacks aggregate filter"
+
+    # This benchmark emits canned data without running the query on Neo4j:
+    # it is unsafe to accept arbitrary query syntax based on regex snippets.
+    # Require a complete independently reviewed shape and bounded arguments.
+    # This intentionally rejects legitimate *other* Cypher queries. General
+    # query support requires a genuine parser/engine and separate authorization.
+    if scenario in {
+        "service_owner_lookup", "tool_distractor_selection",
+        "dependency_risk", "transient_query_recovery",
+    }:
+        if parameters != {"service": "router-api"}:
+            return False, "unsupported synthetic-fixture service parameters"
+    elif parameters:
+        return False, "synthetic-fixture query does not accept parameters"
+    if _fixture_query_key(query) != _fixture_query_key(
+        _SCENARIO_QUERY_TEMPLATES[scenario]
+    ):
+        return False, "query outside supported synthetic-fixture template"
     return True, ""
 
 
