@@ -274,3 +274,40 @@ The original SQuAD2 human gold is a tiny reused dev subset; no population
 performance, production semantic verification, training-teacher, or latent
 neuron ancestry claim. Run `tests/test_k2_posthoc_boundary.py` for source,
 non-oracle postprocessors, known counterexamples and exact 12-cell receipt.
+
+## EXP032C actual native EOS adjacency result
+
+`research/k2_stop_pairing.py` performs 16 real frozen-model short-context
+SQuAD2 QA generations under the original K2 EOS ID1 and 32-token budget,
+with separate original human answerable/unanswerable score controls.
+Native ID64019 `<|ifm|im_end|>` appeared on **7** examples, in all
+seven followed immediately by EOS ID1; the remaining nine generated
+neither ID before reaching the output cap. Altering only the post-hoc
+cut before ID64019 changed **0** decoded results. This is strong evidence
+against an ignored alternate terminator as the principal 32-token runaway
+explanation on this tiny cohort, but not production stop-rule authority.
+Central measured Markdown: `EXPERIMENT-032C-STOP-PAIRING.md`, SHA256
+`4aae198cb8c56e97ae554471486e0597f8075df680b8fe9715d091ba2dc38fa2`.
+Prospective central source: `EXPERIMENT-032C-STOP-PAIRING-PROTOCOL.md`.
+Regression tests `tests/test_k2_stop_pairing.py` validate raw-token
+order, padding after EOS, exact report, and source-identity gates.
+
+## EXP032D frozen Qwen candidate-specific verification — measured
+
+`research/k2_qwen_candidate_guard.py` replays K2 on the original eight
+SQuAD2 human-annotated answerable/unanswerable source pairs, then applies
+the same candidate source/question lexical gate as EXP032B and forwards
+only eligible candidates (11) to frozen Qwen3.5-0.8B **native chat**.
+Candidate decisions never receive human gold or answerability flags;
+only strict whole-output YES accepts, every other verdict denies.
+
+Real measured result: 11 Qwen evaluations yielded 10 YES and 1 NO, with
+no output caps. Correct answerable /8 stayed 6; false non-UNKNOWN on
+human-unanswerable /8 improved from lexical gate **4 to 3**, not zero.
+It is NOT an independent evidence authority, does NOT establish reliable
+abstention, and does NOT license K2 for grounded production QA.
+Central `EXPERIMENT-032D-QWEN-VERIFIER.md` SHA256
+`b6c04efdfd42187c7bcd8f470500467191d7ffe37ab4945cb4b37510510742fc`.
+Preregistration: `EXPERIMENT-032D-QWEN-VERIFIER-PROTOCOL.md`.
+Regression: `tests/test_k2_qwen_candidate_guard.py`. No source
+passages, gold, raw generations or candidates were retained.

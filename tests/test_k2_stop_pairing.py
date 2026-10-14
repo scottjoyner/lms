@@ -39,8 +39,34 @@ class Timeline(unittest.TestCase):
   self.assertEqual(sum(r['impossible'] for r in cohort),8)
  def test_exact_report_if_completed(self):
   p=RESEARCH/'EXPERIMENT-032C-STOP-PAIRING.md'
-  if not p.is_file():return
+  self.assertTrue(p.is_file())
+  self.assertEqual(a.sha(p),'4aae198cb8c56e97ae554471486e0597f8075df680b8fe9715d091ba2dc38fa2')
   text=p.read_text()
   self.assertIn(a.PROTOCOL,text)
-  self.assertIn('Native EOS',text)
-  self.assertIn('Strict UNKNOWN',text)
+  for row in ('| both | 7 |','| alt only | 0 |','| eos only | 0 |',
+              '| neither | 9 |','| alt before eos | 7 |',
+              '| eos before alt | 0 |','| 1 | 7 |',
+              '| Native EOS | 0 | 0 | 7 |',
+              '| Earlier ID64019 or EOS | 0 | 0 | 7 |'):
+   self.assertIn(row,text)
+  self.assertIn('Native EOS missing after 32 generated tokens: **9/16**.',text)
+  self.assertIn('Post-hoc alternate cut changed decoded string: **0/16**.',text)
+  self.assertIn('NOT evidence that a missed stop marker caused a long continuation.',text)
+
+class RealK2StopPairingReceipt(unittest.TestCase):
+ def test_completed_report_digest_and_exact_census(self):
+  report=RESEARCH/'EXPERIMENT-032C-STOP-PAIRING.md'
+  self.assertTrue(report.is_file())
+  self.assertEqual(a.sha(report),'4aae198cb8c56e97ae554471486e0597f8075df680b8fe9715d091ba2dc38fa2')
+  text=report.read_text()
+  for needle in (
+      '| both | 7 |', '| alt only | 0 |', '| eos only | 0 |',
+      '| neither | 9 |','| alt before eos | 7 |',
+      '| eos before alt | 0 |', '| 1 | 7 |',
+      'Native EOS missing after 32 generated tokens: **9/16**.',
+      'Post-hoc alternate cut changed decoded string: **0/16**.',
+      '| Native EOS | 0 | 0 | 7 |',
+      '| Earlier ID64019 or EOS | 0 | 0 | 7 |'):
+   self.assertIn(needle,text)
+  self.assertIn(a.EXP032B_SHA,text)
+  self.assertIn(a.PROTOCOL,text)
