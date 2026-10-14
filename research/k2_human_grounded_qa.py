@@ -20,7 +20,7 @@ import torch
 
 SOURCE=Path('/home/scott/git/.latent-squad2-dev-research/dev-v2.0.json')
 SOURCE_SHA='80a5225e94905956a6446d296ca1093975c4d3b3260f1d6c8f68bc2ab77182d8'
-PROTOCOL_SHA='e6e7e2da0a1c58b15587384f77ee8d0c2c8760e5a105d099a154d411ec0b99ef'
+PROTOCOL_SHA='547ec8dcbe91e821604864160a7c3f340fa43bff7b88be0dbf36ddf72323ad68'
 FILL_TARGET=768
 POSITIONS=('short','prefix','gap')
 BATCH=2
@@ -243,7 +243,7 @@ def main():
     source,source_receipt,eligible=source_rows()
     sys.path.insert(0,str(a.evidence_dir))
     import run_exp021_free_response as prior
-    if not a.preflight_only and ram()<38:raise RuntimeError('Resource admission <38 GiB')
+    if not a.preflight_only and ram()<36:raise RuntimeError('Resource admission <36 GiB')
     # Preflight uses only tokenizers and frozen local source; no large model load.
     from transformers import AutoTokenizer
     if a.stage=='mopd_249':
