@@ -1,4 +1,4 @@
-"""EXP032 strict source locking and neuron null/similarity controls."""
+"""EXP033 strict source locking and neuron null/similarity controls."""
 import sys
 import unittest
 from pathlib import Path
@@ -10,7 +10,7 @@ import k2_human_grounded_qa as prior
 R=Path('/home/scott/knowledge/50-Research/llm-research/latent-world-geometry-2026')
 class TestSniffer(unittest.TestCase):
  def test_protocol_and_source(self):
-  self.assertEqual(m.sha(R/'EXPERIMENT-032-PROTOCOL.md'),m.PROTOCOL)
+  self.assertEqual(m.sha(R/'EXPERIMENT-033-PROTOCOL.md'),m.PROTOCOL)
   self.assertEqual(len(m.STAGES),3)
   self.assertEqual(m.LAYERS['mid2_47684'],m.LAYERS['rl_merged'])
   self.assertNotEqual(m.LAYERS['rl_merged'],m.LAYERS['qwen08_chat'])
@@ -48,7 +48,7 @@ class TestSniffer(unittest.TestCase):
   self.assertLessEqual(stats['null_fraction'],1)
   self.assertGreaterEqual(stats['null_fraction'],2/256)
  def test_report_if_measured(self):
-  path=R/'EXPERIMENT-032-NEURON-SNIFFER.md'
+  path=R/'EXPERIMENT-033-NEURON-SNIFFER.md'
   if not path.exists():self.skipTest('Live inference has not finished')
   t=path.read_text()
   self.assertIn(m.PROTOCOL,t)

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""EXP032: frozen read-only MLP gated-neuron study, source-locked Markdown."""
+"""EXP033: frozen read-only MLP gated-neuron study, source-locked Markdown."""
 import argparse, gc, hashlib, itertools, json, os, re, sys, time
 from pathlib import Path
 for k,v in {'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','CUDA_VISIBLE_DEVICES':'-1','OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'2','MKL_NUM_THREADS':'2'}.items():os.environ[k]=v
 import numpy as np
 import torch
-PROTOCOL='db83b66726ab0d75ce3370a512e278768f90db0fd81009daa01a2966cedb30d9'
+PROTOCOL='d02117319214ac0c3cd9276933b6cf1b3eb7f8eebd00970231f088aee39b4ac8'
 SOURCE_SHA='aad6e578544e2a3f100ab4b5c93d7ee6158fbfbe14bd426b8bffd9f9d1cde23b'
 ORIGINAL_SHA={'mid2_47684':'6513d65b456a0f52d230e386078d732a4b2800663c4d9b11c76b3cd569651c2a','rl_merged':'6513d65b456a0f52d230e386078d732a4b2800663c4d9b11c76b3cd569651c2a','qwen08_chat':'e27009abf39759a4b34a18665da2db87fc2a11aa9b53ecc9229ce37d4129f251'}
 STAGES=('mid2_47684','rl_merged','qwen08_chat')
@@ -96,17 +96,17 @@ def capture(model,tok,rows,stage):
             if set(one)!=set(ids):raise RuntimeError('One or more MLP hooks failed')
             for i in ids:values[i].append(one[i]);
             del x,out
-            if j%4==3:print('EXP032',stage,'source',j+1,'/16',round(time.monotonic()-START,1),flush=True)
+            if j%4==3:print('EXP033',stage,'source',j+1,'/16',round(time.monotonic()-START,1),flush=True)
     finally:
         for h in handles:h.remove()
     return {i:np.stack(v,axis=0) for i,v in values.items()}
 
 def report(all_values,custody):
-    lines=['# EXP-032 — Frozen MLP neuron activation sniffer across K2 and Qwen architectures',
+    lines=['# EXP-033 — Frozen MLP neuron activation sniffer across K2 and Qwen architectures',
       '', '**2026-10-14 | source-pinned real BF16 CPU forwards, research only.**',
       'This is an observational MLP activation study, not causal neuron or teacher identification.',
       '', '## Exact custody and structural boundaries','',
-      f'EXP032 preregistration SHA256 `{PROTOCOL}`; SQuAD selected source SHA256 `{SOURCE_SHA}`.',
+      f'EXP033 preregistration SHA256 `{PROTOCOL}`; SQuAD selected source SHA256 `{SOURCE_SHA}`.',
       'All 16 exact EXP029 short prompts from 8 paired original SQuAD2 article topics.',
       'Four prespecified relative-depth blocks per model; native gated-MLP',
       '`down_proj` **input** activations at last input token per prompt.',
@@ -163,7 +163,7 @@ def report(all_values,custody):
        'No training, graph, credentials, routing, NAS or model promotion.',
        '', '## Replay','',
        'Use published checkpoint/SQuAD source hashes with the frozen LMS script',
-       '`research/k2_neuron_sniffer.py` and protocol `EXPERIMENT-032-PROTOCOL.md`.',
+       '`research/k2_neuron_sniffer.py` and protocol `EXPERIMENT-033-PROTOCOL.md`.',
        'The runner refuses overwritten reports and any incomplete model stage.','']
     return '\n'.join(lines)
 
@@ -173,7 +173,7 @@ def main():
     c.add_argument('--out',required=True,type=Path)
     x=c.parse_args()
     if x.out.exists():raise SystemExit('STOP existing Markdown report')
-    if sha(x.evidence_dir/'EXPERIMENT-032-PROTOCOL.md')!=PROTOCOL:raise RuntimeError('Prospective protocol changed')
+    if sha(x.evidence_dir/'EXPERIMENT-033-PROTOCOL.md')!=PROTOCOL:raise RuntimeError('Prospective protocol changed')
     sys.path.insert(0,str(x.evidence_dir))
     import k2_human_grounded_qa as prior
     import run_exp021_free_response as backend
@@ -194,11 +194,11 @@ def main():
             activations[stage]=values
         finally:
             del model; gc.collect()
-        print('EXP032_STAGE_COMPLETE',stage,'secs',round(time.monotonic()-START,1),flush=True)
+        print('EXP033_STAGE_COMPLETE',stage,'secs',round(time.monotonic()-START,1),flush=True)
     text=report(activations,custody)
     if not x.out.parent.exists():raise RuntimeError('Output parent missing')
     tmp=x.out.with_name(x.out.name+'.tmp')
     if tmp.exists():raise RuntimeError('Scratch path exists')
     tmp.write_text(text,encoding='utf8');tmp.replace(x.out)
-    print('EXP032_FULL_COMPLETE',sha(x.out),'secs',round(time.monotonic()-START,1))
+    print('EXP033_FULL_COMPLETE',sha(x.out),'secs',round(time.monotonic()-START,1))
 if __name__=='__main__':main()
