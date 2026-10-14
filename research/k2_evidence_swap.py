@@ -105,10 +105,13 @@ def prep(evidence,prior,tokenizer,stage):
         sort_keys=True,separators=(',',':')).encode()).hexdigest()
     return suffixes,receipt,donor_sha,shifts,leak_count
 
-def batch_logps(model,head,samples,stage):
+def batch_logps(model,head,samples,stage,pad_id):
     maxlen=max(len(s['full']) for s in samples)
-    pad=(64255 if stage=='mopd_249' else model.config.pad_token_id)
-    if pad is None:pad=0
+    # Top-level Qwen3.5 config lacks pad_token_id. The published tokenizer
+    # is the authoritative padding source for the attention-masked batch.
+    if not isinstance(pad_id,int) or pad_id<0 or pad_id>=int(head.shape[0]):
+        raise RuntimeError('Invalid tokenizer-native pad ID')
+    pad=pad_id
     ids=torch.full((len(samples),maxlen),pad,dtype=torch.long)
     attn=torch.zeros_like(ids)
     for i,s in enumerate(samples):
@@ -247,7 +250,7 @@ def main():
         for start in range(0,len(seq),BATCH):
             if available()<22:raise RuntimeError('In-run memory below 22 GiB')
             group=seq[start:start+BATCH]
-            values=batch_logps(model,head,group,args.stage)
+            values=batch_logps(model,head,group,args.stage,tok.pad_token_id)
             for row,value in zip(group,values):
                 scored.append({'article':row['article'],'impossible':row['impossible'],
                                'source':row['source'],'choice':row['choice'],'lp':value})

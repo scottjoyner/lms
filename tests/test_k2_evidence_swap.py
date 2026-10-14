@@ -34,6 +34,12 @@ class EvidenceSwap(unittest.TestCase):
   self.assertEqual(sorted(shifts),[3,4,6,7,14,20,64,64])
   self.assertTrue(all(i!=p[i] for i in range(8)))
   self.assertEqual(set(p),set(range(8)))
+ def test_qwen_pad_from_published_tokenizer_not_multimodal_config(self):
+  import json
+  config=json.loads(Path('/home/scott/git/.latent-qwen35-0p8b-model/config.json').read_text())
+  self.assertNotIn('pad_token_id',config)
+  self.assertEqual(self.qwen.pad_token_id,248044)
+  self.assertEqual(self.k2.pad_token_id,64255)
  def test_full_native_source_and_candidate_suffixes(self):
   for stage,tok,sha in [('mopd_249',self.k2,K2_SHA),('qwen08_chat',self.qwen,QWEN_SHA)]:
    rows,receipt,donor,shifts,leak=e.prep(EVIDENCE,prior,tok,stage)
@@ -59,6 +65,15 @@ class EvidenceSwap(unittest.TestCase):
   self.assertEqual(result['unanswerable']['positive_source_gain'],8)
   self.assertEqual(result['answerable']['mean_source_gain'],1.)
   with self.assertRaises(RuntimeError):e.summarize(fake[:-1])
+ def test_measured_k2_full_candidate_source_swap(self):
+  p=EVIDENCE/'EXPERIMENT-034-K2-EVIDENCE-SWAP.md'
+  self.assertEqual(e.sha(p),'eea7b12d7de64a74057721006028b2cbef2e70c113d3dd10cfde3610d1cf2661')
+  doc=p.read_text()
+  self.assertIn('| answerable | 8 | 0 | 8 | +13.99098 | +13.70894 | +7.7336..+22.1475 |',doc)
+  self.assertIn('| unanswerable | 5 | 0 | 8 | +10.97771 | +10.05620 | +4.9251..+21.7904 |',doc)
+  self.assertIn('all 64 candidate strings completed',doc.lower())
+  self.assertIn(e.PROTOCOL_SHA,doc)
+  self.assertIn(DONORS,doc)
  def test_reports_when_present(self):
   for m in ('K2','QWEN'):
    report=EVIDENCE/f'EXPERIMENT-034-{m}-EVIDENCE-SWAP.md'
