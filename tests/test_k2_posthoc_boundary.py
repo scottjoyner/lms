@@ -69,9 +69,26 @@ class PostHocBoundaryTests(unittest.TestCase):
                    (1,1,1,7))
  def test_result_hash_and_summary_if_completed(self):
   p=E/'EXPERIMENT-032B-STOP-POSTHOC.md'
-  if not p.is_file():return
+  self.assertTrue(p.is_file())
+  self.assertEqual(m.sha(p),'a4c23ec645a5dfe825257ce8ed481d068011c8ecc0fbb5c07597075364ba8a4c')
   text=p.read_text()
   self.assertIn(m.PROTOCOL_SHA,text)
   self.assertIn(m.EXP029_RESULTS,text)
-  self.assertIn('| short | native |',text)
-  self.assertIn('| gap | always_unknown |',text)
+  expected={
+   ('short','native'):(0,7,0,8,0,0),
+   ('short','alt_cut'):(0,7,0,8,0,0),
+   ('short','first_word'):(6,6,1,7,0,16),
+   ('short','lexical_gate'):(6,6,1,7,0,16),
+   ('short','question_exclusion_gate'):(6,6,4,4,1,16),
+   ('short','always_unknown'):(0,0,8,0,8,16),
+   ('gap','native'):(0,6,0,8,0,0),
+   ('gap','alt_cut'):(0,6,0,8,0,0),
+   ('gap','first_word'):(4,4,1,7,1,16),
+   ('gap','lexical_gate'):(4,4,1,7,1,16),
+   ('gap','question_exclusion_gate'):(4,4,4,4,3,16),
+   ('gap','always_unknown'):(0,0,8,0,8,16)}
+  for (place,rule),count in expected.items():
+   self.assertIn('| '+place+' | '+rule+' | '+' | '.join(map(str,count))+' |',text)
+  self.assertIn('| short | 7 | 9 | 7 | 0 |',text)
+  self.assertIn('| gap | 2 | 14 | 2 | 0 |',text)
+  self.assertIn('No gold or is_unanswerable flag passed to any interpretation rule.',text)

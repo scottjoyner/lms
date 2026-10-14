@@ -246,3 +246,31 @@ Central Markdown `EXPERIMENT-031-TERMINATORS.md` SHA256:
 `a0e7db3d681eb81cc3880715aab9f9542948a4008b1e61516ad7e8c1499beb50`.
 Regression: `tests/test_k2_termination_audit.py`. Original data and
 model service state untouched.
+
+## EXP-032B — post-hoc termination and lexical verification failure
+
+This parallel study is intentionally **EXP-032B**, separate from the
+concurrent EXP-032 MLP-neuron analysis in another LMS worktree.
+`research/k2_posthoc_boundary.py` replays all original 16 short and 16
+long-gap human-gold SQuAD2 K2 prompts under unchanged official mOPD
+weights/native EOS. Six post-hoc interpretation rules score the exact
+same generated traces; the original native results reproduce EXP029
+strict/lenient/UNKNOWN and native-cap counts before writing evidence.
+The source-only lexical evidence controls NEVER consult gold labels or
+unanswerability when selecting output, but they accept unsupported answers
+on **7/8** negative cases in both placements; excluding words also found
+in the question reduces unsupported answers only to **4/8** negative cases.
+First-word readout recovers 6/8 short and 4/8 long-gap strict human gold,
+without becoming an independent entailment verifier. Alternative 64019
+truncation changes **no decoded text** despite being emitted 7/16 short,
+2/16 gap. Always-UNKNOWN has zero unsupported answers and zero factual
+coverage. No serving EOS changes, no model mutation or registration.
+
+All measured observations in central human-readable Markdown:
+`EXPERIMENT-032B-STOP-POSTHOC.md`, SHA256
+`a4c23ec645a5dfe825257ce8ed481d068011c8ecc0fbb5c07597075364ba8a4c`;
+prospective `EXPERIMENT-032B-STOP-POSTHOC-PROTOCOL.md`.
+The original SQuAD2 human gold is a tiny reused dev subset; no population
+performance, production semantic verification, training-teacher, or latent
+neuron ancestry claim. Run `tests/test_k2_posthoc_boundary.py` for source,
+non-oracle postprocessors, known counterexamples and exact 12-cell receipt.
