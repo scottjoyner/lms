@@ -14,7 +14,9 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .hermes_real_cypher_gate import OWNER, SERVICE, OwnerWitness, verify_final_answer
+from .hermes_real_cypher_gate import (
+    OWNER, SERVICE, OwnerWitness, ScratchCypherGate, verify_final_answer,
+)
 
 TOOL = "mcp__lms_benchmark__graph_query"
 CASE = "mcp_tool_distractor_selection"
@@ -156,6 +158,9 @@ def _verify_native(trial: Path) -> dict[str, Any]:
         raise ValueError("Cypher call not explicitly read-only")
     if set(args) != {"query", "read_only"} or not isinstance(args["query"], str):
         raise ValueError("unexpected Cypher argument contract")
+    # Independently enforce the read-only owner lookup grammar. A plausible
+    # looking owner record is insufficient to establish native provenance.
+    ScratchCypherGate._safe_query(args["query"], None, True)
     matches = []
     for index, message in enumerate(messages):
         if not isinstance(message, dict) or message.get("role") != "tool":
@@ -220,7 +225,9 @@ def _verify_native(trial: Path) -> dict[str, Any]:
     }
 
 
-def audit_native_trial(trial_dir: Path) -> dict[str, Any]:
+def audit_native_trial(
+    trial_dir: Path, *, expected_container_id: str | None = None,
+) -> dict[str, Any]:
     """A successful transcript match is NOT an independent teardown or release."""
     output = {
         "schema": "lms-hermes-native-http-provenance.v1",
@@ -231,7 +238,11 @@ def audit_native_trial(trial_dir: Path) -> dict[str, Any]:
         "research_only": True,
     }
     try:
-        output.update(_verify_native(trial_dir.resolve(strict=True)))
-    except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+        verified = _verify_native(trial_dir.resolve(strict=True))
+        if (expected_container_id is not None
+                and verified["exact_container_id"] != expected_container_id):
+            raise ValueError("native result came from different scoped research container")
+        output.update(verified)
+    except (OSError, ValueError, KeyError, IndexError, TypeError, RuntimeError) as exc:
         output["denial"] = str(exc)
     return output

@@ -265,3 +265,83 @@ def test_native_bridge_tampering_denied(trial, tamper, reason):
     outcome = audit_native_trial(trial)
     assert outcome["native_transcript_http_correlated"] is False
     assert reason in outcome["denial"]
+
+def test_independent_cypher_shape_check_rejects_canned_result(trial):
+    """A forged owner row cannot rescue an unbound query, even with hashes."""
+    record_path = trial / "fixture-state" / "calls.jsonl"
+    record = json.loads(record_path.read_text())
+    forged = "MATCH (s:Service {name: 'router-api'}) RETURN 'team-atlas' AS owner"
+    record["arguments"]["query"] = forged
+    _jsonl(record_path, [record])
+    artifact = trial / "agent-result.json"
+    agent = json.loads(artifact.read_text())
+    call = agent["result"]["messages"][1]["tool_calls"][0]["function"]
+    call["arguments"] = json.dumps(record["arguments"])
+    _write(artifact, agent)
+    result = audit_native_trial(trial)
+    assert result["native_transcript_http_correlated"] is False
+    assert "owner projection is not bound" in result["denial"]
+
+
+def test_scoped_container_id_must_match_native_owner_witness(trial):
+    accepted = audit_native_trial(trial, expected_container_id=CID)
+    assert accepted["native_transcript_http_correlated"] is True
+    rejected = audit_native_trial(trial, expected_container_id="f" * 64)
+    assert rejected["native_transcript_http_correlated"] is False
+    assert "different scoped research container" in rejected["denial"]
+
+
+def test_posthoc_three_replays_with_same_container_are_not_physical_acceptance(
+    trial, tmp_path, monkeypatch,
+):
+    """Three otherwise valid transcripts cannot reuse one scratch Neo4j ID."""
+    import shutil
+    import subprocess
+
+    from scripts.hermes_native_posthoc_rescore import score_existing_run
+
+    original = tmp_path / "native-experiment"
+    originals = []
+    for i in (1, 2, 3):
+        target = original / "trial-roots" / "mcp_tool_distractor_selection" / f"trial-{i:02d}"
+        shutil.copytree(trial, target)
+        report_file = target / "trial-report.json"
+        report = json.loads(report_file.read_text())
+        report["trial_index"] = i
+        _write(report_file, report)
+        old = {
+            "exact_container_removed": True,
+            "scratch_container_id": CID,
+            "teardown_receipt": {
+                "docker_daemon_healthy": True,
+                "exact_container_absent": True,
+            },
+            "native_transcript_http_correlated": True,
+            "runner_valid": True,
+        }
+        _write(target / "native-independent-provenance.json", old)
+        originals.append(old)
+    _write(original / "native-research-summary.json", {
+        "run_count_expected": 3,
+        "trials": originals,
+        "owned_container_ids": [CID, CID, CID],
+        "research_only": True,
+        "native_correlated_count": 3,
+        "model_server_removed": True,
+    })
+
+    def missing_container(command, **kwargs):
+        if command[:2] == ["docker", "info"]:
+            return subprocess.CompletedProcess(command, 0, "29.8.2\n", "")
+        assert command[:2] == ["docker", "inspect"]
+        return subprocess.CompletedProcess(
+            command, 1, "", f"error: no such object: {CID}",
+        )
+
+    monkeypatch.setattr(subprocess, "run", missing_container)
+    rescore = score_existing_run(original)
+    assert rescore["posthoc_native_success_count"] == 3
+    assert rescore["distinct_owned_container_ids_verified"] is False
+    assert rescore["physical_source_custody_verified"] is False
+    assert rescore["physical_three_trial_acceptance"] is False
+    assert rescore["case_gate_passed"] is False

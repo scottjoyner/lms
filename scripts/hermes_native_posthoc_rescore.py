@@ -68,7 +68,10 @@ def score_existing_run(root: Path) -> dict:
             raise ValueError(f"trial {index} identity mismatch")
         if old.get("exact_container_removed") is not True:
             raise ValueError(f"trial {index} missing original teardown proof")
-        updated = audit_native_trial(trial)
+        old_container_id = old.get("scratch_container_id")
+        updated = audit_native_trial(
+            trial, expected_container_id=old_container_id,
+        )
         container_id = None
         for record in (trial / "fixture-state" / "calls.jsonl").read_text().splitlines():
             parsed = json.loads(record)
@@ -82,11 +85,23 @@ def score_existing_run(root: Path) -> dict:
         now_absent = None
         if container_id:
             try:
-                current = subprocess.run(
-                    ["docker", "inspect", "--format", "{{.Id}}", container_id],
+                healthy = subprocess.run(
+                    ["docker", "info", "--format", "{{.ServerVersion}}"],
                     capture_output=True, text=True, timeout=12, check=False,
                 )
-                now_absent = current.returncode != 0 and not current.stdout.strip()
+                if healthy.returncode == 0 and healthy.stdout.strip():
+                    current = subprocess.run(
+                        ["docker", "inspect", "--format", "{{.Id}}", container_id],
+                        capture_output=True, text=True, timeout=12, check=False,
+                    )
+                    # Only an exact "no such object: ID" from a healthy daemon
+                    # proves absence. Socket errors and wrong IDs are UNKNOWN.
+                    now_absent = (
+                        current.returncode == 1
+                        and not current.stdout.strip()
+                        and current.stderr.strip().lower()
+                        == f"error: no such object: {container_id}"
+                    )
             except (OSError, subprocess.TimeoutExpired):
                 now_absent = None
         outcome["trials"].append({
@@ -97,6 +112,8 @@ def score_existing_run(root: Path) -> dict:
             "original_runner_valid": old.get("runner_valid"),
             "timed_out": report.get("timed_out"),
             "original_teardown_verified": True,
+            "original_scoped_container_id": old_container_id,
+            "original_exact_teardown_receipt": old.get("teardown_receipt"),
             "current_container_absent_from_docker": now_absent,
             "native_evidence": updated,
         })
@@ -104,10 +121,31 @@ def score_existing_run(root: Path) -> dict:
         trial["native_evidence"]["native_transcript_http_correlated"] is True
         for trial in outcome["trials"]
     )
+    # Historical v1 timeouts lack per-trial exact-ID custody receipts.
+    # Count observable native successes without rewriting that history, but
+    # NEVER claim 3/3 physical acceptance without three separate, matching,
+    # independently rechecked research container identities.
+    ids = [trial.get("original_scoped_container_id")
+           for trial in outcome["trials"]]
+    distinct = (all(isinstance(cid, str) and ID_RE.fullmatch(cid) for cid in ids)
+                and len(set(ids)) == 3)
+    original_order = before.get("owned_container_ids")
+    custody = (distinct and original_order == ids
+               and all(
+                   trial["native_evidence"].get("exact_container_id") == cid
+                   and trial["current_container_absent_from_docker"] is True
+                   and (trial["original_exact_teardown_receipt"] or {}).get(
+                       "docker_daemon_healthy") is True
+                   and (trial["original_exact_teardown_receipt"] or {}).get(
+                       "exact_container_absent") is True
+                   for trial, cid in zip(outcome["trials"], ids)
+               ))
+    outcome["distinct_owned_container_ids_verified"] = bool(distinct)
+    outcome["physical_source_custody_verified"] = bool(custody)
     outcome["physical_three_trial_acceptance"] = (
         outcome["posthoc_native_success_count"] == 3
         and outcome["model_server_teardown_reported"]
-        and all(t["original_teardown_verified"] for t in outcome["trials"])
+        and custody
     )
     # Even if a future run passes 3/3, review, PR merge and routing remain
     # separate decisions that this script cannot authorize.

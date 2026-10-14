@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -76,6 +77,28 @@ def _trial_command(args, **kwargs):
     return command
 
 
+def _verify_exact_container_removed(container_id: str) -> dict:
+    """Fail closed if Docker is down; an arbitrary nonzero inspect is not proof."""
+    if not re.fullmatch(r"[0-9a-f]{64}", container_id):
+        raise RuntimeError("invalid exact owned research container ID")
+    healthy = subprocess.run(
+        ["docker", "info", "--format", "{{.ServerVersion}}"],
+        text=True, capture_output=True, timeout=12, check=False,
+    )
+    if healthy.returncode != 0 or not healthy.stdout.strip():
+        raise RuntimeError("Docker daemon unhealthy; teardown status UNKNOWN")
+    inspected = subprocess.run(
+        ["docker", "inspect", "--format", "{{.Id}}", container_id],
+        text=True, capture_output=True, timeout=12, check=False,
+    )
+    expected = f"error: no such object: {container_id}"
+    if (inspected.returncode != 1 or inspected.stdout.strip()
+            or inspected.stderr.strip().lower() != expected):
+        raise RuntimeError("exact owned research container absence NOT established")
+    return {"docker_daemon_healthy": True, "docker_inspect_exit_code": 1,
+            "exact_container_absent": True}
+
+
 def _die(_signal, _frame):
     raise RuntimeError("native research interrupted; attempt bounded teardown")
 
@@ -114,6 +137,7 @@ def main(argv=None):
         "qualification_authorized": False,
         "model_sha256": EXPECTED_SHA,
         "run_count_expected": 3, "trials": [],
+        "owned_container_ids": [],
         "model_server_removed": False,
     }
     previous = signal.signal(signal.SIGTERM, _die)
@@ -159,6 +183,10 @@ def main(argv=None):
             state["server_ready"] = True
             for index in (1, 2, 3):
                 with ScratchHermesArchive() as scratch:
+                    container_id = scratch.container_id
+                    if container_id in state["owned_container_ids"]:
+                        raise RuntimeError("duplicate research container identity")
+                    state["owned_container_ids"].append(container_id)
                     os.environ.update(env)
                     os.environ["LFM25_DISPOSABLE_NEO4J_ID"] = scratch.container_id
                     trial = bench.run_one_trial(
@@ -168,14 +196,14 @@ def main(argv=None):
                     container_id = scratch.container_id
                 if not scratch.destroyed:
                     raise RuntimeError("per-trial scratch teardown unverified")
-                inspected = subprocess.run(
-                    ["docker", "inspect", "--format", "{{.Id}}", container_id],
-                    text=True, capture_output=True, timeout=12, check=False,
-                )
-                if inspected.returncode == 0:
-                    raise RuntimeError("owned scratch container survived teardown")
+                teardown = _verify_exact_container_removed(container_id)
                 folder = root / case["case_key"] / f"trial-{index:02d}"
-                audit = audit_native_trial(folder)
+                audit = audit_native_trial(
+                    folder, expected_container_id=container_id,
+                )
+                audit["scratch_container_id"] = container_id
+                audit["teardown_receipt"] = teardown
+                audit["teardown_verified"] = True
                 audit["exact_container_removed"] = True
                 audit["runner_valid"] = bool(trial.get("valid"))
                 state["trials"].append(audit)
