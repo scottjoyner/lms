@@ -1,14 +1,12 @@
 """Offline security/semantics regression for isolated real-Cypher graph witness."""
 from __future__ import annotations
-import copy
-import json
 import json
 import subprocess
 
 import pytest
 
 from lms_agent_bench.hermes_real_cypher_gate import (
-    CONTAINER_NAME, OWNER, SCRATCH_IMAGE, RESEARCH_LABEL, MAX_RAM,
+    CONTAINER_NAME, SCRATCH_IMAGE, RESEARCH_LABEL, MAX_RAM,
     ScratchCypherGate, WitnessDenied, verify_final_answer,
 )
 
