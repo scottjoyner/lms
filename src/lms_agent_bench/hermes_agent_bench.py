@@ -330,11 +330,30 @@ def trial_process(args: argparse.Namespace) -> int:
                 max_iterations=int(case.get("max_iterations") or 20),
                 enabled_toolsets=["mcp-lms-benchmark"],
             )
-            raw = agent.run_conversation(
-                user_message=prompt,
-                system_message=str(case.get("system") or ""),
-                task_id=f"lms-benchmark-{case.get('case_key')}",
-            )
+            # Explicit research opt-in: observe only loopback HTTP envelopes
+            # containing the native Hermes tool result. Never attach to a
+            # normal/canned benchmark or a production Hermes configuration.
+            from contextlib import nullcontext
+
+            provenance = nullcontext()
+            if os.environ.get("LMS_HERMES_NATIVE_PROVENANCE_RESEARCH") == "1":
+                from lms_agent_bench.hermes_native_http_probe import observe_loopback_http
+
+                config = load_json(home / "config.yaml")
+                mcp_args = config["mcp_servers"]["lms-benchmark"]["args"]
+                if ("hermes_live_graph_fixture.py" not in
+                        {Path(str(part)).name for part in mcp_args}
+                        or "--confirm-research-only" not in mcp_args):
+                    raise ValueError("HTTP provenance probe requires isolated live research MCP")
+                provenance = observe_loopback_http(
+                    state_dir / "model-http-receipts.jsonl", endpoint=args.endpoint,
+                )
+            with provenance:
+                raw = agent.run_conversation(
+                    user_message=prompt,
+                    system_message=str(case.get("system") or ""),
+                    task_id=f"lms-benchmark-{case.get('case_key')}",
+                )
         finally:
             os.chdir(previous_cwd)
         if not isinstance(raw, Mapping):

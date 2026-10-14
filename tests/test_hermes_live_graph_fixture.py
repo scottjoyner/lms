@@ -85,3 +85,13 @@ def test_graph_schema_remains_visible(fixture):
     result, err = fixture.call("graph_schema", {})
     assert err is False and result["read_only"] is True
     assert "OWNED_BY" in result["relationships"]
+
+
+def test_live_tool_advertisement_is_restricted(fixture):
+    tools = fixture.tools
+    from lms_agent_bench.hermes_mcp_fixture import TOOLS
+    assert [tool["name"] for tool in tools] == [tool["name"] for tool in TOOLS]
+    query = next(tool for tool in tools if tool["name"] == "graph_query")
+    assert query["inputSchema"]["required"] == ["query", "read_only"]
+    assert "parameters" not in query["inputSchema"]["properties"]
+    assert query["inputSchema"]["properties"]["read_only"]["const"] is True
