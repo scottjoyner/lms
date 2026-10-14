@@ -9,6 +9,8 @@ from lms_agent_bench.hermes_mcp_fixture import Fixture, owner_lookup_query_admis
     ("MATCH (s:Service {name:'router-api'}) RETURN s.owner AS owner", {}),
     ("MATCH (s:Service) WHERE s.name=$target RETURN s.owner", {'target':'router-api'}),
     ('MATCH (s:Service) WHERE s.name="router-api" RETURN s.owner', {}),
+    ("MATCH (s:Service {name:'router-api'})-[:OWNED_BY]->(t:Team) RETURN t.name", {}),
+    ("MATCH (s:`Service` {name:'router-api'}) RETURN s.owner", {}),
 ])
 def test_exact_owner_lookups_are_admissible(tmp_path, query, params):
     allowed, _ = owner_lookup_query_admissible(query,params)
@@ -23,6 +25,9 @@ def test_exact_owner_lookups_are_admissible(tmp_path, query, params):
     ('MATCH (n:router-api) RETURN n.owner, n',{}),
     ('MATCH (n:router-api) RETURN n',{}),
     ('MATCH (n) RETURN n LIMIT 50',{}),
+    ("MATCH (s:service {name:'router-api'}) RETURN s.owner",{}),
+    ("MATCH (s:SERVICE {name:'router-api'}) RETURN s.owner",{}),
+    ("MATCH (s:Service {Name:'router-api'}) RETURN s.owner",{}),
     ('SELECT * FROM services WHERE name="router-api"',{}),
     ("MATCH (s:Service {name:'worker-api'}) RETURN s.owner",{}),
     ('MATCH (s:Service) WHERE s.name=$target RETURN s.owner',{'target':'worker-api'}),
