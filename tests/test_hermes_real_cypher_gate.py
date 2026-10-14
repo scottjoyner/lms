@@ -224,3 +224,125 @@ def test_archived_trial_wrong_case_key_fails_closed(tmp_path):
     (folder/"trial-report.json").write_text(json.dumps(record))
     with pytest.raises(ValueError,match="unexpected Hermes case"):
         score_archived_trial(folder,ScratchCypherGate(expected_container_id=CONTAINER_ID))
+
+
+def test_scratch_run_command_hard_isolation():
+    from lms_agent_bench.hermes_scratch_replay import RUN_COMMAND, CONTAINER_NAME
+    assert RUN_COMMAND[:4] == ["docker", "run", "-d", "--name"]
+    assert RUN_COMMAND[4] == CONTAINER_NAME
+    assert RUN_COMMAND[RUN_COMMAND.index("--network") + 1] == "none"
+    assert RUN_COMMAND[RUN_COMMAND.index("--memory") + 1] == "3g"
+    assert "NEO4J_AUTH=none" in RUN_COMMAND
+    assert "--publish" not in RUN_COMMAND and "-p" not in RUN_COMMAND
+    assert "--volume" not in RUN_COMMAND and "-v" not in RUN_COMMAND
+    assert "--mount" not in RUN_COMMAND
+    assert "/data:rw,size=2g" in RUN_COMMAND
+    assert RUN_COMMAND[-1] == SCRATCH_IMAGE
+
+
+class FakeResearchLifecycle:
+    def __init__(self, *, initially_exists=False, seed_fails=False):
+        self.exists = initially_exists
+        self.seed_fails = seed_fails
+        self.destroyed = False
+        self.ops = []
+
+    def __call__(self, args, *, timeout):
+        self.ops.append(args)
+        if args[1] == "inspect":
+            if not self.exists:
+                return subprocess.CompletedProcess(args, 1, "", "")
+            if "{{json .}}" in args:
+                return subprocess.CompletedProcess(args, 0, json.dumps(container_receipt()), "")
+            return subprocess.CompletedProcess(args, 0, CONTAINER_ID + "\n", "")
+        if args[1] == "run":
+            assert not self.exists
+            self.exists = True
+            return subprocess.CompletedProcess(args, 0, CONTAINER_ID + "\n", "")
+        if args[1] == "rm":
+            assert self.exists
+            self.exists = False
+            self.destroyed = True
+            return subprocess.CompletedProcess(args, 0, CONTAINER_ID + "\n", "")
+        assert args[1] == "exec"
+        query = args[-1]
+        if query.startswith("RETURN 1"):
+            return subprocess.CompletedProcess(args, 0, "ready\n1\n", "")
+        if "count(n)" in query:
+            return subprocess.CompletedProcess(args, 0, "node_count\n0\n", "")
+        if query.startswith("CREATE "):
+            return subprocess.CompletedProcess(args, 1 if self.seed_fails else 0, "", "")
+        if "ORDER BY service" in query:
+            return subprocess.CompletedProcess(
+                args, 0,
+                'service, owner\n"router-api", "team-atlas"\n"worker-api", "team-beta"\n', ""
+            )
+        raise AssertionError("unexpected query in fake harness")
+
+
+def test_scratch_launcher_denies_existing_named_container():
+    from lms_agent_bench.hermes_scratch_replay import ScratchHermesArchive
+    fake = FakeResearchLifecycle(initially_exists=True)
+    with pytest.raises(WitnessDenied, match="exists"):
+        with ScratchHermesArchive(runner=fake):
+            pass
+    assert fake.exists and not fake.destroyed
+    assert not any(x[1] in ("run", "rm", "exec") for x in fake.ops)
+
+
+def test_scratch_launcher_starts_seeds_and_always_tears_down():
+    from lms_agent_bench.hermes_scratch_replay import ScratchHermesArchive
+    fake = FakeResearchLifecycle()
+    with ScratchHermesArchive(runner=fake) as research:
+        assert research.container_id == CONTAINER_ID
+        assert "team-atlas" in research.readback
+        assert fake.exists
+    assert fake.destroyed and not fake.exists
+    assert sum(x[1] == "run" for x in fake.ops) == 1
+    assert sum(x[1] == "rm" for x in fake.ops) == 1
+    assert sum(x[-1].startswith("CREATE ") for x in fake.ops if x[1] == "exec") == 1
+
+
+def test_scratch_launcher_destroys_on_seed_failure():
+    from lms_agent_bench.hermes_scratch_replay import ScratchHermesArchive
+    fake = FakeResearchLifecycle(seed_fails=True)
+    with pytest.raises(WitnessDenied):
+        with ScratchHermesArchive(runner=fake):
+            pass
+    assert fake.destroyed and not fake.exists
+    assert sum(x[1] == "rm" for x in fake.ops) == 1
+
+
+def test_scratch_run_rejects_existing_output_before_docker(tmp_path):
+    from lms_agent_bench.hermes_scratch_replay import run_archived_research
+    output = tmp_path / "receipt.json"
+    output.write_text("existing")
+    with pytest.raises(WitnessDenied, match="overwrite"):
+        run_archived_research(tmp_path, output)
+    assert output.read_text() == "existing"
+
+
+def test_harness_cli_exit_code_does_not_promote_failed_model(monkeypatch, tmp_path):
+    import sys
+    from lms_agent_bench import hermes_scratch_replay as entry
+    monkeypatch.setattr(sys, "argv", ["hermes-scratch", "--confirm-research-only",
+                                       "--case-dir", str(tmp_path), "--output",
+                                       str(tmp_path/"report.json")])
+    monkeypatch.setattr(entry, "run_archived_research", lambda *a, **kw: {
+        "real_end_to_end_pass_count": 1, "trial_count": 3,
+        "case_gate_passed": False,
+    })
+    assert entry.main() == 3
+
+
+def test_harness_cli_zero_only_if_all_trials_pass(monkeypatch, tmp_path):
+    import sys
+    from lms_agent_bench import hermes_scratch_replay as entry
+    monkeypatch.setattr(sys, "argv", ["hermes-scratch", "--confirm-research-only",
+                                       "--case-dir", str(tmp_path), "--output",
+                                       str(tmp_path/"report.json")])
+    monkeypatch.setattr(entry, "run_archived_research", lambda *a, **kw: {
+        "real_end_to_end_pass_count": 3, "trial_count": 3,
+        "case_gate_passed": True,
+    })
+    assert entry.main() == 0
