@@ -194,3 +194,14 @@ Strict exact answers, lenient gold spans, first lexical answer word,
 exact/first UNKNOWN and EOS/token cap are separately counted. A correct
 first word is **not** a strictly valid complete response. Human-gold
 source/predictions are never committed or logged. No model promotion.
+
+## EXP030 completed strict32
+
+Frozen mOPD K2 with only the leading instruction stronger generated all
+32 human-gold short/gap responses. 0/8 strict answers, 0/8 strict UNKNOWN
+for each position; 5/8 answers matched first lexical word in each;
+**all 32 outputs reached the 32-token limit** (baseline 23/32).
+Measured central Markdown `EXPERIMENT-030-STRICT32.md` SHA256
+`4bf704a6b64ef79f0ca5b73cfe2e55b73c8a39990ad5328c8a90367614ba175e`.
+This does not establish correct whole-response output or safe abstention.
+Independent `budget64` arm remains resource-admission gated.

@@ -73,6 +73,15 @@ class TestContract(unittest.TestCase):
                     baseline['short']['caps']),(0,0,9))
   self.assertEqual((baseline['gap']['exact'],baseline['gap']['unknown'],
                     baseline['gap']['caps']),(0,0,14))
+ def test_strict_measured_report_exact_custody(self):
+  p=EVIDENCE/'EXPERIMENT-030-STRICT32.md'
+  self.assertEqual(m.sha(p),'4bf704a6b64ef79f0ca5b73cfe2e55b73c8a39990ad5328c8a90367614ba175e')
+  doc=p.read_text()
+  self.assertIn('| short | 174–317 | 0 | 6 | 5 | 0 | 0 | 8 | 16 |',doc)
+  self.assertIn('| gap | 943–1086 | 0 | 7 | 5 | 0 | 0 | 8 | 16 |',doc)
+  self.assertIn(m.PROTOCOL_SHA,doc)
+  self.assertIn(EXPECTED['strict32'],doc)
+  self.assertIn(m.PARENT_SHA,doc)
  def test_report_if_present(self):
   for arm in m.ARMS:
    p=EVIDENCE/f'EXPERIMENT-030-{arm.upper()}.md'
