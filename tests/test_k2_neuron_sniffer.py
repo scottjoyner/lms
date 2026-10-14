@@ -47,10 +47,21 @@ class TestSniffer(unittest.TestCase):
   self.assertGreater(stats['top32_mass'],0)
   self.assertLessEqual(stats['null_fraction'],1)
   self.assertGreaterEqual(stats['null_fraction'],2/256)
+ def test_measured_report_exact_source_and_cells(self):
+  p=R/'EXPERIMENT-033-NEURON-SNIFFER.md'
+  self.assertEqual(m.sha(p),'f9c0b10b6846eab1e4f675fd0303ce770f80e58ca77748cd9e278b561e7765ff')
+  t=p.read_text()
+  self.assertIn('| 0 | 0.946832 | 25 |',t)
+  self.assertIn('| 7 | 0.603693 | 11 |',t)
+  self.assertIn('| 14 | 0.667980 | 12 |',t)
+  self.assertIn('| 27 | 0.873103 | 23 |',t)
+  self.assertIn('| 2/4 | 7 | 6 | 0.580472 | 0.476405 |',t)
+  self.assertIn('EXPERIMENT-033-PROTOCOL.md',t)
+  self.assertIn(m.PROTOCOL,t)
  def test_report_if_measured(self):
   path=R/'EXPERIMENT-033-NEURON-SNIFFER.md'
   if not path.exists():self.skipTest('Live inference has not finished')
   t=path.read_text()
   self.assertIn(m.PROTOCOL,t)
-  self.assertIn('within-K2',t.lower())
+  self.assertIn('within-k2',t.lower())
   self.assertIn('not',t.lower())

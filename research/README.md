@@ -246,3 +246,20 @@ Central Markdown `EXPERIMENT-031-TERMINATORS.md` SHA256:
 `a0e7db3d681eb81cc3880715aab9f9542948a4008b1e61516ad7e8c1499beb50`.
 Regression: `tests/test_k2_termination_audit.py`. Original data and
 model service state untouched.
+
+## EXP033 gated MLP neuron experiment (completed)
+
+`research/k2_neuron_sniffer.py` hooks the last input-token pre-down-projection
+MLP intermediate activation in K2 midtraining-2 and RL (layers 0/7/14/27)
+and Qwen3.5-0.8B official native chat (layers 0/6/12/23). The protocol
+is independent EXP033 to preserve another research stream's EXISTING EXP032
+stop/lexical source-gate protocol. Exactly 16 human SQuAD2 question inputs
+from eight articles are pinned with source and model SHA256; outputs are
+aggregate Markdown with no raw prompt, per-example neuron activation or
+neuron IDs persisted. K2 top-32 within-coordinate matches and 16-example
+K2/Qwen Gram CKAs have paired/sign-flip/shuffle controls. This is NOT
+causal neuron identification or teacher weight provenance.
+
+Evidence: `~/knowledge/50-Research/llm-research/latent-world-geometry-2026/EXPERIMENT-033-NEURON-SNIFFER.md`,
+SHA256 `f9c0b10b6846eab1e4f675fd0303ce770f80e58ca77748cd9e278b561e7765ff`.
+Tests: `tests/test_k2_neuron_sniffer.py`. No production/graph/NAS mutation.
