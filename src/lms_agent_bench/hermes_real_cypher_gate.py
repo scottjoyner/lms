@@ -91,7 +91,7 @@ class ScratchCypherGate:
         self.expected_container_id = expected_container_id
         self.runner = command_runner
 
-    def _checked_container(self) -> str:
+    def _checked_container(self, *, require_running: bool = True) -> str:
         try:
             receipt = self.runner(
                 ["docker", "inspect", "--format", "{{json .}}", CONTAINER_NAME],
@@ -118,7 +118,7 @@ class ScratchCypherGate:
             raise WitnessDenied("ports forbidden")
         if not (0 < int(host.get("Memory") or 0) <= MAX_RAM):
             raise WitnessDenied("unbounded memory")
-        if (data.get("State") or {}).get("Status") != "running":
+        if require_running and (data.get("State") or {}).get("Status") != "running":
             raise WitnessDenied("scratch Neo4j not running")
         if "NEO4J_AUTH=none" not in config.get("Env", []):
             raise WitnessDenied("unexpected research auth configuration")
