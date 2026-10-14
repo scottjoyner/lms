@@ -171,13 +171,15 @@ def owner_lookup_query_admissible(query: str, parameters: Mapping[str, Any] | No
         return False, "missing MATCH/RETURN Cypher clauses"
     if re.search(r":\s*[A-Za-z_]\w*-[A-Za-z_]\w*", query):
         return False, "hyphenated Cypher label is missing backticks"
+    if not re.search(r":(?:Service\b|`Service`)", query):
+        return False, "case-sensitive Service node label required"
     if re.search(r"(?i)\b(?:DETACH|DELETE|CREATE|MERGE|SET|REMOVE|DROP)\b", query):
         return False, "mutation verb in read-only Cypher"
     values = parameters or {}
     if not isinstance(values, Mapping):
         return False, "parameters must be an object"
-    quoted = re.search(r"(?i)(?:name|id|service)\s*[:=]\s*['\"]router-api['\"]", query)
-    refs = re.findall(r"(?i)(?:name|id|service)\s*=\s*\$([A-Za-z_]\w*)", query)
+    quoted = re.search(r"\bname\s*[:=]\s*['\"]router-api['\"]", query)
+    refs = re.findall(r"\bname\s*=\s*\$([A-Za-z_]\w*)", query)
     bound = any(values.get(ref) == "router-api" for ref in refs)
     if not (quoted or bound):
         return False, "owner lookup must restrict service identity to router-api"
