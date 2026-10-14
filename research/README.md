@@ -205,3 +205,26 @@ Measured central Markdown `EXPERIMENT-030-STRICT32.md` SHA256
 `4bf704a6b64ef79f0ca5b73cfe2e55b73c8a39990ad5328c8a90367614ba175e`.
 This does not establish correct whole-response output or safe abstention.
 Independent `budget64` arm remains resource-admission gated.
+
+## EXP030 both interventions completed
+
+`research/k2_human_output_contract.py` completed 32 SQuAD2 direct model
+generations per arm on the pinned official K2 mOPD checkpoint. Stronger
+single-word/UNKNOWN instruction at 32 tokens did not fix exact outputs,
+and reached the cap on 32/32 items. Holding prompts completely identical
+and raising max_new_tokens to 64 still produced 0/8 exact human gold and
+0/8 exact UNKNOWN at both short and long-gap placements.
+
+`research/k2_human_output_comparison.py` is a **separate SHA-pinned
+Markdown-only** reconciliation with the untouched original 32-token
+EXP029 result. Reports in central knowledge:
+`EXPERIMENT-030-STRICT32.md`, SHA256
+`4bf704a6b64ef79f0ca5b73cfe2e55b73c8a39990ad5328c8a90367614ba175e`;
+`EXPERIMENT-030-BUDGET64.md`, SHA256
+`ac206d810c20668e22c790f687c803be55ef868e02ab846bd576bec12b40b490`;
+`EXPERIMENT-030-COMPARISON.md`, SHA256
+`a47b18bc55bc8f5de83be03726ee4161973e8231684d2f65ebe1eac7b524afc0`.
+Tests `tests/test_k2_human_output_contract.py` and
+`tests/test_k2_human_output_comparison.py` verify all counts and fail-closed
+on tampered source. No original source weights, training, NAS or services
+changed. This study DOES NOT solve UNKNOWN abstention or authorize promotion.

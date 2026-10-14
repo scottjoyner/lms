@@ -82,6 +82,15 @@ class TestContract(unittest.TestCase):
   self.assertIn(m.PROTOCOL_SHA,doc)
   self.assertIn(EXPECTED['strict32'],doc)
   self.assertIn(m.PARENT_SHA,doc)
+ def test_budget64_measured_report_exact_custody(self):
+  p=EVIDENCE/'EXPERIMENT-030-BUDGET64.md'
+  self.assertEqual(m.sha(p),'ac206d810c20668e22c790f687c803be55ef868e02ab846bd576bec12b40b490')
+  doc=p.read_text()
+  self.assertIn('| short | 164–307 | 0 | 8 | 6 | 0 | 0 | 8 | 9 |',doc)
+  self.assertIn('| gap | 933–1076 | 0 | 7 | 4 | 0 | 0 | 8 | 13 |',doc)
+  self.assertIn(m.PROTOCOL_SHA,doc)
+  self.assertIn(EXPECTED['budget64'],doc)
+  self.assertIn(m.PARENT_SHA,doc)
  def test_report_if_present(self):
   for arm in m.ARMS:
    p=EVIDENCE/f'EXPERIMENT-030-{arm.upper()}.md'
