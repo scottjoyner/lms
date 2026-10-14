@@ -55,3 +55,24 @@ Canonical report SHA256:
 `56c4b353462ced77cec1637aa675cb2edd4e1c1190b7f7f2bbe47cec142a69a4`.
 This confirms weight continuity, **not** causal RL change or any
 common Qwen3.5 weight ancestry. Beware default-RoPE↔YaRN confound.
+
+## EXP024 RoPE × model-weight factorial
+
+`research/k2_rope_factorial.py` loads two pinned K2 BF16 checkpoint
+weights sequentially and evaluates each with default and YaRN positional
+encoding **by replacing only the rotary-embedding module in memory**.
+It verifies native EXP018 A/B totals (149/256 and 161/256), checks
+representative learned-tensor SHA256 before and after, runs the same
+256 fact/reversal QA rows, and generates exact 5×5 CKA grids on
+64 reversed fact statements for four controlled contrasts plus the
+native comparison. Nothing is registered with fleet model serving.
+Human-readable output is saved in central `~/knowledge` as
+`EXPERIMENT-024-ROPE-FACTORIAL.md`; SHA256
+`ffd0752b7d160bb0d9582b2d3c73b05a47703c74a3acf5acf692ce3d42b967a3`.
+Tests: `tests/test_k2_rope_factorial.py`.
+**18/18 combined EXP022/023/024 source/evidence tests PASS.**
+
+Interpretation: fixed mid2 learned weights with YaRN scored 160/256
+versus native default 149/256, nearly reproducing native RL/YaRN
+161/256. A nonzero weight×RoPE interaction precludes unique causal
+allocation to historical RL training. Source facts remain synthetic.
