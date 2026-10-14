@@ -7,6 +7,9 @@ All tools other than schema and graph_query fail closed; every call is receipted
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import time
 from pathlib import Path
 
 from lms_agent_bench.hermes_mcp_fixture import Fixture, serve, TOOLS
@@ -76,6 +79,34 @@ class LiveCypherFixture(Fixture):
                 "container_id": proof.container_id,
             },
         }
+        # Separate native engine receipt: tie the actual cypher-shell exit,
+        # parsed columns/rows and exact Docker ID to one MCP request/result.
+        # A replayed canned fixture can never emit this physical witness.
+        if hasattr(self, "_mcp_request_id"):
+            if (getattr(proof, "execution_exit_code", None) != 0
+                    or not isinstance(getattr(proof, "engine_stdout_sha256", None), str)
+                    or len(proof.engine_stdout_sha256) != 64):
+                return {"error": "missing zero-exit Neo4j engine stdout witness"}, True
+            canonical = json.dumps(result, sort_keys=True, separators=(",", ":"),
+                                   ensure_ascii=False).encode("utf-8")
+            result_digest = hashlib.sha256(canonical).hexdigest()
+            engine_receipt = {
+                "schema": "lms-hermes-neo4j-engine-witness.v2",
+                "mcp_request_id": self._mcp_request_id,
+                "query": proof.query,
+                "accepted": proof.accepted,
+                "execution_exit_code": proof.execution_exit_code,
+                "cypher_shell_stdout_sha256": proof.engine_stdout_sha256,
+                "columns": list(proof.columns),
+                "records": [list(row) for row in proof.records],
+                "exact_container_id": proof.container_id,
+                "mcp_result_sha256": result_digest,
+                "timestamp_unix_ns": time.time_ns(),
+            }
+            with (self.state_dir / "neo4j-engine-witnesses.jsonl").open(
+                "a", encoding="utf-8"
+            ) as handle:
+                handle.write(json.dumps(engine_receipt, sort_keys=True) + "\n")
         return result, False
 
 

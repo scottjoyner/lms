@@ -81,6 +81,25 @@ def main(argv=None):
                 raise RuntimeError("missing call-to-MCP request IDs")
             if [x["mcp_request_id"] for x in wire] != [3, 4]:
                 raise RuntimeError("missing flushed MCP wire receipts")
+            from lms_agent_bench.hermes_native_provenance import _hash_json
+
+            engine = [json.loads(x) for x in
+                      (state / "neo4j-engine-witnesses.jsonl").read_text().splitlines()]
+            if (len(engine) != 1 or engine[0].get("schema") !=
+                    "lms-hermes-neo4j-engine-witness.v2"
+                    or not isinstance(engine[0].get("cypher_shell_stdout_sha256"), str)
+                    or len(engine[0]["cypher_shell_stdout_sha256"]) != 64
+                    or engine[0].get("mcp_request_id") != 4
+                    or engine[0].get("query") != QUERY
+                    or engine[0].get("execution_exit_code") != 0
+                    or engine[0].get("accepted") is not True
+                    or engine[0].get("records") != [["team-atlas"]]
+                    or engine[0].get("exact_container_id") != scratch.container_id
+                    or engine[0].get("mcp_result_sha256") != _hash_json(payload)
+                    or not engine[0].get("timestamp_unix_ns", 0)
+                    < wire[1]["timestamp_unix_ns"]):
+                raise RuntimeError("native Neo4j engine receipt failed independent check")
+            result["neo4j_engine_receipt_verified"] = True
             result["graph_owner_verified"] = True
             result["nine_tools_advertised"] = True
             result["mcp_request_ids_linked"] = True
