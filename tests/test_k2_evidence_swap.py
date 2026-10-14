@@ -74,6 +74,14 @@ class EvidenceSwap(unittest.TestCase):
   self.assertIn('all 64 candidate strings completed',doc.lower())
   self.assertIn(e.PROTOCOL_SHA,doc)
   self.assertIn(DONORS,doc)
+ def test_measured_qwen_full_candidate_source_swap(self):
+  p=EVIDENCE/'EXPERIMENT-034-QWEN-EVIDENCE-SWAP.md'
+  self.assertEqual(e.sha(p),'403105ee08da20907de6850574a340544397bb98b5da55f830c13d00685f014d')
+  doc=p.read_text()
+  self.assertIn('| answerable | 8 | 0 | 8 | +30.46691 | +31.33203 | +17.5657..+39.3851 |',doc)
+  self.assertIn('| unanswerable | 1 | 0 | 8 | +17.03037 | +14.53505 | +9.3552..+26.8731 |',doc)
+  self.assertIn('Published native chat template used: **True**',doc)
+  self.assertIn('all 64 candidate strings completed',doc.lower())
  def test_reports_when_present(self):
   for m in ('K2','QWEN'):
    report=EVIDENCE/f'EXPERIMENT-034-{m}-EVIDENCE-SWAP.md'

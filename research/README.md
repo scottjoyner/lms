@@ -246,3 +246,39 @@ Central Markdown `EXPERIMENT-031-TERMINATORS.md` SHA256:
 `a0e7db3d681eb81cc3880715aab9f9542948a4008b1e61516ad7e8c1499beb50`.
 Regression: `tests/test_k2_termination_audit.py`. Original data and
 model service state untouched.
+
+## EXP034 — Human-annotated evidence-swap full-sequence candidate likelihood
+
+In this dedicated isolated LMS worktree, `research/k2_evidence_swap.py`
+reconstructs official 8-article paired SQuAD2 dev human-gold questions,
+checks frozen SHA256 source/model/tokenizer receipts and applies a single
+**gold-blind article-level derangement** chosen to minimize original versus
+donor K2 token-count difference. All eight articles have different donors;
+none of the answerable human-gold words occurs in the donor passage.
+
+Under each unchanged original question, the frozen **K2 mOPD plain** and
+**Qwen3.5-0.8B official native-chat** configurations separately score
+full candidate suffix likelihood of the original article's one-word
+human gold versus uppercase `UNKNOWN`. The same article answer word is a
+foil for a paired human-unanswerable question. Source swapping changes
+only the passage, never model weights, questions or candidate strings.
+The Qwen model's multimodal config does not expose top-level `pad_token_id`;
+use its tokenizer-native ID **248044** instead, with an attention mask.
+
+Both actual 64-complete-suffix per-model passes finished and are recorded
+as aggregate-only human-readable Markdown in central `~/knowledge`:
+`EXPERIMENT-034-K2-EVIDENCE-SWAP.md`, SHA256
+`eea7b12d7de64a74057721006028b2cbef2e70c113d3dd10cfde3610d1cf2661`;
+`EXPERIMENT-034-QWEN-EVIDENCE-SWAP.md`, SHA256
+`403105ee08da20907de6850574a340544397bb98b5da55f830c13d00685f014d`;
+`EXPERIMENT-034-COMPARISON.md`, SHA256
+`b16671fe3d50e8da57571e9911f9e3a54128e948c3d789b54c1282149ac0d54b`.
+
+`research/k2_evidence_swap_compare.py` refuses corrupted, incomplete,
+foreign-chat-template or differently pinned source reports. Test scripts:
+`tests/test_k2_evidence_swap.py`, `tests/test_k2_evidence_swap_compare.py`.
+Important: cross-model raw log-likelihood magnitudes are not comparable;
+source-word preference does not prove question entailment. Public dev data
+were previously exposed, sample only eight article groups, no oracle
+conditional policy and no fleet promotion. Research-only, no NAS, graph,
+production model routing, training or deployment changes.
