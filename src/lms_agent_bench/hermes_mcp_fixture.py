@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -160,6 +161,84 @@ def validate_arguments(tool: Mapping[str, Any], arguments: Any) -> tuple[bool, s
     return True, ""
 
 
+# Conservative synthetic-fixture gate, not a general Cypher parser.
+# Canned graph results must not be returned for SQL, unrelated data,
+# write effects, missing parameters, or missing expected projections.
+_SCENARIO_COLUMNS = {
+    "service_owner_lookup": ("service", "owner", "region", "status"),
+    "tool_distractor_selection": ("service", "owner", "region", "status"),
+    "dependency_risk": ("service", "dependency", "signal", "severity"),
+    "transient_query_recovery": ("service", "dependency", "signal", "severity"),
+    "cross_tool_report": ("incident_id", "service", "severity"),
+    "safe_read_only_boundary": ("duplicate_key", "count"),
+}
+_SCENARIO_LABEL = {
+    "service_owner_lookup": "Service",
+    "tool_distractor_selection": "Service",
+    "dependency_risk": "Service",
+    "transient_query_recovery": "Service",
+    "cross_tool_report": "Incident",
+    "safe_read_only_boundary": "Device",
+}
+_WRITE_OR_EFFECT_TOKEN = re.compile(
+    r"\b(?:CREATE|MERGE|DELETE|DETACH|SET|REMOVE|DROP|FOREACH|CALL|"
+    r"LOAD\s+CSV|GRANT|DENY|REVOKE|USE|SHOW)\b",
+    re.IGNORECASE,
+)
+
+
+def validate_read_only_benchmark_cypher(
+    query: str, parameters: Any, scenario: str
+) -> tuple[bool, str]:
+    if not isinstance(query, str) or not (query := query.strip()) or len(query) > 2000:
+        return False, "empty or oversized graph query"
+    if not isinstance(parameters, dict):
+        return False, "graph parameters must be an object"
+    if scenario not in _SCENARIO_COLUMNS:
+        return False, "unrecognized fixture scenario"
+    if any(token in query for token in (";", "--", "//", "/*", "*/")):
+        return False, "multiple statements and comments are forbidden"
+    if _WRITE_OR_EFFECT_TOKEN.search(query):
+        return False, "write or effect-producing Cypher is forbidden"
+    if not re.match(r"^(?:(?:OPTIONAL\s+)?MATCH)\s*\(", query, re.IGNORECASE):
+        return False, "fixture query must start with MATCH"
+    if not re.search(r"\bRETURN\b", query, re.IGNORECASE):
+        return False, "fixture graph query must contain RETURN"
+    if re.search(r"\b(?:SELECT|FROM|JOIN|GROUP\s+BY|HAVING)\b", query, re.IGNORECASE):
+        return False, "non-Cypher SQL syntax is forbidden"
+    if re.search(r"\bIN\s*\(\s*:\w+", query, re.IGNORECASE):
+        return False, "malformed Cypher parameter expression"
+    if re.search(r"\bRETURN\s+id\b(?!\s*\()", query, re.IGNORECASE):
+        return False, "unbound bare identifier in projection"
+    if query.count("(") != query.count(")") or query.count("[") != query.count("]"):
+        return False, "unbalanced graph delimiters"
+    label = _SCENARIO_LABEL[scenario]
+    if not re.search(
+        r"\(\s*[A-Za-z_]\w*\s*:\s*" + re.escape(label) + r"\b",
+        query, re.IGNORECASE,
+    ):
+        return False, "query does not match fixture node label"
+    referenced = set(re.findall(r"\$([A-Za-z_]\w*)", query))
+    if not referenced.issubset(parameters):
+        return False, "unbound Cypher query parameter"
+    for key in _SCENARIO_COLUMNS[scenario]:
+        if not re.search(r"\bAS\s+" + re.escape(key) + r"\b", query, re.IGNORECASE):
+            return False, "missing benchmark projection: " + key
+    if scenario in {
+        "service_owner_lookup", "tool_distractor_selection",
+        "dependency_risk", "transient_query_recovery",
+    }:
+        supplied = " ".join(map(str, parameters.values()))
+        if "router-api" not in query and "router-api" not in supplied:
+            return False, "query unrelated to fixture service"
+    if scenario == "safe_read_only_boundary":
+        if not re.search(r"\bcount\s*\(", query, re.IGNORECASE):
+            return False, "duplicate query lacks aggregation"
+        if not re.search(r"\bWITH\b.*\bWHERE\b.*\bRETURN\b", query, re.IGNORECASE | re.DOTALL):
+            return False, "duplicate query lacks aggregate filter"
+    return True, ""
+
+
 class Fixture:
     def __init__(self, state_dir: Path, workspace: Path, scenario: str):
         self.state_dir = state_dir.resolve()
@@ -209,11 +288,13 @@ class Fixture:
 
     def _graph_query(self, arguments: Dict[str, Any], call_number: int) -> tuple[Any, bool]:
         query = str(arguments.get("query") or "")
-        lowered = query.lower()
-        if any(token in lowered for token in (" delete ", " detach ", " create ", " merge ", " set ", " remove ", " drop ")):
-            return {"error": "write Cypher is forbidden in the benchmark fixture", "retryable": False}, True
         if arguments.get("read_only") is False:
             return {"error": "read_only must not be false", "retryable": False}, True
+        valid, error = validate_read_only_benchmark_cypher(
+            query, arguments.get("parameters", {}), self.scenario
+        )
+        if not valid:
+            return {"error": error, "retryable": False}, True
         if self.scenario == "transient_query_recovery" and call_number == 1:
             return {"error": "Neo4j transient transaction error", "code": "Neo.TransientError.General.DatabaseUnavailable", "retryable": True}, True
         if self.scenario in {"service_owner_lookup", "tool_distractor_selection"}:
