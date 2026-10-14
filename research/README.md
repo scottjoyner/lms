@@ -102,3 +102,19 @@ descriptive bootstrap for five factorial contrasts. Result SHA256:
 `4452696eb2b567332112b392baac941a403c718053ccb33377dbe6cca020653c`.
 Regression: `tests/test_k2_rope_fact_control.py` (27 LMS scientific
 source/evidence tests passing for EXP022–026).
+
+## EXP027 YaRN frequency versus amplitude
+
+`research/k2_yarn_components.py` uses frozen K2 midtraining-2 weights and
+separately copies official default/YaRN inverse frequencies and rotary
+cosine/sine `attention_scaling` into four in-memory rotary modules.
+`research/k2_rope_components_fixture.py` deterministically generates 256
+source-disjoint authored synthetic A/B and factual/neutral prompts (SHA256
+`ef0f99caa44a96f689c4b80ebe8f842032289238513d99bfbfb44dfa3ca79523`).
+The 2×2 factorial shows a 24/64 both-order correctness gain with *scaling
+alone*, no gain with frequencies alone, and only 37→39/64 debiased
+correct-entity change. Do not conflate the changed letter-readout prior
+with semantic competence. Saved Markdown under `~/knowledge`:
+`EXPERIMENT-027-YARN-COMPONENTS.md`, SHA256
+`d37b5e4babfc3db23ba2a02745e15f987a1552e82404741ef9bfb41f8a797ff2`.
+Regression: `tests/test_k2_yarn_components.py`. No JSON results.
