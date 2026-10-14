@@ -1,10 +1,15 @@
 """Offline negative teardown checks; never invokes real Docker."""
 
 import subprocess
+from pathlib import Path
+from runpy import run_path
 
 import pytest
 
-from scripts.hermes_native_three_trial_research import _verify_exact_container_removed
+_VERIFY = run_path(str(
+    Path(__file__).resolve().parents[1] / "scripts/hermes_native_three_trial_research.py"
+))
+_verify_exact_container_removed = _VERIFY["_verify_exact_container_removed"]
 
 CID = "a" * 64
 
