@@ -76,3 +76,16 @@ Interpretation: fixed mid2 learned weights with YaRN scored 160/256
 versus native default 149/256, nearly reproducing native RL/YaRN
 161/256. A nonzero weight×RoPE interaction precludes unique causal
 allocation to historical RL training. Source facts remain synthetic.
+
+## EXP025 full checkpoint parameter closure
+
+`research/k2_full_weight_lineage.py` recomputes all 255 BF16 tensor
+comparisons per adjacent K2 checkpoint (1,078,285,824 total parameters),
+including the input embedding, norm and LM head omitted by EXP023.
+Fails closed on exact EXP018 SHA, index, 255-key inventory, shape/dtype,
+expected full parameter count, per-tensor finiteness and EXP023 252
+transformer-tensor numerical parity. No raw weight or hidden vectors
+exported. Observations only in central `~/knowledge` as
+`EXPERIMENT-025-FULL-WEIGHT-DRIFT.md`; checksum
+`169507cd918359b189abf208c5708af5a301a8017096b23642864f455f86821a`.
+Tests: `tests/test_k2_full_weight_lineage.py`.
