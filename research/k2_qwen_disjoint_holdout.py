@@ -17,7 +17,7 @@ import torch
 import k2_qwen_candidate_guard as parent
 import k2_disjoint_squad_fixture as fixture
 
-PROTOCOL='f5cdfbe9d2a72417cdbf53937322101f23739f984812e11431cbfcb938e5b36b'
+PROTOCOL='937d28cc94374125952afcf07b9ab291f94bde223566d8217404efcf93ad3c33'
 SOURCE_SELECTION='1382fc12d772628b8dfd2cf250dc36c8f35b9215d774db89dba05bc912e5ee65'
 N_SOURCE=16
 ARMS=('first_word','lexical_gate','question_exclusion','qwen_verifier','always_unknown')
@@ -142,7 +142,7 @@ def main():
     if len(candidates)!=32:raise RuntimeError('K2 native cohort incomplete')
     subset=[i for i,c in enumerate(candidates) if c['verified_candidate_eligible']]
     if not subset:raise RuntimeError('No Qwen-eligible candidate: unresolved low coverage')
-    if parent.memory_gib()<36:raise RuntimeError('Pre-Qwen memory admission gate')
+    if parent.memory_gib()<34:raise RuntimeError('Amended pre-Qwen memory admission gate (34GiB)')
     qwen,qtok,qreceipt=loaders.load_model('qwen08_chat')
     if qreceipt['revision']!=parent.QWEN_REV or not qreceipt['native_chat_template']:
         raise RuntimeError('Qwen revision or native chat template mismatch')
