@@ -139,3 +139,22 @@ check.** Central measured Markdown `EXPERIMENT-028-CONTEXT-GAP.md`
 SHA256 `97adff195b2d50b5a57877434db4313994ef1a700920517f9d98f0ea7a65eeec`. Frequency-only switching did not produce a
 consistent improvement across these four small, placement-matched cells.
 The two-source-group pilot remains **too small for generalization**.
+
+## EXP029 public human-annotated QA + abstention (preflight)
+
+`research/k2_human_grounded_qa.py` deterministically filters the official
+Stanford SQuAD 2.0 dev split (source SHA256
+`80a5225e94905956a6446d296ca1093975c4d3b3260f1d6c8f68bc2ab77182d8`),
+selects eight unique article topics each with one one-word answerable
+and one unanswerable human-written question, and uses direct token
+generation rather than A/B logits. The same 768-token neutral filler
+appears either before source evidence or between evidence and question,
+with per-question matched input length. Gold source selection digest:
+`aad6e578544e2a3f100ab4b5c93d7ee6158fbfbe14bd426b8bffd9f9d1cde23b`.
+All source checks, annotations/spans, strict/lenient/UNKNOWN scoring,
+K2 tokenizer and native Qwen chat tokenizer passed 7 offline tests.
+No raw human dataset, prediction strings or label sources are committed;
+source dataset must be staged locally with original CC BY-SA 4.0 attribution.
+Each model requires an independently complete resource-gated 48-prompt
+pass before any outcome is added to the canonical Markdown evidence.
+K2 is not assigned a fictitious chat template. Nothing deployed.
