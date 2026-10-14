@@ -425,3 +425,82 @@ def test_posthoc_three_replays_with_same_container_are_not_physical_acceptance(
     assert rescore["physical_source_custody_verified"] is False
     assert rescore["physical_three_trial_acceptance"] is False
     assert rescore["case_gate_passed"] is False
+
+
+@pytest.mark.parametrize("daemon_healthy", [True, False])
+def test_timed_out_trials_still_have_independent_exact_id_teardown_custody(
+    trial, tmp_path, monkeypatch, daemon_healthy,
+):
+    """Three missing native answers are NO-GO even with three removed IDs."""
+    import shutil
+    import subprocess
+    from pathlib import Path
+    from runpy import run_path
+
+    runner = run_path(str(
+        Path(__file__).resolve().parents[1] / "scripts/hermes_native_posthoc_rescore.py"
+    ))
+    score_existing_run = runner["score_existing_run"]
+    experiment = tmp_path / "timed-out-native-research"
+    ids = [char * 64 for char in ("a", "b", "c")]
+    audits = []
+    for index, container_id in enumerate(ids, 1):
+        target = experiment / "trial-roots/mcp_tool_distractor_selection" / f"trial-{index:02d}"
+        shutil.copytree(trial, target)
+        (target / "agent-result.json").unlink()
+        report_path = target / "trial-report.json"
+        report = json.loads(report_path.read_text())
+        report.update({
+            "trial_index": index, "valid": False, "passed": False,
+            "timed_out": True, "process_returncode": 124,
+            "final_response": "",
+        })
+        _write(report_path, report)
+        rejected = {
+            "mcp_request_id": index, "sequence": 1,
+            "tool": "graph_query", "argument_valid": True,
+            "arguments": {"query": "MATCH (n) RETURN n", "read_only": True},
+            "is_error": True, "result": {"error": "read-only owner shape denied"},
+        }
+        _jsonl(target / "fixture-state/calls.jsonl", [rejected])
+        audit = {
+            "exact_container_removed": True,
+            "scratch_container_id": container_id,
+            "teardown_receipt": {
+                "docker_daemon_healthy": True,
+                "exact_container_absent": True,
+            },
+            "runner_valid": False, "native_transcript_http_correlated": False,
+        }
+        _write(target / "native-independent-provenance.json", audit)
+        audits.append(audit)
+    _write(experiment / "native-research-summary.json", {
+        "trials": audits, "run_count_expected": 3,
+        "owned_container_ids": ids,
+        "research_only": True, "model_server_removed": True,
+        "native_correlated_count": 0,
+    })
+
+    def docker(args, **kwargs):
+        if args[:2] == ["docker", "info"]:
+            return subprocess.CompletedProcess(
+                args, 0 if daemon_healthy else 1,
+                "29.8.2\n" if daemon_healthy else "", "" if daemon_healthy else "down",
+            )
+        assert args[:2] == ["docker", "inspect"]
+        assert args[-1] in ids
+        return subprocess.CompletedProcess(
+            args, 1, "", f"error: no such object: {args[-1]}",
+        )
+
+    monkeypatch.setattr(subprocess, "run", docker)
+    scored = score_existing_run(experiment)
+    assert scored["posthoc_native_success_count"] == 0
+    assert scored["posthoc_engine_witness_count"] == 0
+    assert scored["distinct_owned_container_ids_verified"] is True
+    assert scored["physical_scratch_custody_verified"] is daemon_healthy
+    assert scored["physical_source_custody_verified"] is daemon_healthy
+    assert scored["physical_three_trial_acceptance"] is False
+    assert scored["case_gate_passed"] is False
+    assert all(t["native_evidence"]["native_transcript_http_correlated"] is False
+               for t in scored["trials"])

@@ -72,14 +72,30 @@ def score_existing_run(root: Path) -> dict:
         updated = audit_native_trial(
             trial, expected_container_id=old_container_id,
         )
-        container_id = None
+        # Failed/timed-out queries have no owner row, hence no result-side
+        # container_id. Never require successful inference to audit cleanup:
+        # use the exact ID captured *before* this trial by the native runner.
+        # Historic pre-custody runs may still fall back to their accepted
+        # query's result ID, but cannot earn the three-ID custody gate.
+        resource_ids = set()
         for record in (trial / "fixture-state" / "calls.jsonl").read_text().splitlines():
             parsed = json.loads(record)
             summary = (parsed.get("result") or {}).get("summary") or {}
             candidate = summary.get("container_id")
-            if isinstance(candidate, str) and ID_RE.fullmatch(candidate):
-                container_id = candidate
-                break
+            if candidate is not None:
+                if not isinstance(candidate, str) or not ID_RE.fullmatch(candidate):
+                    raise ValueError(f"trial {index} has invalid graph resource identity")
+                resource_ids.add(candidate)
+        if len(resource_ids) > 1:
+            raise ValueError(f"trial {index} mixes graph resource identities")
+        if (resource_ids and old_container_id is not None
+                and resource_ids != {old_container_id}):
+            raise ValueError(f"trial {index} graph result mismatches owned scratch ID")
+        container_id = (
+            old_container_id
+            if isinstance(old_container_id, str) and ID_RE.fullmatch(old_container_id)
+            else next(iter(resource_ids), None)
+        )
         # The original research runner verified teardown at physical run time.
         # Fresh Docker inspection is supplementary; daemon errors remain UNKNOWN.
         now_absent = None
@@ -113,6 +129,7 @@ def score_existing_run(root: Path) -> dict:
             "timed_out": report.get("timed_out"),
             "original_teardown_verified": True,
             "original_scoped_container_id": old_container_id,
+            "result_resource_ids": sorted(resource_ids),
             "original_exact_teardown_receipt": old.get("teardown_receipt"),
             "current_container_absent_from_docker": now_absent,
             "native_evidence": updated,
@@ -139,7 +156,9 @@ def score_existing_run(root: Path) -> dict:
     original_order = before.get("owned_container_ids")
     custody = (distinct and original_order == ids
                and all(
-                   trial["native_evidence"].get("exact_container_id") == cid
+                   (trial["native_evidence"].get("native_transcript_http_correlated")
+                    is not True
+                    or trial["native_evidence"].get("exact_container_id") == cid)
                    and trial["current_container_absent_from_docker"] is True
                    and (trial["original_exact_teardown_receipt"] or {}).get(
                        "docker_daemon_healthy") is True
@@ -148,6 +167,9 @@ def score_existing_run(root: Path) -> dict:
                    for trial, cid in zip(outcome["trials"], ids)
                ))
     outcome["distinct_owned_container_ids_verified"] = bool(distinct)
+    outcome["physical_scratch_custody_verified"] = bool(custody)
+    # Backward-compatible field: custody of the source container only, NOT
+    # correctness of an owner query or authenticated engine provenance.
     outcome["physical_source_custody_verified"] = bool(custody)
     outcome["physical_three_trial_acceptance"] = (
         outcome["posthoc_native_success_count"] == 3
