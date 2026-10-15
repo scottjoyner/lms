@@ -284,7 +284,7 @@ class Fixture:
         return {"columns": [], "records": [], "summary": {"read_only": True, "records": 0}}, False
 
     def call(self, name: str, arguments: Any) -> tuple[Any, bool]:
-        tool = next((item for item in TOOLS if item["name"] == name), None)
+        tool = next((item for item in getattr(self, "tools", TOOLS) if item["name"] == name), None)
         if tool is None:
             result = {"error": f"unknown tool: {name}"}
             self._record(name, arguments, False, result, True)
@@ -385,7 +385,7 @@ def serve(fixture: Fixture) -> int:
         elif method == "ping":
             output = response_result(request_id, {})
         elif method == "tools/list":
-            output = response_result(request_id, {"tools": TOOLS})
+            output = response_result(request_id, {"tools": getattr(fixture, "tools", TOOLS)})
         elif method == "tools/call":
             params = message.get("params") if isinstance(message.get("params"), dict) else {}
             name = str(params.get("name") or "")
