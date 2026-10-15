@@ -87,3 +87,16 @@ def test_native_worker_adapter_has_generic_no_answer(tmp_path):
     assert "team-atlas" not in GENERIC
     assert receipt["qualification_authorized"] is False
     assert (tmp_path / "private.txt").stat().st_mode & 0o077 == 0
+
+
+def test_entrypoint_explicit_worker_disclosure_branch():
+    from pathlib import Path
+    # Source guard on the research-specific child process, not Hermes global code.
+    path = Path(__file__).resolve().parents[1] / (
+        "scripts/hermes_native_worker_holdout_entrypoint.py"
+    )
+    src = path.read_text()
+    assert 'if mode == "worker":' in src
+    assert 'if mode in ("specific", "generic"):' not in src
+    assert 'kw["skip_tool_search_assembly"] = True' in src
+    assert '"--research-holdout-service", "worker-api"' in src

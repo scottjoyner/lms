@@ -100,7 +100,7 @@ def scoped_trial(args):
             original_get_defs = model_tools.get_tool_definitions
             original_run_defs = run_agent.get_tool_definitions
 
-            if mode in ("specific", "generic"):
+            if mode == "worker":
                 def visible_direct(*arguments, **kw):
                     if kw.get("enabled_toolsets") == ["mcp-lms-benchmark"]:
                         kw = dict(kw)
