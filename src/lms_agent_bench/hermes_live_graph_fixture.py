@@ -34,11 +34,19 @@ LIVE_TOOLS = [
 
 class LiveCypherFixture(Fixture):
     tools = LIVE_TOOLS
-    def __init__(self, state_dir, workspace, scenario, container_id):
+    def __init__(self, state_dir, workspace, scenario, container_id,
+                 *, service_name="router-api"):
         if scenario != "tool_distractor_selection":
             raise WitnessDenied("unsupported live-scoped Hermes scenario")
         super().__init__(state_dir, workspace, scenario)
-        self.gate = ScratchCypherGate(expected_container_id=container_id)
+        # Preserve the original default contract for existing callers/tests.
+        # Only the explicit, allowlisted scratch holdout passes a new target.
+        if service_name == "router-api":
+            self.gate = ScratchCypherGate(expected_container_id=container_id)
+        else:
+            self.gate = ScratchCypherGate(
+                expected_container_id=container_id, service_name=service_name,
+            )
         self.gate._checked_container()
 
     def call(self, name, arguments):
@@ -117,6 +125,9 @@ def main():
     parser.add_argument("--workspace", required=True)
     parser.add_argument("--scenario", required=True)
     parser.add_argument("--research-container-id", required=True)
+    parser.add_argument("--research-holdout-service",
+                        choices=("router-api", "worker-api"),
+                        default="router-api")
     parser.add_argument("--confirm-research-only", action="store_true")
     args = parser.parse_args()
     if not args.confirm_research_only:
@@ -124,6 +135,7 @@ def main():
     fixture = LiveCypherFixture(
         Path(args.state_dir), Path(args.workspace), args.scenario,
         args.research_container_id,
+        service_name=args.research_holdout_service,
     )
     return serve(fixture)
 

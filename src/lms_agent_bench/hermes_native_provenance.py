@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from .hermes_real_cypher_gate import (
-    OWNER, SERVICE, OwnerWitness, ScratchCypherGate, verify_final_answer,
+    OWNER, SERVICE, RESEARCH_OWNERS, OwnerWitness, ScratchCypherGate,
+    verify_final_answer,
 )
 
 TOOL = "mcp__lms_benchmark__graph_query"
@@ -89,7 +90,7 @@ def _assistant_args(message: Any, call_id: str) -> Any:
 
 def _engine_witness_verified(path: Path, *, call_id: int | str,
                              query: str, container_id: str,
-                             result_digest: str, latest_ns: int) -> bool:
+                             result_digest: str, latest_ns: int, expected_owner: str = OWNER) -> bool:
     """A physical cypher-shell exit/readback is a stronger gate than MCP text.
 
     Older archived native runs lack this separate receipt. Their HTTP bridge
@@ -113,13 +114,18 @@ def _engine_witness_verified(path: Path, *, call_id: int | str,
             or not isinstance(receipt.get("cypher_shell_stdout_sha256"), str)
             or not CID.fullmatch(receipt["cypher_shell_stdout_sha256"])
             or receipt.get("columns") not in (["owner"], ["s.owner"], ["n.owner"], ["t.name"])
-            or receipt.get("records") != [[OWNER]]
+            or receipt.get("records") != [[expected_owner]]
             or type(stamp) is not int or not 0 < stamp < latest_ns):
         raise ValueError("Neo4j engine witness failed independent custody/readback check")
     return True
 
 
-def _verify_native(trial: Path) -> dict[str, Any]:
+def _verify_native(
+    trial: Path, *, service_name: str = SERVICE,
+) -> dict[str, Any]:
+    if service_name not in RESEARCH_OWNERS:
+        raise ValueError("native target is outside fixed scratch allowlist")
+    expected_owner = RESEARCH_OWNERS[service_name]
     files = {
         "trial": trial / "trial-report.json",
         "agent": trial / "agent-result.json",
@@ -177,7 +183,7 @@ def _verify_native(trial: Path) -> dict[str, Any]:
     summary = result.get("summary") or {}
     owner_rows = result.get("records")
     if (result.get("columns") != ["owner"]
-            or owner_rows != [{"owner": OWNER}]
+            or owner_rows != [{"owner": expected_owner}]
             or summary.get("source") != "disposable_real_neo4j"
             or summary.get("read_only") is not True
             or summary.get("records") != 1):
@@ -192,7 +198,9 @@ def _verify_native(trial: Path) -> dict[str, Any]:
         raise ValueError("unexpected Cypher argument contract")
     # Independently enforce the read-only owner lookup grammar. A plausible
     # looking owner record is insufficient to establish native provenance.
-    ScratchCypherGate._safe_query(args["query"], None, True)
+    ScratchCypherGate._safe_query(
+        args["query"], None, True, service_name=service_name,
+    )
     matches = []
     for index, message in enumerate(messages):
         if not isinstance(message, dict) or message.get("role") != "tool":
@@ -237,15 +245,16 @@ def _verify_native(trial: Path) -> dict[str, Any]:
         raise ValueError("model HTTP request did not contain exact native tool-result bytes")
     witness = OwnerWitness(
         True, "live MCP owner witness", args["query"],
-        ("owner",), ((OWNER,),), container, 0,
+        ("owner",), ((expected_owner,),), container, 0,
     )
-    if not verify_final_answer(witness, final):
+    if not verify_final_answer(witness, final, service_name=service_name):
         raise ValueError("native final answer not correctly attributable")
     engine_path = trial / "fixture-state" / "neo4j-engine-witnesses.jsonl"
     engine_verified = _engine_witness_verified(
         engine_path, call_id=call_id, query=args["query"],
         container_id=container, result_digest=_hash_json(result),
         latest_ns=response["timestamp_unix_ns"],
+        expected_owner=expected_owner,
     )
     if engine_verified:
         files["neo4j_engine"] = engine_path
@@ -260,7 +269,7 @@ def _verify_native(trial: Path) -> dict[str, Any]:
         "hermes_tool_call_id": tool_id,
         "model_http_request_sha256": observed[0]["request_sha256"],
         "exact_container_id": container,
-        "owner": OWNER, "service": SERVICE,
+        "owner": expected_owner, "service": service_name,
         "source_sha256": {
             key: hashlib.sha256(path.read_bytes()).hexdigest()
             for key, path in files.items()
@@ -270,6 +279,7 @@ def _verify_native(trial: Path) -> dict[str, Any]:
 
 def audit_native_trial(
     trial_dir: Path, *, expected_container_id: str | None = None,
+    service_name: str = SERVICE,
 ) -> dict[str, Any]:
     """A successful transcript match is NOT an independent teardown or release."""
     output = {
@@ -284,7 +294,9 @@ def audit_native_trial(
         "research_only": True,
     }
     try:
-        verified = _verify_native(trial_dir.resolve(strict=True))
+        verified = _verify_native(
+            trial_dir.resolve(strict=True), service_name=service_name,
+        )
         if (expected_container_id is not None
                 and verified["exact_container_id"] != expected_container_id):
             raise ValueError("native result came from different scoped research container")

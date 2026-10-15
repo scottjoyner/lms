@@ -164,12 +164,17 @@ def validate_arguments(tool: Mapping[str, Any], arguments: Any) -> tuple[bool, s
     return True, ""
 
 
-def owner_lookup_query_admissible(query: str, parameters: Mapping[str, Any] | None = None) -> tuple[bool, str]:
+def owner_lookup_query_admissible(
+    query: str, parameters: Mapping[str, Any] | None = None,
+    *, service: str = "router-api",
+) -> tuple[bool, str]:
     """Reject obvious fake/broad owner lookups before returning canned fixture data.
 
     This is deliberately a conservative semantic screen, NOT a Cypher parser.
     Full admission still requires a disposable real Neo4j query witness.
     """
+    if service not in ("router-api", "worker-api"):
+        return False, "unapproved research service identity"
     if not re.search(r"(?i)\bMATCH\s*\(", query) or not re.search(r"(?i)\bRETURN\b", query):
         return False, "missing MATCH/RETURN Cypher clauses"
     if re.search(r":\s*[A-Za-z_]\w*-[A-Za-z_]\w*", query):
@@ -181,11 +186,11 @@ def owner_lookup_query_admissible(query: str, parameters: Mapping[str, Any] | No
     values = parameters or {}
     if not isinstance(values, Mapping):
         return False, "parameters must be an object"
-    quoted = re.search(r"\bname\s*[:=]\s*['\"]router-api['\"]", query)
+    quoted = re.search(r"\bname\s*[:=]\s*['\"]" + re.escape(service) + r"['\"]", query)
     refs = re.findall(r"\bname\s*=\s*\$([A-Za-z_]\w*)", query)
-    bound = any(values.get(ref) == "router-api" for ref in refs)
+    bound = any(values.get(ref) == service for ref in refs)
     if not (quoted or bound):
-        return False, "owner lookup must restrict service identity to router-api"
+        return False, "owner lookup must restrict service identity to " + service
     return True, "conservative shape only; not executed by Neo4j"
 
 

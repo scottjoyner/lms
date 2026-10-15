@@ -24,6 +24,8 @@ CONTAINER_NAME = "lfm25-hermes-realcypher-gate-20261014"
 MAX_RAM = 3221225472
 OWNER = "team-atlas"
 SERVICE = "router-api"
+# Fixed scratch-only holdout. Production graph names/credentials never accepted.
+RESEARCH_OWNERS = {"router-api": "team-atlas", "worker-api": "team-beta"}
 BLOCKED = re.compile(
     r"(?i)\b(?:CALL|APOC|DBMS|PROCEDURE|UNWIND|FOREACH|USE|SHOW|"
     r"CREATE|MERGE|DELETE|DETACH|SET|REMOVE|DROP|LOAD|GRANT|DENY|REVOKE|"
@@ -60,14 +62,15 @@ def _run(argv: list[str], *, timeout: int) -> subprocess.CompletedProcess[str]:
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
 
 
-def _bound_owner_projection(query: str) -> bool:
+def _bound_owner_projection(query: str, *, service_name: str = SERVICE) -> bool:
     """Small deliberately *incomplete* shape whitelist, not a Cypher parser.
 
     Avoid returning an expected owner literal as if it came from the graph.
     Unsupported shapes must receive a denial, not a canned owner record.
     """
     service = (r"\(\s*(?P<s>[A-Za-z_]\w*)\s*:\s*(?:Service|`Service`)"
-               r"\s*\{\s*name\s*:\s*(?P<q>['\"])router-api(?P=q)\s*\}\s*\)")
+               r"\s*\{\s*name\s*:\s*(?P<q>['\"])" + re.escape(service_name)
+               + r"(?P=q)\s*\}\s*\)")
     direct = re.fullmatch(
         r"\s*MATCH\s*" + service +
         r"\s*RETURN\s*(?P=s)\.owner(?:\s+AS\s+owner)?\s*",
@@ -88,7 +91,12 @@ def _bound_owner_projection(query: str) -> bool:
 class ScratchCypherGate:
     """One disposable Neo4j research container, read-only queries only."""
 
-    def __init__(self, *, expected_container_id: str, command_runner=_run):
+    def __init__(self, *, expected_container_id: str, command_runner=_run,
+                 service_name: str = SERVICE):
+        if service_name not in RESEARCH_OWNERS:
+            raise WitnessDenied("service outside pinned scratch research allowlist")
+        self.service_name = service_name
+        self.expected_owner = RESEARCH_OWNERS[service_name]
         if not re.fullmatch(r"[a-f0-9]{64}", expected_container_id):
             raise WitnessDenied("exact 64-character research container ID required")
         self.expected_container_id = expected_container_id
@@ -128,7 +136,10 @@ class ScratchCypherGate:
         return data["Id"]
 
     @staticmethod
-    def _safe_query(query: str, parameters: Mapping[str, Any] | None, read_only: bool) -> None:
+    def _safe_query(query: str, parameters: Mapping[str, Any] | None,
+                    read_only: bool, *, service_name: str = SERVICE) -> None:
+        if service_name not in RESEARCH_OWNERS:
+            raise WitnessDenied("service outside pinned scratch research allowlist")
         if read_only is not True:
             raise WitnessDenied("explicit read_only=true mandatory")
         if not isinstance(query, str) or not query or len(query) > 1500:
@@ -139,17 +150,19 @@ class ScratchCypherGate:
             raise WitnessDenied("effect-producing or unsupported clause")
         if not isinstance(parameters, (dict, type(None))):
             raise WitnessDenied("parameters must be an object")
-        allowed, explanation = owner_lookup_query_admissible(query, parameters)
+        allowed, explanation = owner_lookup_query_admissible(
+            query, parameters, service=service_name,
+        )
         if not allowed:
             raise WitnessDenied("owner lookup shape: " + explanation)
         if parameters:
             raise WitnessDenied("parameterized execution not qualified yet")
-        if not _bound_owner_projection(query):
+        if not _bound_owner_projection(query, service_name=service_name):
             raise WitnessDenied("owner projection is not bound to an approved service/relationship pattern")
 
     def check(self, query: str, *, parameters: Mapping[str, Any] | None = None,
               read_only: bool = False) -> OwnerWitness:
-        self._safe_query(query, parameters, read_only)
+        self._safe_query(query, parameters, read_only, service_name=self.service_name)
         container_id = self._checked_container()
         argv = [
             "docker", "exec", CONTAINER_NAME, "cypher-shell",
@@ -181,7 +194,7 @@ class ScratchCypherGate:
         records = [tuple(row) for row in table[1:] if len(row) == len(header)]
         good = (len(table) == len(records) + 1 and len(records) == 1
                 and len(owner_indices) == 1
-                and records[0][owner_indices[0]] == OWNER)
+                and records[0][owner_indices[0]] == self.expected_owner)
         return OwnerWitness(
             good, "verified owner" if good else "missing, ambiguous or incorrect owner",
             query, tuple(header), tuple(records), container_id, result.returncode,
@@ -190,16 +203,18 @@ class ScratchCypherGate:
 
 
 def verify_final_answer(witness: OwnerWitness, final_response: str,
-                        *, timed_out: bool = False) -> bool:
+                        *, timed_out: bool = False, service_name: str = SERVICE) -> bool:
     """Require independent owner result AND complete attributed final answer."""
-    if not witness.accepted or timed_out or not isinstance(final_response, str):
+    if (service_name not in RESEARCH_OWNERS or not witness.accepted or timed_out
+            or not isinstance(final_response, str)):
         return False
     # A deliberately small positive answer grammar. Literal co-occurrence is
     # inadequate: "router-api is NOT owned by team-atlas" must never pass.
     normalized = re.sub(r"\*+", "", final_response).strip()
     return re.fullmatch(
-        r"The\s+owner\s+of\s+router-api\s+is\s+team-atlas"
-        r"(?:\s*\([^()\n]*\))?\.?",
+        r"The\s+owner\s+of\s+" + re.escape(service_name)
+        + r"\s+is\s+" + re.escape(RESEARCH_OWNERS[service_name])
+        + r"(?:\s*\([^()\n]*\))?\.?",
         normalized,
         flags=re.IGNORECASE,
     ) is not None
