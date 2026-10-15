@@ -20,8 +20,14 @@ class LauncherTests(unittest.TestCase):
     def test_model_free_preflight(self):
         completed=subprocess.run(["bash",str(SH),"--preflight-only"],
             capture_output=True,text=True,timeout=12)
-        self.assertEqual(completed.returncode,0,completed.stdout+completed.stderr)
-        self.assertIn("EXP041B_PREFLIGHT_FIXTURE_OK",completed.stdout)
-        self.assertIn("DRY_RUN_NO_MODEL_LOADING_OR_WRITES",completed.stdout)
+        if (pathlib.Path("/home/scott/git/wt-knowledge-k2-latex-20261014") /
+                "50-Research/llm-research/latent-world-geometry-2026/" /
+                "EXPERIMENT-041B-RESULTS-2026-10-15.md").exists():
+            self.assertEqual(completed.returncode,73,completed.stdout+completed.stderr)
+            self.assertIn("HOLD_EXP041B_REPORT_EXISTS_NO_OVERWRITE",completed.stderr)
+        else:
+            self.assertEqual(completed.returncode,0,completed.stdout+completed.stderr)
+            self.assertIn("EXP041B_PREFLIGHT_FIXTURE_OK",completed.stdout)
+            self.assertIn("DRY_RUN_NO_MODEL_LOADING_OR_WRITES",completed.stdout)
 if __name__=="__main__":
     unittest.main()
