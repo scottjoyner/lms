@@ -7,9 +7,10 @@ All tools other than schema and graph_query fail closed; every call is receipted
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 from pathlib import Path
 
-from lms_agent_bench.hermes_mcp_fixture import Fixture, serve
+from lms_agent_bench.hermes_mcp_fixture import Fixture, TOOLS, serve
 from lms_agent_bench.hermes_real_cypher_gate import (
     ScratchCypherGate, WitnessDenied,
 )
@@ -20,6 +21,19 @@ class LiveCypherFixture(Fixture):
         if scenario != "tool_distractor_selection":
             raise WitnessDenied("unsupported live-scoped Hermes scenario")
         super().__init__(state_dir, workspace, scenario)
+        # Contract applies only to the live, independently verified graph tool.
+        # Historical canned fixtures keep their original advertised schema.
+        self.tools = deepcopy(TOOLS)
+        graph = next(t for t in self.tools if t["name"] == "graph_query")
+        schema = graph["inputSchema"]
+        schema["required"] = ["query", "read_only"]
+        graph["description"] = (
+            "Run a read-only Cypher owner lookup against disposable Neo4j. "
+            "Required: query and read_only=true. Bind to the named :Service "
+            "router-api and return an owner value, not node objects. "
+            "Research gate denies parameters, writes, broad scans, and "
+            "unsupported query shapes."
+        )
         self.gate = ScratchCypherGate(expected_container_id=container_id)
         self.gate._checked_container()
 
