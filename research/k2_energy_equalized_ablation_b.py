@@ -109,7 +109,7 @@ def pair_stats(t,r,baseline,tm,rm):
                 top_limited=top_limited)
 
 def report(rows):
-    lines=["# EXP-039 — Measured per-example energy-equalized gated-coordinate ablation","",
+    lines=["# EXP-039B — Measured per-example energy-equalized gated-coordinate ablation","",
       "**2026-10-15, frozen K2 Mid2, research only.**",
       "Protocol SHA256: "+PROTOCOL_SHA+" (BF16 0.5% tolerance frozen before model forwards).",
       "Selection: 24 EXP036 prompts, topic receipt "+DEV_SHA+".",
