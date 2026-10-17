@@ -9,6 +9,10 @@ PROTOCOL=Path(__file__).resolve().parent/"EXP053-PROTOCOL-2026-10-16.md"
 PROTOCOL_SHA="c37b25b9cd5d08015a05bd1e5791b9e0c8d9d6367cf9599149106b6800c681d8"
 MANIFEST=Path(__file__).resolve().parent/"EXP053-COHORT-MANIFEST-2026-10-16.json"
 MANIFEST_SHA="43e8309ac1c8ebdb28ae1c478254d43313449e0a44588c301f0a984a240d92b9"
+# Scientific trust bootstrap: owner must independently verify distinct actual
+# human identities/key possession and pin the exact public-key roster digest.
+# Remains unset until owner approval. Programmatic signers are not human peers.
+APPROVED_REVIEWER_ROSTER_SHA256=""
 SEED="EXP053-RACE-HIGH-TEST-v1"
 MIN_REVIEWED=40
 TARGET=64
@@ -165,6 +169,10 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if (seal["packet_sha256"]!=digest(packet) or
         digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
         deny("answer key differs from committed manifest")
+    if not APPROVED_REVIEWER_ROSTER_SHA256:
+        deny("owner-approved human reviewer trust roster not yet pinned")
+    if not keys_path.is_file() or filehash(keys_path)!=APPROVED_REVIEWER_ROSTER_SHA256:
+        deny("reviewer roster not identical to independently owner-approved keys")
     try:
         trust=json.loads(keys_path.read_text())
     except (ValueError,OSError) as exc:
