@@ -29,7 +29,7 @@ digest(TEST).then(x=>{console.log(x);if(x!==EXPECTED)process.exitCode=7;});
 """)
             # Mock DOM only; no real reviewer packet or licensed text.
             setup="""const vm=require('vm'),fs=require('fs'),{webcrypto}=require('crypto');
-const ctx={document:{getElementById:()=>({})},window:{addEventListener:()=>{}},
+const ctx={document:{getElementById:()=>({addEventListener:()=>{}})},window:{addEventListener:()=>{}},
 crypto:webcrypto,TextEncoder,console,TEST:JSON.parse(process.argv[3]),EXPECTED:process.argv[4]};
 vm.createContext(ctx);vm.runInContext(fs.readFileSync(process.argv[2],'utf8'),ctx);
 """
