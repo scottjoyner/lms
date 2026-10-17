@@ -15,10 +15,14 @@ Do not use model loading, inference, GPU acceleration, production serving,
 network transfers, or modified model weights as substitutes for this read-only
 identity proof.
 
-**The actual multi-gigabyte checkpoint hash scan has NOT completed.** Earlier
-tool execution prevented it. No checksum of a checkpoint shard is asserted or
-published as measured here. Dry run and synthetic fixture tests are software
-checks only.
+**2026-10-17 update:** The actual read-only multi-gigabyte checkpoint scan
+subsequently COMPLETED. See
+`EXP053-CHECKPOINT-CUSTODY-AUDIT-2026-10-17.md` and the source-free
+`EXP053-WEIGHT-IDENTITY-2026-10-16.json`, SHA256
+`e95c771517869f2060b84c7a270bc3e59bd659500c5187d2227d2f94d00440b6`.
+The system `sha256sum` command independently reproduced **39/39 weight shard
+digests**. This is verified local-file identity, NOT automatic source approval,
+model evaluation or proof of an actual inference runner's behavior.
 
 ## Fail-closed reporting handoff
 
@@ -73,10 +77,12 @@ at report/model/shard level, invalid or noncanonical lowercase SHA256 digests,
 unsafe or repeated shard filenames, non-integer/boolean byte counts, unordered
 shards, mismatched total weights, and inappropriate shard-index presence.
 These are structural anti-corruption checks, not proof of authenticity by
-themselves. A true weight scan and independently reviewed checksum pin are
-still entirely absent; `WEIGHT_REPORT_SHA` remains empty. Software tests
-patch in **synthetic report metadata only** and do not sign reviews, score
-RACE questions, inspect real weight tensors, or establish research evidence.
+themselves. As of 2026-10-17 the actual read-only weight scan is COMPLETE and
+its individual SHA256 hashes were independently reproduced 39/39; the
+**owner-reviewed scientific checksum pin is still absent** and
+`WEIGHT_REPORT_SHA` remains empty. Software tests patch in **synthetic report
+metadata only** and do not sign reviews, score RACE questions, examine tensor
+values, or establish semantic-grounding research outcomes.
 
 The offline-only reviewer HTML now captures `input` and `change` events,
 updates progress using the in-memory unsigned draft on each edit, and activates
