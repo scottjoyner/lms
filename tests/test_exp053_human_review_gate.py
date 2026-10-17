@@ -40,7 +40,10 @@ class TestEXP053(unittest.TestCase):
         k=Ed25519PrivateKey.generate()
         p=k.public_key().public_bytes(encoding=serialization.Encoding.Raw,
                                       format=serialization.PublicFormat.Raw)
-        trust={"tester":base64.b64encode(p).decode()}
+        second=Ed25519PrivateKey.generate().public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,format=serialization.PublicFormat.Raw)
+        trust={"tester":base64.b64encode(p).decode(),
+               "other":base64.b64encode(second).decode()}
         record={"schema":"exp053-review-v1","reviewer_id":"tester","role":"independent",
                 "packet_sha256":"test-only","attestation":ATTEST,"decisions":[]}
         record["signature"]=k.sign(x.canonical(record)).hex()
@@ -65,4 +68,37 @@ class TestEXP053(unittest.TestCase):
     def test_no_overwrite(self):
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.build(PRIVATE,x.MANIFEST)
+    def test_reused_signing_key_two_reviewer_ids_denied(self):
+        key=Ed25519PrivateKey.generate()
+        pub=key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,format=serialization.PublicFormat.Raw)
+        shared=base64.b64encode(pub).decode()
+        r={"schema":"exp053-review-v1","reviewer_id":"reviewer_1",
+           "role":"independent","packet_sha256":"test",
+           "attestation":ATTEST,"decisions":[]}
+        r["signature"]=key.sign(x.canonical(r)).hex()
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.verify_signed(r,{"reviewer_1":shared,"reviewer_2":shared})
+    def test_third_review_must_cover_exact_disputed_subset(self):
+        packet={"cases":[
+            {"case_id":"a","article":"A review-supported article passage with explicit evidence.",
+             "question":"Who performed the action?","options":{"A":"Ana","B":"Bob"}},
+            {"case_id":"b","article":"Another paragraph with enough words for a citation.",
+             "question":"What was recorded?","options":{"A":"Blue","B":"Red"}}]}
+        review={"packet_sha256":x.digest(packet),"role":"adjudicator",
+                "decisions":[{"case_id":"a","decision":"reject",
+                              "reject_reason":"No uniquely supported option"}]}
+        r=x.decisions_for(review,packet,required_ids={"a"})
+        self.assertEqual(set(r),{"a"})
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.decisions_for(review,packet,required_ids={"b"})
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.decisions_for(review,packet)
+    def test_same_article_under_64_ids_denied(self):
+        repeated=[{"example_id":f"id_{i}","article":"A "*150,
+                   "question":f"What happens when condition {i} occurs?",
+                   "options":["A1","B1","C1","D1"],"answer":"A"}
+                  for i in range(64)]
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.cohort(repeated)
 if __name__=="__main__":unittest.main()
