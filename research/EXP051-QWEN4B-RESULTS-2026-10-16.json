@@ -1,0 +1,47 @@
+{
+  "fixture_sha256": "af188e9d490d420e02cc67d83a3405d37061fd281012f2dfb67efb8864740f9c",
+  "forwards": 80,
+  "model": "qwen",
+  "note": "synthetic nonindependent pilot; no human-adjudicated semantic grounding",
+  "protocol_sha256": "63c3c50afc2f98bb2d5928da180e7dc1f79f52b7672378ec829fb6f7209c4fdf",
+  "seconds": 53.494,
+  "sources_sha256": {
+    "config.json": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+    "model.safetensors.index.json": "eae340074abb0a5f31a6621f7ae8e8248a7c1790df04a722c4e4b70c2a6d1dbb",
+    "tokenizer.json": "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927"
+  },
+  "summary": {
+    "question_x_evidence": {
+      "mean": 8.703124975290848,
+      "n_topics": 8,
+      "positive_topics": 8
+    },
+    "source_switch": {
+      "mean": 9.355468721565558,
+      "n_topics": 8,
+      "positive_topics": 8
+    },
+    "strict": {
+      "supported_original": {
+        "correct": 16,
+        "n": 16
+      },
+      "supported_swapped": {
+        "correct": 16,
+        "n": 16
+      },
+      "supported_withheld": {
+        "correct": 16,
+        "n": 16
+      },
+      "unrelated_original": {
+        "correct": 16,
+        "n": 16
+      },
+      "unrelated_swapped": {
+        "correct": 16,
+        "n": 16
+      }
+    }
+  }
+}
