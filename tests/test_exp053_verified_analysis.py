@@ -35,6 +35,21 @@ class VerifiedScoreReplay(unittest.TestCase):
              "tokenizer_sha256":scan["models"][model]["tokenizer_json_sha256"]}
         return packet,scan,approved,rec
 
+    def test_no_independently_pinned_weight_receipt_denied(self):
+        packet,scan,approved,rec=self.fixture()
+        self.assertEqual(v.WEIGHT_REPORT_SHA,"")
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            v.admitted_weight_inventory(scan)
+
+    def test_wrong_checkpoint_digest_denied_even_if_source_matches(self):
+        packet,scan,approved,rec=self.fixture()
+        inventory={rec["model"]:"a"*64}
+        rec["checkpoint_sha256"]="b"*64
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            v.check_private_archive([rec],approved,packet,scan,inventory)
+        rec["checkpoint_sha256"]="a"*64
+        self.assertEqual(v.check_private_archive([rec],approved,packet,scan,inventory),1)
+
     def test_only_source_exact_prompt_accepted_as_receipt(self):
         packet,scan,approved,rec=self.fixture()
         self.assertEqual(v.check_private_archive([rec],approved,packet,scan),1)
