@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import tempfile
+import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -17,6 +18,7 @@ from unittest.mock import patch
 R = Path(__file__).resolve().parents[1] / "research"
 sys.path.insert(0, str(R))
 import exp053_operator_run as run
+import exp053_external_witness as witness
 from exp053_race_review import canonical
 
 try:
@@ -48,6 +50,14 @@ class SyntheticOperatorClaim(unittest.TestCase):
             encoding=serialization.Encoding.Raw,
             format=serialization.PublicFormat.Raw)
         self.pubsha = digest(self.pub)
+        self.witness_key = Ed25519PrivateKey.generate()
+        self.witness_pub = self.witness_key.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw)
+        self.witness_pub_sha = digest(self.witness_pub)
+        self.highwater = (0, "0" * 64)
+        self.highwater_lock = threading.Lock()
+        self.witness_fault = None
         self.packet = "d" * 64
         self.provenance = self.make_provenance("fictional-run-001")
         self.auth_path = self.scorer_private / "operator-auth-001.json"
@@ -87,10 +97,59 @@ class SyntheticOperatorClaim(unittest.TestCase):
         self.last_record = record
         return target
 
+    def synthetic_external_cas(self, request):
+        """Isolated fake remote state: NOT independently operated or durable."""
+        if self.witness_fault == "offline":
+            raise ConnectionError("synthetic witness unavailable")
+        with self.highwater_lock:
+            count, last = self.highwater
+            if (request["schema"] != witness.REQUEST_SCHEMA or
+                    request["expected_previous_sequence"] != count or
+                    request["previous_claim_sha256"] != last or
+                    request["sequence"] != count + 1):
+                raise ValueError("mock external atomic CAS conflict")
+            self.highwater = (request["sequence"], request["claim_sha256"])
+            receipt = {
+                "schema": witness.RESPONSE_SCHEMA,
+                "nonce_hex": request["nonce_hex"],
+                "sequence": request["sequence"],
+                "previous_claim_sha256": request["previous_claim_sha256"],
+                "claim_sha256": request["claim_sha256"],
+                "runner_execution_id_sha256": request["runner_execution_id_sha256"],
+                "witness_counter": request["sequence"],
+                "status": "committed",
+                "witness_public_key_b64": base64.b64encode(self.witness_pub).decode(),
+            }
+            if self.witness_fault == "stale_nonce":
+                receipt["nonce_hex"] = "a" * 64
+            elif self.witness_fault == "wrong_counter":
+                receipt["witness_counter"] = request["sequence"] + 1
+            elif self.witness_fault == "boolean_counter":
+                receipt["witness_counter"] = True
+            elif self.witness_fault == "not_committed":
+                receipt["status"] = "rejected"
+            elif self.witness_fault == "wrong_execution":
+                receipt["runner_execution_id_sha256"] = "f" * 64
+            elif self.witness_fault == "extra_field":
+                receipt["private_research"] = "must not be accepted"
+            receipt["signature_hex"] = self.witness_key.sign(canonical(receipt)).hex()
+            if self.witness_fault == "tampered_signature":
+                receipt["signature_hex"] = "00" * 64
+            if self.witness_fault == "wrong_public_key":
+                receipt["witness_public_key_b64"] = base64.b64encode(
+                    Ed25519PrivateKey.generate().public_key().public_bytes(
+                        encoding=serialization.Encoding.Raw,
+                        format=serialization.PublicFormat.Raw)).decode()
+            return receipt
+
     def consume(self, auth=None, provenance=None, *, pin=True):
         with patch.object(run, "APPROVED_OPERATOR_PUBLIC_KEY_SHA256",
                           self.pubsha if pin else ""), patch.object(
-            run, "APPROVED_OPERATOR_CLAIM_LEDGER_PATH", str(self.state_path)):
+            run, "APPROVED_OPERATOR_CLAIM_LEDGER_PATH", str(self.state_path)), patch.object(
+            witness, "APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256",
+            self.witness_pub_sha), patch.object(
+            witness, "APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256", "e" * 64), patch.object(
+            witness, "_external_cas", self.synthetic_external_cas):
             return run.consume_unique_run(
                 self.auth_path if auth is None else auth,
                 self.scorer_private,
@@ -100,6 +159,9 @@ class SyntheticOperatorClaim(unittest.TestCase):
     def test_no_real_operator_pins_exist(self):
         self.assertEqual(run.APPROVED_OPERATOR_PUBLIC_KEY_SHA256, "")
         self.assertEqual(run.APPROVED_OPERATOR_CLAIM_LEDGER_PATH, "")
+        self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256, "")
+        self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256, "")
+        self.assertEqual(witness.filehash(witness.SPEC), witness.SPEC_SHA256)
         self.assertEqual(run.filehash(run.SPEC), run.SPEC_SHA256)
         self.assertEqual(run.filehash(run.MARKER_SPEC), run.MARKER_SPEC_SHA256)
         self.sign()
@@ -265,6 +327,64 @@ class SyntheticOperatorClaim(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "HOLD"):
             self.consume()
         self.assertEqual(marker.read_text(), "CORRUPT_PRIVATE_MARKER")
+
+    def test_fresh_nonce_and_signed_receipt_enforced_before_local_mutation(self):
+        for fault in ("stale_nonce", "wrong_counter", "boolean_counter",
+                      "not_committed", "wrong_execution", "extra_field",
+                      "tampered_signature", "wrong_public_key", "offline"):
+            with self.subTest(fault=fault):
+                self.create_state()
+                self.highwater = (0, "0" * 64)
+                self.witness_fault = fault
+                self.sign()
+                with self.assertRaisesRegex(ValueError, "HOLD"):
+                    self.consume()
+                self.assertEqual(
+                    json.loads(self.state_path.read_text())["last_sequence"], 0)
+                marker = self.state_path.with_name(
+                    self.state_path.name + ".used-" +
+                    self.provenance["execution_id_sha256"])
+                self.assertFalse(marker.exists())
+        self.witness_fault = None
+
+    def test_restored_local_state_and_deleted_marker_cannot_replay_remote(self):
+        self.sign()
+        accepted = self.consume()
+        self.assertEqual(accepted["external_highwater_sequence"], 1)
+        self.assertEqual(self.highwater[0], 1)
+        marker = self.state_path.with_name(
+            self.state_path.name + ".used-" +
+            self.provenance["execution_id_sha256"])
+        marker.unlink()  # simulated privileged rollback of LOCAL state only
+        self.create_state()  # local claim journal restored to prior snapshot
+        self.sign()
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            self.consume()
+        self.assertEqual(
+            json.loads(self.state_path.read_text())["last_sequence"], 0)
+        self.assertEqual(self.highwater[0], 1)
+
+    def test_remote_commit_precedes_local_marker_and_claim(self):
+        self.sign()
+        self.witness_fault = "not_committed"
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            self.consume()
+        self.assertEqual(self.highwater[0], 1)
+        self.assertEqual(
+            json.loads(self.state_path.read_text())["last_sequence"], 0)
+        self.assertFalse(list(self.operator_dir.glob("*.used-*")))
+
+    def test_unconfigured_external_authorities_always_hold(self):
+        self.sign()
+        with patch.object(run, "APPROVED_OPERATOR_PUBLIC_KEY_SHA256",
+                          self.pubsha), patch.object(
+            run, "APPROVED_OPERATOR_CLAIM_LEDGER_PATH",
+            str(self.state_path)):
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                run.consume_unique_run(
+                    self.auth_path, self.scorer_private,
+                    provenance=self.provenance, packet_sha256=self.packet)
+        self.assertEqual(self.highwater[0], 0)
 
     def test_state_inside_scorer_private_directory_denied(self):
         self.sign()
