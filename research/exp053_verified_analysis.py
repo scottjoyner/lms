@@ -7,7 +7,9 @@ from pathlib import Path
 from exp053_race_review import MANIFEST,MANIFEST_SHA,digest,filehash,verified_admission,deny
 from exp053_tokenizer_preflight import PRIVATE,PATHS,ROOT,WITHHELD,options_for,prompt
 from exp053_metrics import analyze, FIELDS as SCORE_FIELDS, rotate as rotate_label
-from exp053_execution_attestation import verify_attestation
+from exp053_execution_attestation import (
+    verify_attestation, read_attested_scores, private_regular_file,
+)
 
 PREFLIGHT=ROOT/"EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json"
 PREFLIGHT_SHA="8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be"
@@ -203,14 +205,10 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
         tokenizer_preflight_sha256=PREFLIGHT_SHA,
         prompt_builder_sha256=PROMPT_CODE_SHA,checkpoint_receipts=checkpoint_ids,
         approved_count=len(admission["accepted"]))
-    try:
-        rows=json.loads(score_archive.read_text())
-    except (OSError,ValueError) as exc:
-        deny("private score archive unreadable or malformed: "+type(exc).__name__)
-    # The verified, signed byte digest must still hold after the analysis read.
-    if filehash(score_archive)!=provenance["score_archive_sha256"]:
-        deny("private score archive mutated after execution attestation")
-    if not isinstance(rows,list):deny("score archive must be a JSON list")
+    # Parse the exact bytes hashed through one private file descriptor, not
+    # a second path read vulnerable to swap-then-restore between hash checks.
+    rows=read_attested_scores(
+        score_archive,private_dir,provenance["score_archive_sha256"])
     check_private_archive(rows,admission["accepted"],packet,scan,checkpoint_ids)
     summary=analyze(rows,admission["accepted"],manifest)
     summary["score_archive_sha256"]=provenance["score_archive_sha256"]
@@ -221,6 +219,13 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
     summary["attempt_log_sha256"]=provenance["attempt_log_sha256"]
     summary["runner_source_sha256"]=provenance["runner_source_sha256"]
     summary["privacy"]="aggregates only; individual scores and RACE text stay private"
+    # Refuse score/log mutation during downstream statistical calculation;
+    # only this source-free aggregate may be persisted to public research.
+    score_end,_=private_regular_file(score_archive,private_dir)
+    attempts_end,_=private_regular_file(attempt_log,private_dir)
+    if (score_end!=provenance["score_archive_sha256"] or
+            attempts_end!=provenance["attempt_log_sha256"]):
+        deny("private scorer evidence changed during aggregate calculation")
     with output.open("x") as f:f.write(json.dumps(summary,sort_keys=True,indent=2)+"\n")
     return summary
 

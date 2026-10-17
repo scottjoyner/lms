@@ -22,6 +22,7 @@ SCHEMA = "exp053-execution-attestation-v1"
 APPROVED_RUNNER_PUBLIC_KEY_SHA256 = ""
 APPROVED_RUNNER_SOURCE_SHA256 = ""
 MAX_ATTESTATION_BYTES = 16384
+MAX_SCORE_ARCHIVE_BYTES = 32 * 1024 * 1024
 FIELDS = {
     "schema", "execution_id", "runner_public_key_b64",
     "runner_source_sha256", "packet_sha256", "signed_admission_sha256",
@@ -75,7 +76,9 @@ def private_regular_file(path, private_dir, *, small_limit=None):
                 if data is not None:
                     data.extend(block)
             after = os.fstat(fd)
-            identity = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
             if identity(before) != identity(after) or size != before.st_size:
                 deny("execution evidence mutated while hashing")
             return digest.hexdigest(), bytes(data) if data is not None else None
@@ -93,10 +96,32 @@ def unambiguous_json(data):
                 raise ValueError("duplicate execution-attestation JSON property")
             output[k] = v
         return output
+    def reject_nonfinite(value):
+        raise ValueError("non-finite JSON value: " + value)
     try:
-        return json.loads(data, object_pairs_hook=reject_duplicates)
+        return json.loads(data, object_pairs_hook=reject_duplicates,
+                          parse_constant=reject_nonfinite)
     except (ValueError, UnicodeDecodeError) as exc:
         deny("invalid or ambiguous execution-attestation JSON: " + type(exc).__name__)
+
+
+def read_attested_scores(score_archive, private_dir, score_sha256):
+    """Bind parsed score bytes to the SAME descriptor that produced their hash.
+
+    Never accept a pre- or post-read path hash as proof of what JSON was
+    actually parsed. A swapped file cannot be silently substituted between
+    path hashing and metrics analysis. This does not authenticate a runner.
+    """
+    if not hex_digest(score_sha256):
+        deny("expected score archive fingerprint is not approved")
+    observed, data = private_regular_file(
+        score_archive, private_dir, small_limit=MAX_SCORE_ARCHIVE_BYTES)
+    if observed != score_sha256:
+        deny("parsed score-file bytes differ from signed execution receipt")
+    rows = unambiguous_json(data)
+    if not isinstance(rows, list):
+        deny("private score archive must contain a JSON list")
+    return rows
 
 
 def verify_attestation(attestation_path, score_archive, attempt_log, private_dir,
