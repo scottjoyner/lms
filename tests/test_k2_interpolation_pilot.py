@@ -1,7 +1,6 @@
 """No-network, no-checkpoint-write regression tests for EXP035."""
 import importlib.util
 import pathlib
-import sys
 import unittest
 
 import torch
