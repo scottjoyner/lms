@@ -30,7 +30,7 @@ Set `reviewer_id` to your registered signer ID, set `attestation` to exactly:
 ## Signing and admission
 
 Each reviewer must separately create and safeguard their own Ed25519 PEM key, e.g. `openssl genpkey -algorithm Ed25519 -out reviewer-key.pem && chmod 600 reviewer-key.pem`, outside the repo. Do not commit, share, or expose a private key.
-From the worktree, use the isolated Python environment `/home/scott/git/.latent-exp053-data-venv/bin/python`. The script `research/exp053_sign_review.py public-key --private-key <reviewer-key.pem>` prints a raw public key for entry in a private `trust_roots.json` map under the corresponding signer ID. Keep that file private; never commit reviewer identity details.
+From the worktree, use the isolated Python environment `/home/scott/git/.latent-exp053-data-venv/bin/python`. The script `research/exp053_sign_review.py public-key --private-key <reviewer-key.pem>` prints each person's raw Ed25519 public key. **Updated 2026-10-17:** These public keys must now be enrolled by a separate, identity-verifying human study owner into a pinned **private A/B-slot roster**, not a caller-selected flat `trust_roots.json` map. Use `EXP053-INDEPENDENT-REVIEWER-ENROLLMENT-2026-10-17.md` for the exact owner-custody format. Never auto-generate, sign, or approve a simulated person on their behalf; the owner-approval pin remains empty.
 After **manual completion** of every item, sign using:
 `python research/exp053_sign_review.py sign --review <completed-review.json> --packet <private/packet.json> --private-key <reviewer-key.pem> --out <reviewer.signed.json>`.
 Preserve the originals separately. Place the two independently signed final reviews into the gate's private directory as `reviewer_A.json` and `reviewer_B.json`.
