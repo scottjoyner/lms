@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """EXP053 source-locked RACE blinded packet and signed review gate. No model access."""
-import argparse,base64,hashlib,json,os
+import argparse
+import base64
+import hashlib
+import json
+import os
 from pathlib import Path
 from collections import defaultdict
 SOURCE=Path("/media/scott/SSD_4TB/hf-cache/huggingface/hub/datasets--ehovy--race/snapshots/2fec9fd81f1dc971569a9b729c43f2f0e6436637/high/test-00000-of-00001.parquet")
@@ -111,9 +115,17 @@ def build(private_dir,public):
           "FULL_INFERENCE_HOLD=True; manifest",digest(manifest))
     return manifest
 def verify_signed(review,trust):
-    if review.get("schema")!="exp053-review-v1":deny("unexpected review schema")
-    rid=review.get("reviewer_id")
+    required={"schema","reviewer_id","role","packet_sha256","attestation",
+              "decisions","signature"}
+    if not isinstance(review,dict) or set(review)!=required:
+        deny("review fields missing or unexpected")
+    if not isinstance(trust,dict) or len(trust)<2:
+        deny("private reviewer trust store invalid")
+    if review["schema"]!="exp053-review-v1":deny("unexpected review schema")
+    rid=review["reviewer_id"]
     if not isinstance(rid,str) or rid not in trust:deny("untrusted reviewer key")
+    if review["role"] not in ("independent","adjudicator"):
+        deny("invalid signed review role")
     if review.get("attestation")!="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me.":
         deny("missing independent human review attestation")
     if not isinstance(trust,dict) or len(trust)<2 or len(set(trust.values()))!=len(trust):
@@ -137,20 +149,26 @@ def require_owner_assigned_signer(review, trust, slots, slot):
     return rid
 
 def check_decision(dec,case):
+    if not isinstance(dec,dict):deny("malformed decision entry")
     status=dec.get("decision")
     if status=="reject":
-        if len(dec.get("reject_reason","").strip())<12:deny("unreasoned reject")
+        reason=dec.get("reject_reason")
+        if not isinstance(reason,str) or len(reason.strip())<12:
+            deny("unreasoned reject")
         return status
     if status!="accept":deny("unreviewed or invalid decision")
     a=dec.get("supported_option");f=dec.get("foil_option")
-    if a not in LETTERS or f not in LETTERS or a==f:
+    if not isinstance(a,str) or not isinstance(f,str) or a not in LETTERS or f not in LETTERS or a==f:
         deny("invalid chosen supported/foil options")
-    if len(dec.get("support_quote","").strip())<20 or dec["support_quote"].strip() not in case["article"]:
+    quote=dec.get("support_quote")
+    if not isinstance(quote,str) or len(quote.strip())<20 or quote.strip() not in case["article"]:
         deny("source quote absent or too short")
-    if len(dec.get("foil_reason","").strip())<15:
+    reason=dec.get("foil_reason")
+    if not isinstance(reason,str) or len(reason.strip())<15:
         deny("foil reason missing")
     return status
 def decisions_for(review,packet,required_ids=None):
+    if not isinstance(review,dict):deny("malformed review payload")
     if review.get("packet_sha256")!=digest(packet):deny("packet mismatch")
     if review.get("role") not in ("independent","adjudicator"):deny("invalid signer role")
     lookup={c["case_id"]:c for c in packet["cases"]}
@@ -159,6 +177,7 @@ def decisions_for(review,packet,required_ids=None):
     if not isinstance(ds,list) or len(ds)!=len(expected):deny("incomplete review form")
     out={}
     for d in ds:
+        if not isinstance(d,dict):deny("malformed reviewer decision payload")
         cid=d.get("case_id")
         if cid in out or cid not in lookup:deny("duplicate/foreign case")
         check_decision(d,lookup[cid]);out[cid]=d
