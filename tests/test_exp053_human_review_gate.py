@@ -1,14 +1,27 @@
 """EXP053 fail-closed software checks; ephemeral test keys are NOT human approvals."""
-import base64,copy,json,sys,tempfile,unittest
+import base64
+import copy
+import importlib.util
+import json
+import sys
+import tempfile
+import unittest
 from pathlib import Path
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives import serialization
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+except ImportError:  # Portable hosted CI must never require private reviewer keys.
+    Ed25519PrivateKey=None
+    serialization=None
 R=Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(R))
 import exp053_race_review as x
 PRIVATE=Path("/media/scott/SSD_4TB/exp053-private-20261016")
+HAS_PRIVATE=(PRIVATE/"packet.json").is_file()
+HAS_SOURCE=x.SOURCE.is_file() and importlib.util.find_spec("pyarrow") is not None
 ATTEST="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me."
 class TestEXP053(unittest.TestCase):
+    @unittest.skipUnless(HAS_SOURCE,"private local RACE source and pyarrow unavailable")
     def test_64_article_disjoint_cohort(self):
         cases=x.cohort(x.corpus())
         self.assertEqual(len(cases),64)
@@ -20,22 +33,26 @@ class TestEXP053(unittest.TestCase):
         self.assertEqual(v["candidate_articles"],64)
         self.assertFalse(v["evaluation_admitted"])
         self.assertFalse({"question","article","options"} & set(v["rows"][0]))
+    @unittest.skipUnless(HAS_PRIVATE,"private local blinded source packet unavailable")
     def test_packet_sealed_by_manifest(self):
         packet=json.loads((PRIVATE/"packet.json").read_text())
         key=json.loads((PRIVATE/"sealed_exam_key.json").read_text())
         m=json.loads(x.MANIFEST.read_text())
         self.assertEqual(x.digest(packet),m["packet_sha256"])
         self.assertEqual(x.digest(key["answer_key"]),m["sealed_answer_key_sha256"])
+    @unittest.skipUnless(HAS_PRIVATE,"private local blinded source packet unavailable")
     def test_unsigned_incomplete_review_denied(self):
         packet=json.loads((PRIVATE/"packet.json").read_text())
         review=json.loads((PRIVATE/"reviewer_A.json").read_text())
         with self.assertRaisesRegex(ValueError,"HOLD"):x.decisions_for(review,packet)
+    @unittest.skipUnless(HAS_PRIVATE,"private local blinded source packet unavailable")
     def test_source_quote_requirement(self):
         packet=json.loads((PRIVATE/"packet.json").read_text())
         bad={"decision":"accept","supported_option":"A","foil_option":"B",
              "support_quote":"This quotation does not occur in the passage.",
              "foil_reason":"Unsupported by the article"}
         with self.assertRaisesRegex(ValueError,"HOLD"):x.check_decision(bad,packet["cases"][0])
+    @unittest.skipUnless(Ed25519PrivateKey is not None,"cryptography not installed in hosted CI")
     def test_ed25519_signature_and_tamper(self):
         k=Ed25519PrivateKey.generate()
         p=k.public_key().public_bytes(encoding=serialization.Encoding.Raw,
@@ -50,6 +67,7 @@ class TestEXP053(unittest.TestCase):
         self.assertEqual(x.verify_signed(record,trust),"tester")
         bad=copy.deepcopy(record);bad["packet_sha256"]="modified"
         with self.assertRaisesRegex(ValueError,"HOLD"):x.verify_signed(bad,trust)
+    @unittest.skipUnless(Ed25519PrivateKey is not None,"cryptography not installed in hosted CI")
     def test_missing_human_attestation_denied(self):
         k=Ed25519PrivateKey.generate()
         p=k.public_key().public_bytes(encoding=serialization.Encoding.Raw,
@@ -59,6 +77,7 @@ class TestEXP053(unittest.TestCase):
         r["signature"]=k.sign(x.canonical(r)).hex()
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.verify_signed(r,{"tester":base64.b64encode(p).decode()})
+    @unittest.skipUnless(HAS_PRIVATE and HAS_SOURCE,"private local source unavailable")
     def test_live_unsigned_gate_stays_hold(self):
         with tempfile.TemporaryDirectory() as d:
             d=Path(d);t=d/"trust.json";t.write_text("{}")
@@ -68,6 +87,7 @@ class TestEXP053(unittest.TestCase):
     def test_no_overwrite(self):
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.build(PRIVATE,x.MANIFEST)
+    @unittest.skipUnless(Ed25519PrivateKey is not None,"cryptography not installed in hosted CI")
     def test_reused_signing_key_two_reviewer_ids_denied(self):
         key=Ed25519PrivateKey.generate()
         pub=key.public_key().public_bytes(

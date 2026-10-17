@@ -1,0 +1,78 @@
+{
+  "approved_only_final_decoy_checked": false,
+  "candidate_articles": 64,
+  "candidate_prompt_count_per_model": 384,
+  "human_reviewed_articles": 0,
+  "label_rotations": 2,
+  "manifest_sha256": "43e8309ac1c8ebdb28ae1c478254d43313449e0a44588c301f0a984a240d92b9",
+  "measurement_plan_sha256": "5239be2dd2413af98759a2ac5fdde100f2407d2de07149347f272d1e5ee0922d",
+  "model_forward_passes": 0,
+  "models": {
+    "K2-Horizon-3.7B": {
+      "candidate_answer_token_ids": {
+        "A": 358,
+        "B": 408,
+        "C": 353,
+        "D": 421
+      },
+      "checkpoint_directory": "K2-Horizon-3.7B",
+      "config_sha256": "d08ee6a1798db2a049a86dc1faf5d62700fa805ae420d636aaee85b87868c677",
+      "label_boundary_checks_passed": 1536,
+      "model_forward_passes": 0,
+      "prompt_tokens_max": 887,
+      "prompt_tokens_median": 419.0,
+      "prompt_tokens_min": 79,
+      "prompt_tokens_p95": 591,
+      "source_prompts_tokenized": 384,
+      "tokenizer_class": "TokenizersBackend",
+      "tokenizer_config_sha256": "af00f3448e0e734f3538e2de5d0a47a4ccfd571449ac925c1948611909ca6d45",
+      "tokenizer_json_sha256": "838d767b7c9925ff257feb20eaa4299a8e3cc35bb3d805589c373f51d2cc3cb6"
+    },
+    "MiniCPM-V-4.7-1B": {
+      "candidate_answer_token_ids": {
+        "A": 357,
+        "B": 417,
+        "C": 351,
+        "D": 414
+      },
+      "checkpoint_directory": "286817f1132b998913a129a221c89b4402b4ab80",
+      "config_sha256": "20ed1fe71b174719b88ed1ce37c840ec45e3657f1120391d45f33505be7638a4",
+      "label_boundary_checks_passed": 1536,
+      "model_forward_passes": 0,
+      "prompt_tokens_max": 914,
+      "prompt_tokens_median": 436.0,
+      "prompt_tokens_min": 83,
+      "prompt_tokens_p95": 617,
+      "source_prompts_tokenized": 384,
+      "tokenizer_class": "Qwen2Tokenizer",
+      "tokenizer_config_sha256": "11d04ab77486ca63a9f2b2537e70bbd8f6b24e1850e53eedb32caa3ca771cb0d",
+      "tokenizer_json_sha256": "33861e37bb955af1e3f3061182b820f347eba2b9c2c1011c82794bf0d6e77b54"
+    },
+    "Qwen3.5-4B-Base": {
+      "candidate_answer_token_ids": {
+        "A": 357,
+        "B": 417,
+        "C": 351,
+        "D": 414
+      },
+      "checkpoint_directory": "1001bb4d826a52d1f399e183466143f4da7b741b",
+      "config_sha256": "ddc63e1c717afa86c865bb5e01313d89d72bb53b97ad4a8a03ba8510c0621670",
+      "label_boundary_checks_passed": 1536,
+      "model_forward_passes": 0,
+      "prompt_tokens_max": 914,
+      "prompt_tokens_median": 436.0,
+      "prompt_tokens_min": 83,
+      "prompt_tokens_p95": 617,
+      "source_prompts_tokenized": 384,
+      "tokenizer_class": "Qwen2Tokenizer",
+      "tokenizer_config_sha256": "3891e840d7dc5fca0af33d3a25083a735e36fe06214e3f707024820cb6b9f89c",
+      "tokenizer_json_sha256": "fe000e3ed39ed12b8d2481d527d44f93c65d37e87645d2dcc80d1bf9d50d2927"
+    }
+  },
+  "pretraining_contamination_excluded": false,
+  "purpose": "source-only prospective feasibility, no model inference",
+  "schema": "exp053-tokenizer-only-preflight-v1",
+  "source_conditions": 3,
+  "source_sha256": "97ef697f4c81e804eb43e7a667a6ac7bb06c11a99cfa537997ae5e2f6c5db2b7",
+  "spec_sha256": "92643aa9e0603d29eeab8dfd24680615036b7ee49d88e12d439a8e5c569b8fb7"
+}

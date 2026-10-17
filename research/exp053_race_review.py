@@ -151,8 +151,7 @@ def decisions_for(review,packet,required_ids=None):
         check_decision(d,lookup[cid]);out[cid]=d
     if set(out)!=expected:deny("unexpected decision scope")
     return out
-def gate(private_dir,keys_path,output,adjudicator_file=None):
-    if output.exists():deny("gate output exists")
+def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
     if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
     if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:
@@ -166,7 +165,11 @@ def gate(private_dir,keys_path,output,adjudicator_file=None):
     if (seal["packet_sha256"]!=digest(packet) or
         digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
         deny("answer key differs from committed manifest")
-    trust=json.loads(keys_path.read_text());observations=[];signer_ids=[]
+    try:
+        trust=json.loads(keys_path.read_text())
+    except (ValueError,OSError) as exc:
+        deny("missing or invalid private reviewer trust roots: "+type(exc).__name__)
+    observations=[];signer_ids=[]
     for slot in ("A","B"):
         review=json.loads((private_dir/("reviewer_"+slot+".json")).read_text())
         signer_ids.append(verify_signed(review,trust))
@@ -204,10 +207,16 @@ def gate(private_dir,keys_path,output,adjudicator_file=None):
             accepted[cid]={"supported":v["supported_option"],"foil":v["foil_option"]}
     if len(accepted)<MIN_REVIEWED:
         deny("only "+str(len(accepted))+" independently adjudicated accepted articles")
-    save_private(output,{"schema":"exp053-admitted-v1","packet_sha256":digest(packet),
-        "reviewers":signer_ids,"accepted":accepted,"rejected":rejected,
-        "human_approval":True,"simulation":False})
-    return len(accepted)
+    return {"schema":"exp053-admitted-v1","packet_sha256":digest(packet),
+            "reviewers":signer_ids,"accepted":accepted,"rejected":rejected,
+            "human_approval":True,"simulation":False}
+
+def gate(private_dir,keys_path,output,adjudicator_file=None):
+    if output.exists():deny("gate output exists")
+    receipt=verified_admission(private_dir,keys_path,adjudicator_file)
+    save_private(output,receipt)
+    return len(receipt["accepted"])
+
 def main():
     ap=argparse.ArgumentParser()
     sub=ap.add_subparsers(dest="cmd",required=True)

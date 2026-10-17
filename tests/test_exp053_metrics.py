@@ -1,5 +1,8 @@
 """All model outputs in this file are deliberately SYNTHETIC software fixtures."""
-import copy,hashlib,sys,unittest
+import copy
+import hashlib
+import sys
+import unittest
 from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"research"))
@@ -28,7 +31,7 @@ def synthetic():
                          "prompt_sha256":sha("synthetic-prompt-"+model+cid+a+str(rot)),
                          "gold_label":"A" if rot==0 else "C",
                          "foil_label":"B" if rot==0 else "D",
-                         "gold_token_count":1,"foil_token_count":1,
+                         "prompt_token_count":413,"gold_token_count":1,"foil_token_count":1,
                          "gold_logp":-4+margin,"foil_logp":-4.,"mode":"raw"}
                     rows.append(rec)
     return rows,approved,manifest
@@ -97,6 +100,10 @@ class EXP053MetricsContract(unittest.TestCase):
         with patch.object(m,"ANALYSIS_PLAN_SHA","0"*64):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 m.analyze(self.rows,self.approved,self.manifest)
+    def test_prompt_token_count_integrity(self):
+        rows=copy.deepcopy(self.rows);rows[0]["prompt_token_count"]=0
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            m.analyze(rows,self.approved,self.manifest)
     def test_mode_not_silently_mixed(self):
         rows=copy.deepcopy(self.rows);rows[0]["mode"]="chat"
         with self.assertRaisesRegex(ValueError,"HOLD"):

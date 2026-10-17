@@ -1,5 +1,10 @@
 """Offline browser UI contract; cannot verify independent human review."""
-import hashlib,json,re,shutil,subprocess,tempfile,unittest
+import hashlib
+import json
+import shutil
+import subprocess
+import tempfile
+import unittest
 from pathlib import Path
 UI=Path(__file__).resolve().parents[1]/"research/exp053_offline_review.html"
 class OfflineReviewUI(unittest.TestCase):
