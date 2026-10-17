@@ -10,6 +10,7 @@ from pathlib import Path
 
 from exp053_external_witness import REQUEST_FIELDS, REQUEST_SCHEMA, RESPONSE_SCHEMA
 from exp053_race_review import canonical
+from exp053_witness_request_auth import verify_authenticated_request
 
 
 def digest64(s):
@@ -20,14 +21,15 @@ def digest64(s):
 class SQLiteCASFixture:
     """Test-only CAS with fresh connections and atomic SQLite transactions."""
 
-    def __init__(self, path, signing_key):
+    def __init__(self, path, signing_key, expected_operator_key_sha256):
         self.path = Path(path)
         self.signing_key = signing_key
+        self.operator_key_sha256 = expected_operator_key_sha256
         self.fail_before_commit = False
         self.fail_after_commit = False
 
     @classmethod
-    def bootstrap(cls, path, signing_key):
+    def bootstrap(cls, path, signing_key, expected_operator_key_sha256):
         path = Path(path)
         if path.exists() or not path.parent.is_dir():
             raise ValueError("test database must have absent path and existing parent")
@@ -55,7 +57,7 @@ class SQLiteCASFixture:
         finally:
             conn.close()
         os.chmod(path, 0o600)
-        return cls(path, signing_key)
+        return cls(path, signing_key, expected_operator_key_sha256)
 
     def connect(self):
         if not self.path.is_file():
@@ -77,8 +79,10 @@ class SQLiteCASFixture:
         finally:
             conn.close()
 
-    @staticmethod
-    def validate(req):
+    def validate(self, req):
+        # Independently provisioned operator root; not a client-supplied
+        # fingerprint. Invalid auth must fail BEFORE SQLite BEGIN IMMEDIATE.
+        verify_authenticated_request(req, self.operator_key_sha256)
         if not isinstance(req, dict) or set(req) != REQUEST_FIELDS:
             raise ValueError("synthetic CAS request has wrong fields")
         if req["schema"] != REQUEST_SCHEMA:

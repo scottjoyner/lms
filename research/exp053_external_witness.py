@@ -12,16 +12,13 @@ from pathlib import Path
 
 from exp053_execution_attestation import hex_digest
 from exp053_race_review import canonical, deny, filehash
+from exp053_witness_request_auth import (REQUEST_FIELDS, verify_authenticated_request)
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "research" / "EXP053-EXTERNAL-HIGHWATER-WITNESS-SPEC-2026-10-17.md"
 SPEC_SHA256 = "3aa0547ee07a9c271fd67b6542544a147790fef052337f1ce1764a8c2cbb5f1e"
 REQUEST_SCHEMA = "exp053-external-highwater-cas-request-v1"
 RESPONSE_SCHEMA = "exp053-external-highwater-cas-response-v1"
-REQUEST_FIELDS = {
-    "schema", "nonce_hex", "sequence", "expected_previous_sequence",
-    "previous_claim_sha256", "claim_sha256", "runner_execution_id_sha256",
-}
 RESPONSE_FIELDS = {
     "schema", "nonce_hex", "sequence", "previous_claim_sha256",
     "claim_sha256", "runner_execution_id_sha256", "witness_counter",
@@ -32,6 +29,9 @@ RESPONSE_FIELDS = {
 # a genuine remote atomic CAS implementation. These are deliberately EMPTY.
 APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256 = ""
 APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256 = ""
+# An external CAS MUST independently authenticate operator requests; this
+# root is never selected by a scorer or supplied via a CLI argument.
+APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256 = ""
 
 
 def _deny(reason):
@@ -50,14 +50,17 @@ def _external_cas(_request):
 def commit_independent_highwater(*, sequence, previous_claim_sha256,
                                  claim_sha256, execution_id_sha256,
                                  operator_public_key_sha256,
-                                 scorer_public_key_sha256):
+                                 scorer_public_key_sha256,
+                                 operator_authorization_bytes):
     """Require a nonce-fresh signed remote CAS commit BEFORE local mutations."""
     if not SPEC.is_file() or filehash(SPEC) != SPEC_SHA256:
         _deny("prospectively frozen high-water protocol changed")
     if (not hex_digest(APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256) or
-            not hex_digest(APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256)):
+            not hex_digest(APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256) or
+            not hex_digest(APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256)):
         _deny("external witness authority or implementation is not approved")
     if (not hex_digest(operator_public_key_sha256) or
+            operator_public_key_sha256 != APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256 or
             not hex_digest(scorer_public_key_sha256) or
             len({APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256,
                  operator_public_key_sha256,
@@ -75,9 +78,17 @@ def commit_independent_highwater(*, sequence, previous_claim_sha256,
         "previous_claim_sha256": previous_claim_sha256,
         "claim_sha256": claim_sha256,
         "runner_execution_id_sha256": execution_id_sha256,
+        "operator_authorization_b64": (
+            base64.b64encode(operator_authorization_bytes).decode()
+            if isinstance(operator_authorization_bytes, bytes) else ""),
     }
     if set(request) != REQUEST_FIELDS:
         _deny("internal request schema mismatch")
+    # A signature on the witness RESPONSE is not authorization for a
+    # REQUEST. Validate exact operator-signed raw bytes before any CAS call;
+    # a separately run witness must independently repeat these checks.
+    verify_authenticated_request(
+        request, APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256)
     try:
         response = _external_cas(request)
     except Exception as exc:
