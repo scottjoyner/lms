@@ -4,7 +4,7 @@ import argparse,hashlib,json
 from pathlib import Path
 from exp053_race_review import MANIFEST,MANIFEST_SHA,digest,filehash,verified_admission,deny
 from exp053_tokenizer_preflight import PRIVATE,PATHS,ROOT,WITHHELD,options_for,prompt
-from exp053_metrics import analyze
+from exp053_metrics import analyze, FIELDS as SCORE_FIELDS, rotate as rotate_label
 
 PREFLIGHT=ROOT/"EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json"
 PREFLIGHT_SHA="8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be"
@@ -16,8 +16,6 @@ WEIGHT_REPORT=ROOT/"EXP053-WEIGHT-IDENTITY-2026-10-16.json"
 WEIGHT_REPORT_SHA=""
 WEIGHT_SPEC=ROOT/"EXP053-WEIGHT-ID-PREFLIGHT-SPEC-2026-10-16.md"
 WEIGHT_SPEC_SHA="b89f573acc2567b114e65746b3026e36636aee9add6c6568c0fac6319f620a81"
-FIELDS=("case_id","article_sha256","model","arm","rotation",
-        "option_order_sha256","prompt_sha256","context_article_sha256")
 
 def sha(s):return hashlib.sha256(s.encode("utf8")).hexdigest()
 def hex_digest(s):return isinstance(s,str) and len(s)==64 and all(c in "0123456789abcdef" for c in s)
@@ -99,7 +97,7 @@ def admitted_weight_inventory(scan):
         identities[name]=calculated
     return identities
 
-def require_sources():
+def require_sources(private_dir=None):
     if not PREFLIGHT.is_file() or filehash(PREFLIGHT)!=PREFLIGHT_SHA:
         deny("tokenizer feasibility receipt modified")
     if not PROMPT_CODE.is_file() or filehash(PROMPT_CODE)!=PROMPT_CODE_SHA:
@@ -109,37 +107,78 @@ def require_sources():
     scan=json.loads(PREFLIGHT.read_text())
     if set(scan["models"])!=set(PATHS) or scan["model_forward_passes"]!=0:
         deny("tokenizer feasibility report invalid")
-    packet=json.loads(PRIVATE.read_text())
+    source_packet=(PRIVATE if private_dir is None else Path(private_dir)/"packet.json")
+    if not source_packet.is_file():
+        deny("private source packet absent from selected review directory")
+    try:
+        packet=json.loads(source_packet.read_text())
+    except (OSError, ValueError) as exc:
+        deny("private source packet unreadable or malformed: "+type(exc).__name__)
     manifest=json.loads(MANIFEST.read_text())
     if digest(packet)!=manifest["packet_sha256"]:
         deny("private packet does not match the public hash")
     return packet,manifest,scan
 
-def check_private_archive(rows,approved,packet,scan,weight_ids=None):
+def check_private_archive(rows,approved,packet,scan,weight_ids):
+    """Reconstruct every source/label receipt; standalone validation is not approval."""
+    if not isinstance(rows,list) or not isinstance(approved,dict):
+        deny("expected private score rows and signed-approved case map")
+    if not isinstance(weight_ids,dict) or set(weight_ids)!=set(scan["models"]):
+        deny("independently pinned checkpoint identities must cover every model")
     cases={c["case_id"]:c for c in packet["cases"]}
+    if len(cases)!=len(packet["cases"]):
+        deny("duplicate case identity in the private cohort")
     ids=sorted(approved)
-    if len(ids)<40:deny("fewer than 40 signed approved cases")
+    if len(ids)<40 or not set(ids)<=set(cases):
+        deny("fewer than 40 signed approved in-cohort cases")
     next_case={c:ids[(i+1)%len(ids)] for i,c in enumerate(ids)}
     for record in rows:
-        if not isinstance(record,dict) or any(k not in record for k in FIELDS):
-            deny("scorer lacks required source receipt fields")
+        if not isinstance(record,dict) or set(record)!=SCORE_FIELDS:
+            deny("scorer receipt missing fields or leaking private data")
         cid=record["case_id"];rot=record["rotation"];arm=record["arm"]
-        if cid not in approved or type(rot)!=int or rot not in (0,1):
+        if (not isinstance(cid,str) or cid not in approved or
+                type(rot)!=int or rot not in (0,1)):
             deny("unapproved or invalid scored case")
-        if arm not in ("supported","withheld","decoy"):deny("invalid source arm")
-        opts=options_for(cases[cid],rot)
+        if not isinstance(arm,str) or arm not in ("supported","withheld","decoy"):
+            deny("invalid source arm")
+        model=record["model"]
+        if not isinstance(model,str) or model not in scan["models"]:
+            deny("unknown score model")
+        case=cases[cid]
+        if record["article_sha256"]!=sha(case["article"]):
+            deny("score article digest differs from source article")
+        opts=options_for(case,rot)
         if record["option_order_sha256"]!=digest(opts):
             deny("displayed options do not match the frozen packet and rotation")
-        article=(cases[cid]["article"] if arm=="supported" else
+        passage=(case["article"] if arm=="supported" else
                  WITHHELD if arm=="withheld" else cases[next_case[cid]]["article"])
-        if record["prompt_sha256"]!=sha(prompt(cases[cid]["question"],opts,article)):
+        expected_context=("WITHHELD" if arm=="withheld" else sha(passage))
+        if record["context_article_sha256"]!=expected_context:
+            deny("source-arm context digest differs from exact source passage")
+        if record["prompt_sha256"]!=sha(prompt(case["question"],opts,passage)):
             deny("prompt hash does not match source, question, options and decoy")
-        model=record["model"]
-        if model not in scan["models"]:deny("unknown model")
+        human=approved[cid]
+        if not isinstance(human,dict) or set(human)!={"supported","foil"}:
+            deny("signed case verdict has unexpected fields")
+        good,foil=human["supported"],human["foil"]
+        if (not isinstance(good,str) or good not in "ABCD" or
+                not isinstance(foil,str) or foil not in "ABCD" or good==foil):
+            deny("invalid signed gold and foil option")
+        if rot==1:
+            good,foil=rotate_label(good),rotate_label(foil)
+        if (record["gold_label"],record["foil_label"])!=(good,foil):
+            deny("score labels disagree with signed approved foil and rotation")
         if record["tokenizer_sha256"]!=scan["models"][model]["tokenizer_json_sha256"]:
             deny("tokenizer does not match the frozen preflight checkpoint")
-        if weight_ids is not None and record.get("checkpoint_sha256")!=weight_ids[model]:
+        if record["checkpoint_sha256"]!=weight_ids[model]:
             deny("score weights do not match the independently pinned checkpoint")
+        if (type(record["prompt_token_count"])!=int or
+                not 1<=record["prompt_token_count"]<=4096 or
+                type(record["gold_token_count"])!=int or record["gold_token_count"]!=1 or
+                type(record["foil_token_count"])!=int or record["foil_token_count"]!=1):
+            deny("invalid score tokenization counts")
+        if record["mode"]!="raw":
+            deny("only separate base-mode score receipts are permitted")
     return len(rows)
 
 def replay(private_dir,trust_roots,score_archive,output,adjudicator=None):
@@ -148,7 +187,7 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None):
     if not score_archive.resolve().is_relative_to(private_dir.resolve()):
         deny("individual score archive must be private")
     admission=verified_admission(private_dir,trust_roots,adjudicator)
-    packet,manifest,scan=require_sources()
+    packet,manifest,scan=require_sources(private_dir)
     if admission["packet_sha256"]!=digest(packet):deny("admission packet mismatch")
     checkpoint_ids=admitted_weight_inventory(scan)
     rows=json.loads(score_archive.read_text())
