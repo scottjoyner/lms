@@ -58,3 +58,31 @@ runtime traces before any performance claims; corpus/answer copyright and
 pretraining-contamination caveats remain unchanged.
 
 No merge, model deployment, NAS/Neo4j writes, training or arXiv promotion.
+
+## 2026-10-17 same-descriptor score custody follow-up
+
+An additional time-of-check/time-of-use risk was identified after introducing
+signed scorer provenance: the old aggregate replayer compared the SHA256 of
+the private score path, then reopened that path to parse JSON, then hashed the
+path again. A sufficiently timed file swap-and-restore could cause the parser
+to see data other than the first hashed version.
+
+The new `read_attested_scores` helper opens the private score file through
+one non-symlink private regular-file descriptor, checks stable inode,
+modification/change times and length, and hashes **the exact same bytes
+that are parsed as JSON**. It rejects an invalid independently attested
+digest, extra or duplicate JSON object keys, `NaN`/`Infinity`,
+non-array archives and input exceeding a **32 MiB** upper bound.
+A separate score-and-attempt-log digest check happens after the pure
+statistical calculations and before any source-free report is written.
+
+Five additional synthetic negative/positive tests validate the parser's
+same-descriptor contract. None uses real answers, model inference or a
+human signing identity.
+
+This does not provide true filesystem immutability, a trusted execution
+environment, a replay-protected operator ledger or proof that native
+log probabilities came from the pinned model. In particular, a valid
+reused signed execution record **must not** be counted as an independent
+replication without a separately approved run-uniqueness witness.
+All independent-approval pins remain empty and admission stays HOLD.
