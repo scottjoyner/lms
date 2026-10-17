@@ -16,6 +16,7 @@ from exp053_execution_attestation import (
     hex_digest, private_regular_file, unambiguous_json,
 )
 from exp053_race_review import canonical, deny, filehash
+from exp053_external_witness import commit_independent_highwater
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "research" / "EXP053-OPERATOR-RUN-UNIQUENESS-SPEC-2026-10-17.md"
@@ -85,7 +86,8 @@ def _signed_authorization(path, private_dir, provenance, packet_sha256,
     return record, digest
 
 
-def _consume_claim(path, private_dir, authorization, authorization_sha256):
+def _consume_claim(path, private_dir, authorization, authorization_sha256,
+                   *, operator_public_key_sha256, scorer_public_key_sha256):
     """Atomically serialize claims on one pre-existing human-owned state inode.
 
     Crash damage always fails closed. The operator must keep an independent
@@ -138,6 +140,16 @@ def _consume_claim(path, private_dir, authorization, authorization_sha256):
                         authorization["previous_claim_sha256"] !=
                         state["last_claim_sha256"]):
                     _deny_invalid("authorization already used, stale, or wrong chained sequence")
+                # A separately administered CAS must commit first: a restored
+                # local journal cannot present a fresh high-water response.
+                # If remote commit succeeds and local update fails, HOLD.
+                witness_evidence = commit_independent_highwater(
+                    sequence=authorization["sequence"],
+                    previous_claim_sha256=authorization["previous_claim_sha256"],
+                    claim_sha256=authorization_sha256,
+                    execution_id_sha256=authorization["runner_execution_id_sha256"],
+                    operator_public_key_sha256=operator_public_key_sha256,
+                    scorer_public_key_sha256=scorer_public_key_sha256)
                 new_state = {
                     "schema": STATE_SCHEMA,
                     "last_sequence": authorization["sequence"],
@@ -176,6 +188,7 @@ def _consume_claim(path, private_dir, authorization, authorization_sha256):
                 return {
                     "operator_sequence": authorization["sequence"],
                     "operator_authorization_sha256": authorization_sha256,
+                    **witness_evidence,
                 }
         finally:
             os.close(fd)
@@ -207,5 +220,8 @@ def consume_unique_run(authorization_path, private_dir, *,
     authorization, digest = _signed_authorization(
         authorization_path, private_dir, provenance, packet_sha256,
         provenance["runner_public_key_sha256"])
-    return _consume_claim(APPROVED_OPERATOR_CLAIM_LEDGER_PATH, private_dir,
-                          authorization, digest)
+    return _consume_claim(
+        APPROVED_OPERATOR_CLAIM_LEDGER_PATH, private_dir,
+        authorization, digest,
+        operator_public_key_sha256=APPROVED_OPERATOR_PUBLIC_KEY_SHA256,
+        scorer_public_key_sha256=provenance["runner_public_key_sha256"])
