@@ -20,10 +20,29 @@ def sha(value):
 
 def allowed_resolved(path, model_path):
     canonical_path = path.resolve(strict=True)
-    roots = (model_path.resolve(), (model_path.parent.parent / "blobs").resolve())
-    if not any(canonical_path.is_relative_to(root) for root in roots):
-        deny("unexpected model file symlink/path escape " + path.name)
-    return canonical_path
+    model_root = model_path.resolve(strict=True)
+    if canonical_path.is_relative_to(model_root):
+        return canonical_path
+    # Hugging Face stores repo-specific immutable blobs adjacent to snapshots.
+    # Some pre-existing snapshots also point to a hub-wide content-addressed
+    # blob store. Neither rule applies to unrecognized storage layouts.
+    if (model_root.parent.name == "snapshots" and
+            model_root.parent.parent.name.startswith("models--") and
+            model_root.parent.parent.parent.name == "hub"):
+        repo_blobs = model_root.parent.parent / "blobs"
+        if canonical_path.is_relative_to(repo_blobs):
+            return canonical_path
+        hub_blobs = model_root.parent.parent.parent / "blobs"
+        try:
+            rel = canonical_path.relative_to(hub_blobs)
+        except ValueError:
+            deny("unexpected model file symlink/path escape " + path.name)
+        if (len(rel.parts) == 2 and len(rel.parts[0]) == 2 and
+                len(rel.parts[1]) == 64 and
+                all(c in "0123456789abcdef" for c in rel.parts[0]+rel.parts[1]) and
+                rel.parts[1].startswith(rel.parts[0])):
+            return canonical_path
+    deny("unexpected model file symlink/path escape " + path.name)
 
 def stream_digest(path, model_path):
     allowed_resolved(path, model_path)
