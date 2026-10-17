@@ -91,6 +91,28 @@ class Enrollment(unittest.TestCase):
         r=copy.deepcopy(self.value);r["slots"]["B"]["public_key_b64"]="bad!"
         with self.assertRaisesRegex(ValueError,"HOLD"):self.check(r)
 
+    def test_oversized_roster_rejected_even_with_matching_digest(self):
+        # A padded but valid JSON file can still be too large for key metadata.
+        content=json.dumps(self.value).encode()+b" "*(roster.MAX_ROSTER_BYTES+1)
+        self.path.write_bytes(content)
+        os.chmod(self.path,0o600)
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            roster.load_roster(self.path,self.packet,hashlib.sha256(content).hexdigest(),ROOT)
+
+    def test_duplicate_json_fields_rejected_even_if_hash_matches(self):
+        normal=json.dumps(self.value,sort_keys=True)
+        ambiguous=(normal[:-1]+',"schema":"'+roster.SCHEMA+'"}').encode()
+        self.path.write_bytes(ambiguous)
+        os.chmod(self.path,0o600)
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            roster.load_roster(self.path,self.packet,hashlib.sha256(ambiguous).hexdigest(),ROOT)
+
+    def test_named_pipe_not_read_as_private_json(self):
+        if not hasattr(os,"mkfifo"):self.skipTest("named pipes unsupported")
+        os.mkfifo(self.path)
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            roster.load_roster(self.path,self.packet,"a"*64,ROOT)
+
     def test_roster_symlink_rejected(self):
         real=Path(self.tmp.name)/"actual.json";real.write_text("{}")
         self.path.symlink_to(real)
