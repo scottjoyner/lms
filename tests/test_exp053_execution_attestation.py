@@ -113,6 +113,43 @@ class ScorerSignatureEvidence(unittest.TestCase):
         self.assertNotIn("runner_public_key_b64", item)
         self.assertNotIn("score_text", item)
 
+    def test_same_descriptor_score_bytes_are_parsed(self):
+        # A valid digest binds the actual bytes parsed, not a separate file read.
+        self.save(self.score, b'[{"case_id":"synthetic_case"}]\n')
+        expected = sha(self.score.read_bytes())
+        rows = witness.read_attested_scores(self.score, self.private, expected)
+        self.assertEqual(rows, [{"case_id": "synthetic_case"}])
+
+    def test_swapped_score_bytes_rejected_by_same_descriptor(self):
+        original = sha(self.score.read_bytes())
+        self.save(self.score, b'["substituted source-free scores"]\n')
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            witness.read_attested_scores(self.score, self.private, original)
+
+    def test_duplicate_json_key_and_nan_denied_during_score_parse(self):
+        for bad in (b'[{"case_id":"x","case_id":"y"}]\n',
+                    b'[{"logprob":NaN}]\n',
+                    b'[{"logprob":Infinity}]\n'):
+            self.save(self.score, bad)
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                witness.read_attested_scores(self.score, self.private,
+                                             sha(self.score.read_bytes()))
+
+    def test_non_list_archive_and_bad_hash_denied(self):
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            witness.read_attested_scores(self.score, self.private, "invalid")
+        self.save(self.score, b'{"scores":[]}')
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            witness.read_attested_scores(self.score, self.private,
+                                         sha(self.score.read_bytes()))
+
+    def test_bounded_score_archive_size(self):
+        self.save(self.score, b'["synthetic and over configured bound"]')
+        with patch.object(witness, "MAX_SCORE_ARCHIVE_BYTES", 24):
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                witness.read_attested_scores(self.score, self.private,
+                                             sha(self.score.read_bytes()))
+
     def test_modified_score_bytes_fail(self):
         self.sign()
         self.save(self.score, b'["fabricated output"]\n')
