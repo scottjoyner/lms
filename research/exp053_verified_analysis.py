@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """EXP053 verified model-free scoring replay; no model imports or inference."""
-import argparse,hashlib,json
+import argparse
+import hashlib
+import json
 from pathlib import Path
 from exp053_race_review import MANIFEST,MANIFEST_SHA,digest,filehash,verified_admission,deny
 from exp053_tokenizer_preflight import PRIVATE,PATHS,ROOT,WITHHELD,options_for,prompt
 from exp053_metrics import analyze, FIELDS as SCORE_FIELDS, rotate as rotate_label
+from exp053_execution_attestation import verify_attestation
 
 PREFLIGHT=ROOT/"EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json"
 PREFLIGHT_SHA="8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be"
@@ -181,7 +184,8 @@ def check_private_archive(rows,approved,packet,scan,weight_ids):
             deny("only separate base-mode score receipts are permitted")
     return len(rows)
 
-def replay(private_dir,trust_roots,score_archive,output,adjudicator=None):
+def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
+           execution_attestation=None,attempt_log=None):
     if not output.parent.is_dir() or output.parent.resolve()!=ROOT.resolve() or output.exists():
         deny("public aggregate output must be a new file inside research")
     if not score_archive.resolve().is_relative_to(private_dir.resolve()):
@@ -190,14 +194,32 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None):
     packet,manifest,scan=require_sources(private_dir)
     if admission["packet_sha256"]!=digest(packet):deny("admission packet mismatch")
     checkpoint_ids=admitted_weight_inventory(scan)
-    rows=json.loads(score_archive.read_text())
+    if execution_attestation is None or attempt_log is None:
+        deny("operator-attested scorer execution and private retry log required")
+    provenance=verify_attestation(
+        execution_attestation,score_archive,attempt_log,private_dir,
+        packet_sha256=digest(packet),admission_sha256=digest(admission),
+        weight_inventory_sha256=WEIGHT_REPORT_SHA,
+        tokenizer_preflight_sha256=PREFLIGHT_SHA,
+        prompt_builder_sha256=PROMPT_CODE_SHA,checkpoint_receipts=checkpoint_ids,
+        approved_count=len(admission["accepted"]))
+    try:
+        rows=json.loads(score_archive.read_text())
+    except (OSError,ValueError) as exc:
+        deny("private score archive unreadable or malformed: "+type(exc).__name__)
+    # The verified, signed byte digest must still hold after the analysis read.
+    if filehash(score_archive)!=provenance["score_archive_sha256"]:
+        deny("private score archive mutated after execution attestation")
     if not isinstance(rows,list):deny("score archive must be a JSON list")
     check_private_archive(rows,admission["accepted"],packet,scan,checkpoint_ids)
     summary=analyze(rows,admission["accepted"],manifest)
-    summary["score_archive_sha256"]=filehash(score_archive)
+    summary["score_archive_sha256"]=provenance["score_archive_sha256"]
     summary["signed_admission_sha256"]=digest(admission)
     summary["tokenizer_preflight_sha256"]=PREFLIGHT_SHA
     summary["checkpoint_receipt_sha256"]=WEIGHT_REPORT_SHA
+    summary["execution_attestation_sha256"]=provenance["execution_attestation_sha256"]
+    summary["attempt_log_sha256"]=provenance["attempt_log_sha256"]
+    summary["runner_source_sha256"]=provenance["runner_source_sha256"]
     summary["privacy"]="aggregates only; individual scores and RACE text stay private"
     with output.open("x") as f:f.write(json.dumps(summary,sort_keys=True,indent=2)+"\n")
     return summary
@@ -207,9 +229,12 @@ def main():
     p.add_argument("--private-dir",type=Path,required=True)
     p.add_argument("--trust-roots",type=Path,required=True)
     p.add_argument("--private-score-archive",type=Path,required=True)
+    p.add_argument("--private-execution-attestation",type=Path,required=True)
+    p.add_argument("--private-attempt-log",type=Path,required=True)
     p.add_argument("--adjudicator-file",type=Path)
     p.add_argument("--out",type=Path,required=True)
     a=p.parse_args()
     print(json.dumps(replay(a.private_dir,a.trust_roots,a.private_score_archive,
-                            a.out,a.adjudicator_file),sort_keys=True))
+                            a.out,a.adjudicator_file,a.private_execution_attestation,
+                            a.private_attempt_log),sort_keys=True))
 if __name__=="__main__":main()
