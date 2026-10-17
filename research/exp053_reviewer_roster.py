@@ -8,10 +8,12 @@ exact private roster SHA256. No approved roster currently exists.
 import base64
 import hashlib
 import json
+import os
 import stat
 from pathlib import Path
 
 SCHEMA = "exp053-owner-reviewed-roster-v1"
+MAX_ROSTER_BYTES = 16384  # Private human-key metadata, never corpus source text.
 ROLES = {"A": "independent", "B": "independent", "ADJ": "adjudicator"}
 
 
@@ -29,24 +31,45 @@ def load_roster(path, packet_sha256, pinned_sha256, repo_root):
     if not lower_sha(pinned_sha256):
         deny("the owner has not independently approved any reviewer roster")
     path = Path(path)
-    if path.is_symlink():
-        deny("symlinked reviewer roster is not allowed")
+    # Read through a single non-following file descriptor to prevent a path
+    # substitution between the permission check and the fingerprinted bytes.
     try:
         resolved = path.resolve(strict=True)
         if resolved.is_relative_to(Path(repo_root).resolve()):
             deny("private reviewer roster must not reside in the public repository")
-        mode = path.stat().st_mode
-        if not stat.S_ISREG(mode) or mode & 0o077:
-            deny("roster must be a private regular file (mode 0600)")
-        data = path.read_bytes()
+        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+        try:
+            before = os.fstat(fd)
+            if not stat.S_ISREG(before.st_mode) or before.st_mode & 0o077:
+                deny("roster must be a private regular file (mode 0600)")
+            if not 1 <= before.st_size <= MAX_ROSTER_BYTES:
+                deny("private reviewer roster size outside allowed limit")
+            with os.fdopen(fd, "rb", closefd=False) as handle:
+                data = handle.read(MAX_ROSTER_BYTES + 1)
+            after = os.fstat(fd)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if identity(before) != identity(after) or len(data) != before.st_size:
+                deny("private roster changed during admission")
+        finally:
+            os.close(fd)
     except (OSError, RuntimeError) as exc:
-        deny("roster cannot be read: " + type(exc).__name__)
+        deny("roster cannot be read safely: " + type(exc).__name__)
     if hashlib.sha256(data).hexdigest() != pinned_sha256:
         deny("private roster differs from owner-reviewed fingerprint")
+    def reject_duplicate_fields(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError("duplicate key in owner-reviewed reviewer roster")
+            obj[key] = value
+        return obj
     try:
-        roster = json.loads(data)
+        roster = json.loads(data, object_pairs_hook=reject_duplicate_fields)
     except (ValueError, UnicodeDecodeError) as exc:
-        deny("invalid roster encoding: " + type(exc).__name__)
+        deny("invalid or ambiguous roster encoding: " + type(exc).__name__)
     required = {"schema", "packet_sha256", "owner_custody_reference_sha256",
                 "blind_assignments_confirmed", "slots"}
     if not isinstance(roster, dict) or set(roster) != required:

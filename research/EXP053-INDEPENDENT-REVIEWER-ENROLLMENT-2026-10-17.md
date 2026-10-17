@@ -77,3 +77,25 @@ weight-file custody and pin only after explicit operator approval.
 No EXP-053 neural forward experiment, deployment, model promotion, public
 RACE publication, merge, production data write or fabricated signoff is
 authorized by this document.
+
+## 2026-10-17 hardening: private-file and malformed-input refusal
+
+The exact-byte pinned private reviewer roster is now opened using a single
+read-only file descriptor that does not follow a final-component symlink,
+with nonblocking behavior (to refuse FIFO/special files) and verified
+`fstat` regular-file status, owner-private permissions, stable device/inode,
+size, mtime and ctime before/after reading. A bounded **16 KiB** maximum
+size prevents oversized metadata masquerading as a small reviewer-key map.
+The JSON parser now refuses duplicate object keys at any nesting level,
+even when an attacker supplies a checksum of those ambiguous bytes.
+
+The signed-review gate also rejects incomplete/extra review fields, bad role
+types, non-dictionary decisions, and malformed quote/rejection fields as
+explicit `HOLD` errors. These safeguards do not establish real human identity,
+independent reading, consent, or signature custody on their own.
+
+Tests use ONLY synthetic private-key identities and dummy payloads. A real
+owner has not approved any signer, and the pin
+`APPROVED_REVIEWER_ROSTER_SHA256=""` stays EMPTY. No generated key, test
+fixture, software signature or candidate question has been accepted as
+an actual human review. The frozen corpus and model-forward HOLD remain.

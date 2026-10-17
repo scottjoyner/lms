@@ -94,6 +94,30 @@ class TestEXP053(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 x.verified_admission(PRIVATE,trust)
 
+    def test_malformed_review_schema_is_hold(self):
+        trust={"reviewer_A":"a"*44,"reviewer_B":"b"*44}
+        for payload in (None,[],{},{"schema":"exp053-review-v1",
+                                     "reviewer_id":"reviewer_A",
+                                     "role":"independent"}):
+            with self.assertRaisesRegex(ValueError,"HOLD"):
+                x.verify_signed(payload,trust)
+
+    def test_malformed_decision_is_hold(self):
+        case={"article":"This passage contains a simple source citation fragment."}
+        for payload in (None,[],{"decision":"accept","supported_option":[],
+                                 "foil_option":"B","support_quote":None,"foil_reason":12},
+                        {"decision":"reject","reject_reason":None}):
+            with self.assertRaisesRegex(ValueError,"HOLD"):
+                x.check_decision(payload,case)
+
+    def test_unsupported_decision_type_is_hold(self):
+        packet={"cases":[{"case_id":"a",
+                           "article":"Source sentence long enough for a quote."}]}
+        rev={"packet_sha256":x.digest(packet),"role":"independent",
+             "decisions":[None]}
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.decisions_for(rev,packet)
+
     def test_no_overwrite(self):
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.build(PRIVATE,x.MANIFEST)
