@@ -109,6 +109,13 @@ function save(){
   review.attestation=$("attest").checked?ATTEST:"";
   review.signature="";dirty=true;
 }
+function updateProgress(){
+  if(!packet||!review)return;
+  const done=review.decisions.filter((x,i)=>complete(x,packet.cases[i])).length;
+  $("status").textContent=done+"/"+packet.cases.length+" complete; unsigned — export to save a file";
+  $("validation").textContent=complete(review.decisions[index],packet.cases[index])?
+    "Case complete":"Case incomplete / awaiting review";
+}
 function complete(d,c){
   if(d.decision==="reject")return d.reject_reason?.trim().length>=12;
   if(d.decision!=="accept")return false;
@@ -125,10 +132,8 @@ function display(){
   $("quote").value=d.support_quote||"";$("foilReason").value=d.foil_reason||"";
   $("rejectReason").value=d.reject_reason||"";setDecision(d.decision);
   $("reviewerId").value=review.reviewer_id||"";$("attest").checked=review.attestation===ATTEST;
-  const done=review.decisions.filter((x,i)=>complete(x,packet.cases[i])).length;
-  $("status").textContent=done+"/"+packet.cases.length+" complete; unsigned";
+  updateProgress();
   $("prev").disabled=index===0;$("next").disabled=index===packet.cases.length-1;
-  $("validation").textContent=complete(d,c)?"Case complete":"Case incomplete / awaiting review";
 }
 $("load").onclick=async()=>{
   try{
@@ -146,12 +151,19 @@ $("load").onclick=async()=>{
     $("setup").hidden=true;$("current").hidden=false;display();
   }catch(e){$("error").textContent="HOLD: "+e.message;packet=null;review=null;}
 };
+// Keep edits only in memory until the reviewer explicitly exports a draft.
+// Every edit sets the unload guard, including typing before navigation.
+function changed(){if(!review)return;save();updateProgress();}
+$("current").addEventListener("input",changed);
+$("current").addEventListener("change",changed);
 $("prev").onclick=()=>{save();index--;display();};
 $("next").onclick=()=>{save();index++;display();};
 $("useQuote").onclick=()=>{
   const chosen=window.getSelection()?.toString()?.trim()||"";
-  if(chosen.length>=20&&packet.cases[index].article.includes(chosen))
+  if(chosen.length>=20&&packet.cases[index].article.includes(chosen)){
     $("quote").value=chosen;
+    changed();
+  }
   else $("validation").textContent="Select a contiguous 20+ character passage span first.";
 };
 $("export").onclick=()=>{
