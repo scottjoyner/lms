@@ -11,6 +11,7 @@ from exp053_execution_attestation import (
     verify_attestation, read_attested_scores, private_regular_file,
 )
 from exp053_attempt_ledger import verify_attempt_ledger
+from exp053_operator_run import consume_unique_run
 
 PREFLIGHT=ROOT/"EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json"
 PREFLIGHT_SHA="8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be"
@@ -188,7 +189,7 @@ def check_private_archive(rows,approved,packet,scan,weight_ids):
     return len(rows)
 
 def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
-           execution_attestation=None,attempt_log=None):
+           execution_attestation=None,attempt_log=None,operator_authorization=None):
     if not output.parent.is_dir() or output.parent.resolve()!=ROOT.resolve() or output.exists():
         deny("public aggregate output must be a new file inside research")
     if not score_archive.resolve().is_relative_to(private_dir.resolve()):
@@ -235,6 +236,14 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
     if (score_end!=provenance["score_archive_sha256"] or
             attempts_end!=provenance["attempt_log_sha256"]):
         deny("private scorer evidence changed during aggregate calculation")
+    if operator_authorization is None:
+        deny("independent operator-issued single-use run authorization required")
+    # Claim only after ALL source, score, retry and statistical checks pass.
+    # Claim remains consumed if later output persistence fails (fail closed).
+    operator_claim=consume_unique_run(
+        operator_authorization,private_dir,provenance=provenance,
+        packet_sha256=digest(packet))
+    summary.update(operator_claim)
     with output.open("x") as f:f.write(json.dumps(summary,sort_keys=True,indent=2)+"\n")
     return summary
 
@@ -245,10 +254,11 @@ def main():
     p.add_argument("--private-score-archive",type=Path,required=True)
     p.add_argument("--private-execution-attestation",type=Path,required=True)
     p.add_argument("--private-attempt-log",type=Path,required=True)
+    p.add_argument("--private-operator-authorization",type=Path,required=True)
     p.add_argument("--adjudicator-file",type=Path)
     p.add_argument("--out",type=Path,required=True)
     a=p.parse_args()
     print(json.dumps(replay(a.private_dir,a.trust_roots,a.private_score_archive,
                             a.out,a.adjudicator_file,a.private_execution_attestation,
-                            a.private_attempt_log),sort_keys=True))
+                            a.private_attempt_log,a.private_operator_authorization),sort_keys=True))
 if __name__=="__main__":main()
