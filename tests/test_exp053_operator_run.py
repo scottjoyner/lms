@@ -374,6 +374,29 @@ class SyntheticOperatorClaim(unittest.TestCase):
             json.loads(self.state_path.read_text())["last_sequence"], 0)
         self.assertFalse(list(self.operator_dir.glob("*.used-*")))
 
+    def test_sqlite_fixture_end_to_end_local_rollback_rejected(self):
+        # The database is still local TEST-ONLY; this validates interfaces,
+        # not a real independent trust domain or remote durable evidence.
+        sys.path.insert(0, str(R.parents[0] / "tests" / "fixtures"))
+        from exp053_sqlite_cas_fixture import SQLiteCASFixture
+        sqlite = SQLiteCASFixture.bootstrap(
+            Path(self.tmp.name) / "fixture-witness-only.sqlite",
+            self.witness_key)
+        self.synthetic_external_cas = sqlite.cas
+        self.sign()
+        claim = self.consume()
+        self.assertEqual(claim["external_highwater_sequence"], 1)
+        self.assertEqual(sqlite.highwater(), (1, claim["operator_authorization_sha256"], 1))
+        # Simulated privileged rollback of ONLY the local journal and marker.
+        marker = self.state_path.with_name(
+            self.state_path.name + ".used-" + self.provenance["execution_id_sha256"])
+        marker.unlink()
+        self.create_state()
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            self.consume()
+        self.assertEqual(sqlite.highwater(), (1, claim["operator_authorization_sha256"], 1))
+        self.assertEqual(json.loads(self.state_path.read_text())["last_sequence"], 0)
+
     def test_unconfigured_external_authorities_always_hold(self):
         self.sign()
         with patch.object(run, "APPROVED_OPERATOR_PUBLIC_KEY_SHA256",
@@ -401,15 +424,30 @@ class SyntheticOperatorClaim(unittest.TestCase):
 
     def test_synthetic_concurrent_consumers_only_one_wins(self):
         self.sign()
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(lambda _: self._try_consume(), range(2)))
+        # All mock roots belong to ONE outer scope. Nested patch.object from
+        # racing threads can restore a nonempty value after both finish.
+        with patch.object(run, "APPROVED_OPERATOR_PUBLIC_KEY_SHA256",
+                          self.pubsha), patch.object(
+            run, "APPROVED_OPERATOR_CLAIM_LEDGER_PATH", str(self.state_path)
+        ), patch.object(
+            witness, "APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256",
+            self.witness_pub_sha
+        ), patch.object(
+            witness, "APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256", "e" * 64
+        ), patch.object(witness, "_external_cas", self.synthetic_external_cas):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda _: self._try_consume(), range(2)))
         self.assertEqual(sum(value == "success" for value in results), 1)
         self.assertEqual(sum(value == "hold" for value in results), 1)
         self.assertEqual(json.loads(self.state_path.read_text())["last_sequence"], 1)
+        self.assertEqual(run.APPROVED_OPERATOR_PUBLIC_KEY_SHA256, "")
+        self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256, "")
 
     def _try_consume(self):
         try:
-            self.consume()
+            run.consume_unique_run(
+                self.auth_path, self.scorer_private,
+                provenance=self.provenance, packet_sha256=self.packet)
             return "success"
         except ValueError as exc:
             if "HOLD" in str(exc):
