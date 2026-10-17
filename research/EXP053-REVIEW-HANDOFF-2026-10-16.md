@@ -11,6 +11,14 @@ Prior EXP051/052 240 synthetic passes remain historical, not the EXP053 scientif
 - Usage restriction: RACE is available for **non-commercial research only**. Never redistribute `packet.json`, source passage text, source-supplying review forms, answer key, or derivatives via GitHub, public artifacts, chats, or unrestricted model training.
 - Source is human-authored exam questions, not proven unseen in model pretraining, and not adjudicated for our study until independent reviewer forms are signed.
 
+## Offline browser review (no JSON hand-editing required)
+
+Use the research-only, source-free HTML file `research/exp053_offline_review.html` in a modern offline-capable browser on the reviewer's own device (opening it as a local file is sufficient, with no HTTP server). Select the privately distributed, **blinded** `packet.json` and *only that reviewer's* `reviewer_A.json` / `reviewer_B.json`. The form checks the source packet's SHA-256 in the browser, displays one question at a time, supports precise source quote selection, tracks completion, and exports unsigned JSON as a **local browser download**. It does not transmit or persist the passages in localStorage, make network requests, sign for the reviewer, or supply answers automatically. Browser CSP prohibits network connections. The original sealed exam answer key must be withheld entirely.
+
+A reviewer may export partial drafts and reload them on their own machine, but cannot pass the signing workflow until all 64 decisions have been completed and they affirm the independent-review attestation. Use secure person-to-person custody of licensed packet data; never commit packet text, forms, or output to public GitHub. Browser form code is audited with a JS syntax check and canonical SHA-256 compatibility test against the actual private packet.
+
+**Cryptographic caveat:** Ed25519 verifies possession of a private key, **not human identity, human independence or actual review quality**. The project owner must independently verify and preapprove the actual human reviewer identities, verify that each controls their separate key, and retain a provenance/consent record outside the signed JSON. Never accept generated keys + automated filled forms as human review. Different public keys are necessary but not sufficient evidence of distinct independent reviewers.
+
 ## Independent review actions
 
 Each of two distinct human reviewers should receive the `packet.json` and **only their own** `reviewer_A.json` or `reviewer_B.json`. Do not show them `sealed_exam_key.json`, other reviewers' forms, model outputs, existing gold labels or signed trust keys.
@@ -28,7 +36,13 @@ After **manual completion** of every item, sign using:
 Preserve the originals separately. Place the two independently signed final reviews into the gate's private directory as `reviewer_A.json` and `reviewer_B.json`.
 Then execute:
 `python research/exp053_race_review.py gate --private-dir /media/scott/SSD_4TB/exp053-private-20261016 --trust-roots <private/trust_roots.json> --out <private/admitted.json>`.
-Disputed reviews **require a separately signed, independent third adjudicator** and `--adjudicator-file`; fewer than 40 accepted distinct articles remains HOLD.
+Disputed reviews **require a separately signed, independent third adjudicator** and `--adjudicator-file`. The third form must contain exactly the disputed IDs, not automatically label all 64. The adjudicator independently examines the same source passages without seeing original answer keys or reviewers' labels; their signed ruling handles every dispute. Fewer than 40 accepted distinct articles remains HOLD.
+
+## Preliminary source-only contamination control
+
+Source overlap audit: `research/EXP053-SOURCE-OVERLAP-AUDIT-2026-10-16.json` (generated via `research/exp053_source_overlap_audit.py`) found **64 distinct full RACE passages**, with **0 exact full-passage matches and 0 shared contiguous 20-token source windows** against 13,594 QASPER source paragraphs and 1,000 QuAC source passages. This is a public, de-identified **source-only** observation; **SQuAD was not available for this audit**, and no result demonstrates absence from any language-model pretraining dataset. Do not overstate it as contamination exclusion.
+
+The model-free analysis supplement, `research/EXP053-MEASUREMENT-PLAN-2026-10-16.md`, was frozen on 2026-10-16 prior to human approvals / EXP053 model forwards, SHA256 `5239be2dd2413af98759a2ac5fdde100f2407d2de07149347f272d1e5ee0922d`. The pure analysis code `research/exp053_metrics.py` refuses changed plans and incomplete article/model/arm/rotation grids. Its successful unit tests use **fabricated synthetic scores** solely for math and safety verification; the 3-model scientific result remains UNMEASURED.
 
 ## Audit and next experiment
 

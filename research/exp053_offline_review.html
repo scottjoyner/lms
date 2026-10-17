@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; object-src 'none'; base-uri 'none'">
+<title>EXP-053 — Offline Independent Human Review</title>
+<style>
+body{font:16px/1.48 system-ui,sans-serif;max-width:1050px;margin:auto;padding:1rem;background:#f7f7f8;color:#171923}
+header,main,footer{background:white;padding:1.2rem;margin:1rem 0;border:1px solid #dadde1;border-radius:8px}
+h1{font-size:1.65rem}h2{font-size:1.22rem}
+button,input,select,textarea{font:inherit}button{padding:.6rem .95rem;cursor:pointer}
+label{display:block;margin:.45rem 0}.row{display:flex;flex-wrap:wrap;gap:1rem;align-items:center}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f1f3f5;border:1px solid #c7cbd0;padding:1rem;border-radius:5px;max-height:340px;overflow-y:auto}
+fieldset{margin:.75rem 0;padding:.7rem;border:1px solid #a8afb8}legend{font-weight:bold}
+fieldset label{padding:.3rem}textarea{display:block;width:96%;min-height:70px;margin:.3rem 0}
+select{padding:.35rem}.hint{font-size:.9rem;color:#414a58}#status{font-weight:bold}#error{color:#7f132c;white-space:pre-wrap}
+input[type=text]{padding:.45rem;min-width:220px}
+nav{display:flex;gap:.7rem;margin-top:1.1rem}
+#current[hidden],#setup[hidden]{display:none}
+</style>
+</head>
+<body>
+<header>
+<h1>EXP-053 · Independent source review</h1>
+<p><strong>Offline only.</strong> This page loads the licensed RACE source packet and your blank review JSON directly from local files. There is no network access, telemetry, automatic approval, model scoring, or server upload. Do not distribute source text or send it to external services. Noncommercial research only.</p>
+<p class="hint">Reviewers must not receive the sealed answer key, other reviewers' answers, or any model predictions. A cryptographic signature is applied separately after you finish reviewing. You can export an incomplete draft and resume with it later.</p>
+</header>
+<section id="setup">
+<main>
+<h2>1 · Open your private review files</h2>
+<label>Blinded <code>packet.json</code> <input type="file" id="packet" accept=".json,application/json"></label>
+<label>Your private <code>reviewer_A.json</code> or <code>reviewer_B.json</code> (or an exported draft) <input type="file" id="review" accept=".json,application/json"></label>
+<button id="load">Load files locally</button>
+<p id="error" role="alert"></p>
+</main>
+</section>
+<section id="current" hidden>
+<main>
+<div class="row"><label>Reviewer ID <input id="reviewerId" type="text" autocomplete="off" placeholder="registered signer ID"></label><span id="status" aria-live="polite"></span></div>
+<h2 id="title"></h2>
+<p class="hint">Exam passage (source only; never show sealed answer keys)</p>
+<pre id="article"></pre>
+<h3 id="question"></h3>
+<fieldset><legend>Uniquely supported answer (choose one)</legend><div id="answers"></div></fieldset>
+<fieldset><legend>Plausible but unsupported answer (choose one)</legend><div id="foils"></div></fieldset>
+<label>Exact supporting quote from the passage, at least 20 characters
+<textarea id="quote" placeholder="Select passage text and click Use selected source text, or paste an exact contiguous quotation"></textarea></label>
+<button id="useQuote">Use selected passage text</button>
+<label>Why the chosen foil is not supported, at least 15 characters
+<textarea id="foilReason"></textarea></label>
+<fieldset><legend>Decision</legend>
+<label><input type="radio" name="decision" value="accept"> Accept uniquely supported answer and foil</label>
+<label><input type="radio" name="decision" value="reject"> Reject as ambiguous or unsuitable</label>
+<label><input type="radio" name="decision" value="unreviewed"> Not reviewed</label>
+</fieldset>
+<label>For rejection, explain why (at least 12 characters)<textarea id="rejectReason"></textarea></label>
+<nav><button id="prev">← Previous</button><button id="next">Next →</button><button id="export">Export unsigned review JSON</button></nav>
+<p id="validation" role="status"></p>
+</main>
+<footer>
+<label><input id="attest" type="checkbox"> <strong>I personally attest:</strong>
+"I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me."</label>
+<p class="hint">Exported JSON is unsigned. Complete all 64 cases; then sign on your device with <code>exp053_sign_review.py</code> using your own independent private key. Never upload the full review to public GitHub.</p>
+</footer>
+</section>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const ATTEST="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me.";
+let packet,review,index=0,dirty=false;
+function canonical(v){
+  if(Array.isArray(v))return "["+v.map(canonical).join(",")+"]";
+  if(v&&typeof v==="object")return "{"+Object.keys(v).sort().map(k=>JSON.stringify(k)+":"+canonical(v[k])).join(",")+"}";
+  return JSON.stringify(v);
+}
+async function digest(v){
+  const bytes=new TextEncoder().encode(canonical(v));
+  const bits=await crypto.subtle.digest("SHA-256",bytes);
+  return Array.from(new Uint8Array(bits),b=>b.toString(16).padStart(2,"0")).join("");
+}
+async function readJson(input){
+  const file=input.files?.[0];if(!file)throw Error("Choose both JSON files.");
+  if(file.size>8000000)throw Error("Unexpectedly large file.");
+  return JSON.parse(await file.text());
+}
+function selectBox(parent,name,opts,value){
+  parent.replaceChildren();
+  for(const [letter,text] of Object.entries(opts)){
+    const label=document.createElement("label"),radio=document.createElement("input");
+    radio.type="radio";radio.name=name;radio.value=letter;radio.checked=value===letter;
+    label.append(radio,document.createTextNode(" "+letter+". "+text));parent.append(label);
+  }
+}
+function selected(name){return document.querySelector('input[name="'+name+'"]:checked')?.value||"";}
+function setDecision(s){
+  const input=document.querySelector('input[name="decision"][value="'+s+'"]');
+  if(input)input.checked=true;
+}
+function save(){
+  if(!review)return;
+  const d=review.decisions[index];
+  d.supported_option=selected("answer");
+  d.foil_option=selected("foil");
+  d.support_quote=$("quote").value.trim();
+  d.foil_reason=$("foilReason").value.trim();
+  d.reject_reason=$("rejectReason").value.trim();
+  d.decision=selected("decision")||"unreviewed";
+  review.reviewer_id=$("reviewerId").value.trim();
+  review.attestation=$("attest").checked?ATTEST:"";
+  review.signature="";dirty=true;
+}
+function complete(d,c){
+  if(d.decision==="reject")return d.reject_reason?.trim().length>=12;
+  if(d.decision!=="accept")return false;
+  return "ABCD".includes(d.supported_option)&&"ABCD".includes(d.foil_option)&&
+    d.supported_option!==d.foil_option&&(d.support_quote?.trim().length||0)>=20&&
+    c.article.includes(d.support_quote.trim())&&(d.foil_reason?.trim().length||0)>=15;
+}
+function display(){
+  const c=packet.cases[index],d=review.decisions[index];
+  $("title").textContent="Question "+(index+1)+" / "+packet.cases.length;
+  $("article").textContent=c.article;$("question").textContent=c.question;
+  selectBox($("answers"),"answer",c.options,d.supported_option);
+  selectBox($("foils"),"foil",c.options,d.foil_option);
+  $("quote").value=d.support_quote||"";$("foilReason").value=d.foil_reason||"";
+  $("rejectReason").value=d.reject_reason||"";setDecision(d.decision);
+  $("reviewerId").value=review.reviewer_id||"";$("attest").checked=review.attestation===ATTEST;
+  const done=review.decisions.filter((x,i)=>complete(x,packet.cases[i])).length;
+  $("status").textContent=done+"/"+packet.cases.length+" complete; unsigned";
+  $("prev").disabled=index===0;$("next").disabled=index===packet.cases.length-1;
+  $("validation").textContent=complete(d,c)?"Case complete":"Case incomplete / awaiting review";
+}
+$("load").onclick=async()=>{
+  try{
+    packet=await readJson($("packet"));review=await readJson($("review"));
+    if(packet.schema!=="exp053-packet-v1"||review.schema!=="exp053-review-v1")
+      throw Error("Unrecognized source packet or review version.");
+    if(!Array.isArray(packet.cases)||packet.cases.length!==64)
+      throw Error("Expected the frozen 64-case private packet.");
+    if(!crypto?.subtle)throw Error("Browser lacks secure local WebCrypto SHA256.");
+    if(await digest(packet)!==review.packet_sha256)throw Error("Packet digest does not match your review form.");
+    if(!Array.isArray(review.decisions)||review.decisions.length!==packet.cases.length||
+       review.decisions.some((d,i)=>d.case_id!==packet.cases[i].case_id))
+      throw Error("Review item IDs differ from packet or packet order.");
+    if(review.signature)throw Error("Already-signed review: open an unsigned draft instead.");
+    $("setup").hidden=true;$("current").hidden=false;display();
+  }catch(e){$("error").textContent="HOLD: "+e.message;packet=null;review=null;}
+};
+$("prev").onclick=()=>{save();index--;display();};
+$("next").onclick=()=>{save();index++;display();};
+$("useQuote").onclick=()=>{
+  const chosen=window.getSelection()?.toString()?.trim()||"";
+  if(chosen.length>=20&&packet.cases[index].article.includes(chosen))
+    $("quote").value=chosen;
+  else $("validation").textContent="Select a contiguous 20+ character passage span first.";
+};
+$("export").onclick=()=>{
+  save();const json=JSON.stringify(review,null,2)+"\n";
+  const blob=new Blob([json],{type:"application/json"}),url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;
+  a.download="EXP053_"+(review.reviewer_id.replace(/[^A-Za-z0-9_-]/g,"_")||"unsigned")+"_review_draft.json";
+  document.body.append(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);dirty=false;display();
+};
+window.addEventListener("beforeunload",e=>{if(dirty){e.preventDefault();e.returnValue="";}});
+</script>
+</body>
+</html>

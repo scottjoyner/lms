@@ -57,6 +57,8 @@ def cohort(rows):
         item["blinded_key"]=LETTERS[perm.index(LETTERS.index(item["key"]))]
         selection.append(item)
     if len({x["case_id"] for x in selection})!=TARGET:deny("duplicate source identity")
+    if len({digest(x["article"].encode()) for x in selection})!=TARGET:
+        deny("distinct article IDs reuse the same passage")
     return selection
 def build_packet(items):
     packet={"schema":"exp053-packet-v1","seed":SEED,
@@ -110,6 +112,8 @@ def verify_signed(review,trust):
     if not isinstance(rid,str) or rid not in trust:deny("untrusted reviewer key")
     if review.get("attestation")!="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me.":
         deny("missing independent human review attestation")
+    if not isinstance(trust,dict) or len(trust)<2 or len(set(trust.values()))!=len(trust):
+        deny("trust registry requires distinct signer public keys")
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     try:
         pub=Ed25519PublicKey.from_public_bytes(base64.b64decode(trust[rid],validate=True))
@@ -133,18 +137,19 @@ def check_decision(dec,case):
     if len(dec.get("foil_reason","").strip())<15:
         deny("foil reason missing")
     return status
-def decisions_for(review,packet):
+def decisions_for(review,packet,required_ids=None):
     if review.get("packet_sha256")!=digest(packet):deny("packet mismatch")
     if review.get("role") not in ("independent","adjudicator"):deny("invalid signer role")
     lookup={c["case_id"]:c for c in packet["cases"]}
     ds=review.get("decisions",[])
-    if len(ds)!=len(lookup):deny("incomplete review form")
+    expected=set(lookup) if required_ids is None else set(required_ids)
+    if not isinstance(ds,list) or len(ds)!=len(expected):deny("incomplete review form")
     out={}
     for d in ds:
         cid=d.get("case_id")
         if cid in out or cid not in lookup:deny("duplicate/foreign case")
         check_decision(d,lookup[cid]);out[cid]=d
-    if set(out)!=set(lookup):deny("partial review")
+    if set(out)!=expected:deny("unexpected decision scope")
     return out
 def gate(private_dir,keys_path,output,adjudicator_file=None):
     if output.exists():deny("gate output exists")
@@ -167,7 +172,8 @@ def gate(private_dir,keys_path,output,adjudicator_file=None):
         signer_ids.append(verify_signed(review,trust))
         if review["role"]!="independent":deny("reviewer role")
         observations.append(decisions_for(review,packet))
-    if signer_ids[0]==signer_ids[1]:deny("two reviewers share identity")
+    if signer_ids[0]==signer_ids[1] or trust[signer_ids[0]]==trust[signer_ids[1]]:
+        deny("two reviewers must have independent signer keys")
     accepted={};rejected=0;unresolved=[]
     for cid,key in seal["answer_key"].items():
         a,b=[rv[cid] for rv in observations]
@@ -185,7 +191,9 @@ def gate(private_dir,keys_path,output,adjudicator_file=None):
         third_id=verify_signed(third,trust)
         if third_id in signer_ids or third["role"]!="adjudicator":
             deny("invalid independent adjudicator")
-        ruling=decisions_for(third,packet)
+        ruling=decisions_for(third,packet,required_ids=unresolved)
+        if third_id in signer_ids or trust[third_id] in [trust[x] for x in signer_ids]:
+            deny("adjudicator key must be independent")
         signer_ids.append(third_id)
         for cid in unresolved:
             v=ruling[cid]

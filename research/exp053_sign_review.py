@@ -27,7 +27,11 @@ def sign(input_path,packet_path,key_path,out):
         deny("reviewer_id must be set by the human reviewer")
     if review.get("attestation")!=ATTEST:
         deny("reviewer must personally attest prior to signing")
-    decisions_for(review,packet)
+    scope=None
+    if review.get("role")=="adjudicator":
+        scope={d.get("case_id") for d in review.get("decisions",[])}
+        if not scope:deny("empty adjudicator review")
+    decisions_for(review,packet,required_ids=scope)
     key=get_key(key_path)
     unsigned={k:v for k,v in review.items() if k!="signature"}
     unsigned["signature"]=key.sign(canonical(unsigned)).hex()
