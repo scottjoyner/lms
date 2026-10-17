@@ -127,6 +127,15 @@ def verify_signed(review,trust):
     except Exception as exc:
         deny("signature validation failed: "+type(exc).__name__)
     return rid
+def require_owner_assigned_signer(review, trust, slots, slot):
+    """Verify a signature AND its owner-approved blinded reviewer slot."""
+    if slot not in slots:
+        deny("signer slot was not independently owner-enrolled")
+    rid=verify_signed(review,trust)
+    if rid!=slots[slot]["reviewer_id"] or review.get("role")!=slots[slot]["role"]:
+        deny("signed reviewer identity or role does not match the enrolled blind slot")
+    return rid
+
 def check_decision(dec,case):
     status=dec.get("decision")
     if status=="reject":
@@ -169,19 +178,15 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if (seal["packet_sha256"]!=digest(packet) or
         digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
         deny("answer key differs from committed manifest")
-    if not APPROVED_REVIEWER_ROSTER_SHA256:
-        deny("owner-approved human reviewer trust roster not yet pinned")
-    if not keys_path.is_file() or filehash(keys_path)!=APPROVED_REVIEWER_ROSTER_SHA256:
-        deny("reviewer roster not identical to independently owner-approved keys")
-    try:
-        trust=json.loads(keys_path.read_text())
-    except (ValueError,OSError) as exc:
-        deny("missing or invalid private reviewer trust roots: "+type(exc).__name__)
+    from exp053_reviewer_roster import load_roster
+    roster=load_roster(keys_path,digest(packet),APPROVED_REVIEWER_ROSTER_SHA256,
+                       Path(__file__).resolve().parents[1])
+    trust=roster["keys"]
     observations=[];signer_ids=[]
     for slot in ("A","B"):
         review=json.loads((private_dir/("reviewer_"+slot+".json")).read_text())
-        signer_ids.append(verify_signed(review,trust))
-        if review["role"]!="independent":deny("reviewer role")
+        rid=require_owner_assigned_signer(review,trust,roster["slots"],slot)
+        signer_ids.append(rid)
         observations.append(decisions_for(review,packet))
     if signer_ids[0]==signer_ids[1] or trust[signer_ids[0]]==trust[signer_ids[1]]:
         deny("two reviewers must have independent signer keys")
@@ -198,10 +203,12 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if unresolved:
         if adjudicator_file is None:
             deny(str(len(unresolved))+" disputed items require independent third review")
+        if "ADJ" not in roster["slots"]:
+            deny("third independent adjudicator has not been owner-enrolled")
         third=json.loads(adjudicator_file.read_text())
-        third_id=verify_signed(third,trust)
-        if third_id in signer_ids or third["role"]!="adjudicator":
-            deny("invalid independent adjudicator")
+        third_id=require_owner_assigned_signer(third,trust,roster["slots"],"ADJ")
+        if third_id in signer_ids:
+            deny("adjudicator must be independent of both reviewers")
         ruling=decisions_for(third,packet,required_ids=unresolved)
         if third_id in signer_ids or trust[third_id] in [trust[x] for x in signer_ids]:
             deny("adjudicator key must be independent")
@@ -217,6 +224,8 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
         deny("only "+str(len(accepted))+" independently adjudicated accepted articles")
     return {"schema":"exp053-admitted-v1","packet_sha256":digest(packet),
             "reviewers":signer_ids,"accepted":accepted,"rejected":rejected,
+            "owner_roster_sha256":roster["roster_sha256"],
+            "owner_custody_reference_sha256":roster["owner_custody_reference_sha256"],
             "human_approval":True,"simulation":False}
 
 def gate(private_dir,keys_path,output,adjudicator_file=None):
