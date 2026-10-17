@@ -1,5 +1,7 @@
 """EXP049 fixed sources, token-length-matched foils and report layout."""
-import pathlib,sys,unittest
+import pathlib
+import sys
+import unittest
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))
 import k2_qasper_matched_foil_fixture as fx

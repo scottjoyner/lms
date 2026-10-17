@@ -1,0 +1,26 @@
+{
+  "distinct_race_article_text": 64,
+  "limitation": "Exact/20-token partial overlap against local public QASPER/QuAC copies only; not a model-training-contamination test.",
+  "manifest_sha256": "43e8309ac1c8ebdb28ae1c478254d43313449e0a44588c301f0a984a240d92b9",
+  "pretraining_overlap_ruled_out": false,
+  "race_articles": 64,
+  "schema": "exp053-source-overlap-v1",
+  "shared_20word_tests": {
+    "qasper": {
+      "exact_full_article_matches": 0,
+      "full_passages_examined": 13594,
+      "race_cases_with_at_least_one_shared_20_word_span": 0,
+      "shared_case_id_hashes": [],
+      "source_sha256": "2ae7ee62a65b1c4225791c70de80c2aad4e8998cf1fd4f09a53103db4f21af93"
+    },
+    "quac": {
+      "exact_full_article_matches": 0,
+      "full_passages_examined": 1000,
+      "race_cases_with_at_least_one_shared_20_word_span": 0,
+      "shared_case_id_hashes": [],
+      "source_sha256": "09e622916280ba04c9352acb1bc5bbe80f11a2598f6f34e934c51d9e6570f378"
+    }
+  },
+  "source_sha256": "97ef697f4c81e804eb43e7a667a6ac7bb06c11a99cfa537997ae5e2f6c5db2b7",
+  "squad_audited": false
+}

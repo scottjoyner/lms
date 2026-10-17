@@ -1,5 +1,7 @@
 """EXP046: paper-disjoint BM25 retrieval, correct evidence, immutable cohort."""
-import hashlib,pathlib,sys,unittest
+import pathlib
+import sys
+import unittest
 R=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(R))
 import k2_qasper_retrieval_fixture as fx
