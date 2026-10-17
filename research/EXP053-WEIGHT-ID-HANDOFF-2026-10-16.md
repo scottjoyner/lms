@@ -48,3 +48,20 @@ RACE text, answer keys, reviewer forms and private score rows remain private.
 Current evidence: the candidate-only tokenizer preflight passed 4,608 boundary
 checks over three tokenizers; no native EXP053 forward passes or independently
 verified human signoffs exist. PR #32 remains draft; no deployment or publication.
+
+## Human-review trust bootstrap is also explicitly disabled
+
+The actual `verified_admission` function now requires
+`APPROVED_REVIEWER_ROSTER_SHA256` to match the supplied private reviewer
+public-key roster. That constant is deliberately empty. This prevents
+caller-generated Ed25519 keys, arbitrarily self-selected signer IDs, or
+synthetic review fixtures from being mistaken for independently enrolled
+human reviewers. The intended future step is for the study owner to
+verify two distinct human identities and key possession offline, approve
+the research-only assignments, and pin the SHA256 of the exact
+public-key map in a code-reviewed change BEFORE human reviews are used.
+
+A pinned key-map digest is necessary but not sufficient evidence of
+true human independence; the out-of-band reviewer enrollment evidence
+and audit still matter. These checks remain closed to agent-generated
+or test-generated identities. The owner has not approved any roster yet.
