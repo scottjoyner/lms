@@ -1,5 +1,8 @@
 """EXP045 frozen QASPER scientific evidence, human labels and decoy controls."""
-import sys,pathlib,unittest,hashlib
+import sys
+import pathlib
+import unittest
+import hashlib
 ROOT=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(ROOT))
 import k2_qasper_evidence_fixture as fixture

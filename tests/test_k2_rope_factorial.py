@@ -1,7 +1,6 @@
 """EXP024 independent reproducibility and fixed-weight/RoPE evidence contracts."""
 import importlib.util
 import hashlib
-import re
 import unittest
 from pathlib import Path
 import numpy as np

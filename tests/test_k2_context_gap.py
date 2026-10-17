@@ -19,8 +19,6 @@ class ContextPilot(unittest.TestCase):
   self.assertEqual(e.PLACEMENTS,('prefix','gap'))
  def test_fixture_and_exact_token_matched_pair(self):
   from transformers import AutoTokenizer
-  from pathlib import Path
-  from k2_rope_components_fixture import make
   tok=AutoTokenizer.from_pretrained('/home/scott/git/.latent-k2-mid2_47684-research',local_files_only=True,trust_remote_code=False)
   rows,sha=e.build(tok)
   self.assertEqual(sha,e.DERIVED_SHA)
@@ -59,7 +57,6 @@ class ContextPilot(unittest.TestCase):
 
 class ContextReportFormatting(unittest.TestCase):
  def test_deterministic_human_readable_report(self):
-  import hashlib
   from transformers import AutoTokenizer
   tok=AutoTokenizer.from_pretrained('/home/scott/git/.latent-k2-mid2_47684-research',local_files_only=True,trust_remote_code=False)
   rows,receipt=e.build(tok)

@@ -1,5 +1,7 @@
 """EXP047 original 8-paper cohort, frozen parser, paired scoring and guards."""
-import unittest,sys,pathlib
+import unittest
+import sys
+import pathlib
 R=pathlib.Path(__file__).resolve().parents[1]/'research';sys.path.insert(0,str(R))
 import k2_qasper_decode_fixture as f
 import k2_qasper_decode_eval as e

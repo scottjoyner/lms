@@ -1,6 +1,4 @@
 """Analytic EXP028A rotary phase evidence regression; no model weights loaded."""
-import hashlib
-import math
 import sys
 import unittest
 from pathlib import Path

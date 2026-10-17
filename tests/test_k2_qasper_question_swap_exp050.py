@@ -1,5 +1,7 @@
 """EXP050 preregistered question/source 2x2 matched-length foil test."""
-import pathlib,sys,unittest
+import pathlib
+import sys
+import unittest
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))
 import k2_qasper_question_swap_fixture as fx

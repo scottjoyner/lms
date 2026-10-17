@@ -1,5 +1,8 @@
 """EXP037 deterministic source-disjoint label rotations; offline-only tests."""
-import importlib.util,pathlib,sys,unittest
+import importlib.util
+import pathlib
+import sys
+import unittest
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))
 spec=importlib.util.spec_from_file_location("k2_label_rotation_falsification",P/"k2_label_rotation_falsification.py")

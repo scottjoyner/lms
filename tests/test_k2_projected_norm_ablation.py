@@ -1,5 +1,8 @@
 """EXP040: projection-energy constraint and no-weight-mutation checks."""
-import importlib.util,pathlib,sys,unittest
+import importlib.util
+import pathlib
+import sys
+import unittest
 import numpy as np
 import torch
 R=pathlib.Path(__file__).resolve().parents[1]/"research"

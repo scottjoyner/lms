@@ -1,5 +1,7 @@
 """EXP041 no-model source, score, and publication fail-closed controls."""
-import sys, pathlib, unittest
+import sys
+import pathlib
+import unittest
 PATH=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(PATH))
 import k2_novel_source_fixture as fixture

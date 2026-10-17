@@ -1,5 +1,8 @@
 """EXP038: bounded causal hook math and selection integrity, no model writes."""
-import importlib.util, pathlib, sys, unittest
+import importlib.util
+import pathlib
+import sys
+import unittest
 import numpy as np
 import torch
 ROOT=pathlib.Path(__file__).resolve().parents[1]/"research"

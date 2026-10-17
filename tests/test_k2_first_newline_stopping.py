@@ -1,5 +1,7 @@
 """EXP042 new-line stop implementation and frozen-source checks, no model load."""
-import pathlib,sys,unittest
+import pathlib
+import sys
+import unittest
 import torch
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))

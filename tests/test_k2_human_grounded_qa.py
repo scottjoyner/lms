@@ -1,5 +1,4 @@
 """EXP029 human-annotated SQuAD2 selection, custody, inference-result contract."""
-import hashlib
 import sys
 import unittest
 from pathlib import Path

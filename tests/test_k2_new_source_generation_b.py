@@ -1,5 +1,7 @@
 """EXP041B only syntactic guard and source custody repair, no inference."""
-import sys,pathlib,unittest
+import sys
+import pathlib
+import unittest
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))
 import k2_new_source_generation_b as runner

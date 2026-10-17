@@ -1,6 +1,5 @@
 """LMS K2 lineage matrix: pinned custody, dense matrix, alignment and fail-closed."""
 import importlib.util
-import json
 import pathlib
 import unittest
 

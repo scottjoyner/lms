@@ -1,5 +1,8 @@
 """EXP044 exact terminal QuAC sentinel intervention, original receipt and scoring."""
-import hashlib,pathlib,sys,unittest
+import hashlib
+import pathlib
+import sys
+import unittest
 from unittest.mock import patch
 P=pathlib.Path(__file__).resolve().parents[1]/"research"
 sys.path.insert(0,str(P))

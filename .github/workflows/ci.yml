@@ -28,8 +28,17 @@ jobs:
       - name: Ruff lint
         run: ruff check src tests
 
-      - name: pytest
-        run: pytest -q
+      - name: Hosted test scope (research-only exclusions)
+        run: |
+          echo "Hosted CI runs core + EXP053 no-source software tests."
+          echo "test_k2_* contains CPU/GPU/tokenizer/model-corpus integration suites"
+          echo "requiring torch, transformers, and independently pinned LOCAL artifacts."
+          echo "Those tests are NOT reported as hosted CI passing; run them in the"
+          echo "isolated, source-authoritative research environment instead."
+          find tests -maxdepth 1 -name 'test_k2_*.py' | sort
+
+      - name: Hosted core and EXP053 tests (no private corpus)
+        run: pytest -q --ignore-glob='tests/test_k2_*.py'
         env:
-          # No live Neo4j in CI; graph-sync smoke tests mock the driver.
+          # No live Neo4j or research model weights in hosted CI.
           NEO4J_PASSWORD: ""
