@@ -84,6 +84,16 @@ class TestEXP053(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 x.gate(PRIVATE,t,d/"admitted.json")
             self.assertFalse((d/"admitted.json").exists())
+    def test_unapproved_reviewer_roster_denied(self):
+        self.assertEqual(x.APPROVED_REVIEWER_ROSTER_SHA256,"")
+        if not HAS_PRIVATE:self.skipTest("private cohort absent")
+        with tempfile.TemporaryDirectory() as directory:
+            directory=Path(directory)
+            trust=directory/"self_selected_roster.json"
+            trust.write_text("{}")
+            with self.assertRaisesRegex(ValueError,"HOLD"):
+                x.verified_admission(PRIVATE,trust)
+
     def test_no_overwrite(self):
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.build(PRIVATE,x.MANIFEST)
