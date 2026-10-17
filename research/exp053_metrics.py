@@ -16,7 +16,7 @@ LETTERS="ABCD"
 FIELDS={"model","case_id","article_sha256","arm","rotation",
         "context_article_sha256","checkpoint_sha256","tokenizer_sha256",
         "option_order_sha256","prompt_sha256","gold_label","foil_label",
-        "gold_token_count","foil_token_count","gold_logp","foil_logp","mode"}
+        "prompt_token_count","gold_token_count","foil_token_count","gold_logp","foil_logp","mode"}
 
 def hold(msg):raise ValueError("HOLD EXP053 METRICS: "+msg)
 def hex64(v):return isinstance(v,str) and len(v)==64 and all(c in "0123456789abcdef" for c in v)
@@ -95,6 +95,8 @@ def analyze(rows,approved,manifest):
         if rot==1:good=(rotate(good[0]),rotate(good[1]))
         if (rec["gold_label"],rec["foil_label"])!=good:
             hold("model output label rotation does not match blinded human foil")
+        if type(rec["prompt_token_count"])!=int or not 1<=rec["prompt_token_count"]<=4096:
+            hold("prompt token count invalid or exceeds preflight window")
         if rec["gold_token_count"]!=1 or rec["foil_token_count"]!=1:
             hold("candidate answer-choice tokens must each be exactly one")
         x,y=rec["gold_logp"],rec["foil_logp"]
