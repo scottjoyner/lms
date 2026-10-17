@@ -10,6 +10,7 @@ from exp053_metrics import analyze, FIELDS as SCORE_FIELDS, rotate as rotate_lab
 from exp053_execution_attestation import (
     verify_attestation, read_attested_scores, private_regular_file,
 )
+from exp053_attempt_ledger import verify_attempt_ledger
 
 PREFLIGHT=ROOT/"EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json"
 PREFLIGHT_SHA="8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be"
@@ -210,6 +211,11 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
     rows=read_attested_scores(
         score_archive,private_dir,provenance["score_archive_sha256"])
     check_private_archive(rows,admission["accepted"],packet,scan,checkpoint_ids)
+    attempt_evidence=verify_attempt_ledger(
+        attempt_log,private_dir,rows,
+        execution_id_sha256=provenance["execution_id_sha256"],
+        packet_sha256=digest(packet),
+        attempt_log_sha256=provenance["attempt_log_sha256"])
     summary=analyze(rows,admission["accepted"],manifest)
     summary["score_archive_sha256"]=provenance["score_archive_sha256"]
     summary["signed_admission_sha256"]=digest(admission)
@@ -217,6 +223,9 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
     summary["checkpoint_receipt_sha256"]=WEIGHT_REPORT_SHA
     summary["execution_attestation_sha256"]=provenance["execution_attestation_sha256"]
     summary["attempt_log_sha256"]=provenance["attempt_log_sha256"]
+    summary["attempt_cells"]=attempt_evidence["attempt_cells"]
+    summary["total_logged_attempts"]=attempt_evidence["total_logged_attempts"]
+    summary["logged_failed_attempts"]=attempt_evidence["logged_failed_attempts"]
     summary["runner_source_sha256"]=provenance["runner_source_sha256"]
     summary["privacy"]="aggregates only; individual scores and RACE text stay private"
     # Refuse score/log mutation during downstream statistical calculation;
