@@ -49,3 +49,35 @@ The model-free analysis supplement, `research/EXP053-MEASUREMENT-PLAN-2026-10-16
 Use `PYTHONPATH=research /home/scott/git/.latent-exp053-data-venv/bin/python -m unittest discover -s tests -p test_exp053_human_review_gate.py -v` for fail-closed gate tests. These are simulated software tests, **not** human adjudication.
 Only after a verified admission receipt is pinned and the reviewed cohort is frozen should a separate, preregistered **EXP-053B** model-forward script be implemented or executed. Paired question×evidence interaction, true foil rejection, free generation, abstention, source specificity, and article-cluster uncertainty remain unmeasured.
 No model weights, production routing, Neo4j, NAS, training, merging, deployment or arXiv changes.
+
+
+## 2026-10-16 supplementary tokenizer and verified-replay readiness
+
+The prospective tokenization plan was frozen BEFORE tokenizer loads:
+EXP053-TOKENIZER-PREFLIGHT-SPEC-2026-10-16.md, SHA256
+92643aa9e0603d29eeab8dfd24680615036b7ee49d88e12d439a8e5c569b8fb7.
+Only 64 candidate passages were used. All three LOCAL tokenizers passed 384
+prompts and 1,536 label-token boundary checks EACH (1,152 prompts and
+4,608 checks total), using no model weights or neural forwards.
+The reproducible source-free summary is
+EXP053-TOKENIZER-PREFLIGHT-2026-10-16.json, SHA256
+8e35a44e1ebb725c0b52469baa4ab5d41472e38fe55346352b96dd26697726be.
+Maximum prompt lengths: K2 887, Qwen 914, MiniCPM 914 tokens.
+These checks do not measure semantic grounding, generation, or abstention.
+
+Future aggregate-only report replay is implemented by
+research/exp053_verified_analysis.py. It REQUIRES fresh verification of the
+independent signed human admission BEFORE reading any private score archive.
+It checks the scorer's full prompt hash and option order against the actual
+private source, original blinded article, exact question, approved-only decoy,
+and the frozen tokenization receipt, then applies strict article-level metrics.
+Score archives must remain in the private research SSD folder, and only
+source-free aggregate metrics may be committed to public GitHub.
+
+A model-forward runner has NOT been implemented or executed for EXP053.
+No signed independent human reviews are available as of this checkpoint.
+The apparent success of synthetic unit tests cannot substitute for external
+adjudication, nor can possession of a signing key establish human identity.
+The operator must independently validate reviewer identities and custody.
+The normal GitHub CI runs Python 3.10/3.11/3.12, Ruff and pytest; the suite's
+local source/crypto integration cases skip when private dependencies are absent.
