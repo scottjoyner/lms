@@ -1,0 +1,51 @@
+{
+  "comparison_limit": "raw text continuation; instruction-tuned multimodal checkpoint, not human-evaluated",
+  "exp051_fixture_sha256": "af188e9d490d420e02cc67d83a3405d37061fd281012f2dfb67efb8864740f9c",
+  "exp051_runner_sha256": "fdd90719644770e685aee84e82ea37b4add347723dce360458f6d668eb190977",
+  "forward_passes": 80,
+  "hf_revision": "286817f1132b998913a129a221c89b4402b4ab80",
+  "model": "minicpm-v4.7-1b",
+  "protocol_sha256": "d9d95a879f3c12a5168c86e7f24969e2e6ce92a6adcfc55b92b7cb4d6f651bee",
+  "sources_sha256": {
+    "config.json": "20ed1fe71b174719b88ed1ce37c840ec45e3657f1120391d45f33505be7638a4",
+    "model.safetensors": "8c4921ac83182c85190ad10c3aeb118d51e385d2d98ec13b88b514bbf6cac002",
+    "tokenizer.json": "33861e37bb955af1e3f3061182b820f347eba2b9c2c1011c82794bf0d6e77b54",
+    "tokenizer_config.json": "11d04ab77486ca63a9f2b2537e70bbd8f6b24e1850e53eedb32caa3ca771cb0d"
+  },
+  "summary": {
+    "question_x_evidence": {
+      "mean": 15.750000150272172,
+      "n_topics": 8,
+      "positive_topics": 8
+    },
+    "source_switch": {
+      "mean": 15.792968833216946,
+      "n_topics": 8,
+      "positive_topics": 8
+    },
+    "strict": {
+      "supported_original": {
+        "correct": 16,
+        "n": 16
+      },
+      "supported_swapped": {
+        "correct": 16,
+        "n": 16
+      },
+      "supported_withheld": {
+        "correct": 16,
+        "n": 16
+      },
+      "unrelated_original": {
+        "correct": 16,
+        "n": 16
+      },
+      "unrelated_swapped": {
+        "correct": 16,
+        "n": 16
+      }
+    }
+  },
+  "timed_forward_seconds": 12.381,
+  "transformers_version": "5.20.1"
+}
