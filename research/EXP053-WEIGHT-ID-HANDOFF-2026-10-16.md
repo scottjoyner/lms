@@ -65,3 +65,26 @@ A pinned key-map digest is necessary but not sufficient evidence of
 true human independence; the out-of-band reviewer enrollment evidence
 and audit still matter. These checks remain closed to agent-generated
 or test-generated identities. The owner has not approved any roster yet.
+
+## 2026-10-17 preparation-only integrity followup
+
+The future public aggregate-replay verifier now **rejects unexpected fields**
+at report/model/shard level, invalid or noncanonical lowercase SHA256 digests,
+unsafe or repeated shard filenames, non-integer/boolean byte counts, unordered
+shards, mismatched total weights, and inappropriate shard-index presence.
+These are structural anti-corruption checks, not proof of authenticity by
+themselves. A true weight scan and independently reviewed checksum pin are
+still entirely absent; `WEIGHT_REPORT_SHA` remains empty. Software tests
+patch in **synthetic report metadata only** and do not sign reviews, score
+RACE questions, inspect real weight tensors, or establish research evidence.
+
+The offline-only reviewer HTML now captures `input` and `change` events,
+updates progress using the in-memory unsigned draft on each edit, and activates
+the unload-warning guard before navigation. Clicking the source-quote helper
+does the same. It still NEVER persists any private passages, reviewer labels,
+or drafts automatically to browser storage or a remote service. A human must
+explicitly export a local unsigned JSON draft and independently sign later.
+A Node-based DOM fixture tests the unsaved-work alert using synthetic text.
+
+The independent human identity roster and actual checkpoint inventory remain
+unapproved, so admission and scientific replay continue to fail closed.

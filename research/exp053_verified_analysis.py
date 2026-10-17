@@ -20,6 +20,7 @@ FIELDS=("case_id","article_sha256","model","arm","rotation",
         "option_order_sha256","prompt_sha256","context_article_sha256")
 
 def sha(s):return hashlib.sha256(s.encode("utf8")).hexdigest()
+def hex_digest(s):return isinstance(s,str) and len(s)==64 and all(c in "0123456789abcdef" for c in s)
 
 def admitted_weight_inventory(scan):
     """Validate operator-pinned checkpoint-file receipts; never read neural weights."""
@@ -40,6 +41,12 @@ def admitted_weight_inventory(scan):
     models=report.get("models")
     if not isinstance(models,dict) or set(models)!=set(scan["models"]):
         deny("incomplete checkpoint inventory")
+    if set(report)!={"schema","spec_sha256","tokenizer_receipt_sha256",
+                     "models","neural_forward_passes","human_reviewed_articles",
+                     "checkpoint_receipts_sha256","claim_limit"}:
+        deny("unexpected weight-report fields, potentially private material")
+    if report["claim_limit"]!="File-byte identity only; no proof of runtime execution or grounding.":
+        deny("incorrect weight receipt scientific claim scope")
     if identity_sha(models)!=report.get("checkpoint_receipts_sha256"):
         deny("checkpoint inventory aggregate mismatch")
     identities={}
@@ -50,17 +57,42 @@ def admitted_weight_inventory(scan):
                 rec.get("tokenizer_sha256")!=known["tokenizer_json_sha256"] or
                 rec.get("checkpoint_revision_or_directory")!=known["checkpoint_directory"]):
             deny("checkpoint inventory not tied to frozen tokenizer/config")
-        shards=rec.get("shards")
-        if not isinstance(shards,list) or len(shards)<1:
-            deny("missing checkpoint shards")
-        if (rec.get("shard_count")!=len(shards) or
-                rec.get("total_weight_bytes")!=sum(x.get("bytes",0) for x in shards) or
-                len({x.get("filename") for x in shards})!=len(shards)):
-            deny("checkpoint shard inventory count or size mismatch")
+        expected_fields={"model","checkpoint_revision_or_directory","config_sha256",
+                         "tokenizer_sha256","weight_index_sha256","shards","shard_count",
+                         "total_weight_bytes","checkpoint_receipt_sha256"}
+        if not isinstance(rec,dict) or set(rec)!=expected_fields:
+            deny("unexpected checkpoint record fields")
+        from exp053_weight_identity import TWO_SHARD_MODELS
+        index_hash=rec["weight_index_sha256"]
+        if name in TWO_SHARD_MODELS:
+            if not hex_digest(index_hash):deny("invalid checkpoint weight-map identity")
+        elif index_hash is not None:
+            deny("unexpected index file for single-file checkpoint")
+        shards=rec["shards"]
+        if (not isinstance(shards,list) or
+                (name in TWO_SHARD_MODELS and len(shards)<2) or
+                (name not in TWO_SHARD_MODELS and len(shards)!=1)):
+            deny("missing or unexpected checkpoint shards")
+        filenames=[]
+        size=0
         for entry in shards:
-            if (not isinstance(entry.get("bytes"),int) or entry["bytes"]<4096 or
-                    not isinstance(entry.get("sha256"),str) or len(entry["sha256"])!=64):
-                deny("invalid checkpoint shard evidence")
+            if not isinstance(entry,dict) or set(entry)!={"filename","bytes","sha256"}:
+                deny("unexpected checkpoint shard fields")
+            filename=entry["filename"]
+            if (not isinstance(filename,str) or not filename.endswith(".safetensors")
+                    or "/" in filename or "\\" in filename or
+                    filename.startswith(".") or ".." in filename):
+                deny("invalid checkpoint shard filename")
+            if type(entry["bytes"])!=int or entry["bytes"]<4096 or not hex_digest(entry["sha256"]):
+                deny("invalid checkpoint shard identity")
+            filenames.append(filename)
+            size+=entry["bytes"]
+        if (filenames!=sorted(set(filenames)) or
+                type(rec["shard_count"])!=int or rec["shard_count"]!=len(shards) or
+                type(rec["total_weight_bytes"])!=int or rec["total_weight_bytes"]!=size):
+            deny("checkpoint shard inventory count, order or size mismatch")
+        if not hex_digest(rec["checkpoint_receipt_sha256"]):
+            deny("invalid checkpoint receipt checksum")
         calculated=identity_sha({k:v for k,v in rec.items() if k!="checkpoint_receipt_sha256"})
         if calculated!=rec.get("checkpoint_receipt_sha256"):
             deny("individual checkpoint digest mismatch")
