@@ -62,6 +62,35 @@ class CheckpointIdentityTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "HOLD"):
                 identity.stream_digest(file, folder)
 
+    def test_shared_hub_content_addressed_cache_with_strict_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            hub = Path(directory) / "hub"
+            snap = hub / "models--synthetic--checkpoint" / "snapshots" / "revision"
+            snap.mkdir(parents=True)
+            shared = hub / "blobs" / "ab"
+            shared.mkdir(parents=True)
+            content_name = "ab" + "1" * 62
+            fixture = shared / content_name
+            fixture.write_bytes(b"P" * 8192)
+            pointer = snap / "model.safetensors"
+            pointer.symlink_to(fixture)
+            self.assertEqual(identity.allowed_resolved(pointer, snap), fixture)
+            self.assertEqual(identity.stream_digest(pointer, snap)["bytes"], 8192)
+            # The shared hub is NOT a free-for-all symlink target.
+            invalid = hub / "blobs" / "ab" / ("cd" + "2" * 62)
+            invalid.write_bytes(b"Q" * 8192)
+            pointer.unlink()
+            pointer.symlink_to(invalid)
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                identity.allowed_resolved(pointer, snap)
+            pointer.unlink()
+            outside = Path(directory) / "outside" / "model.safetensors"
+            outside.parent.mkdir()
+            outside.write_bytes(b"Z" * 8192)
+            pointer.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                identity.allowed_resolved(pointer, snap)
+
     def test_schema_hash_is_canonical(self):
         x = {"model": "synthetic", "weights": ["A", "B"]}
         self.assertEqual(identity.sha(x), identity.sha({"weights": ["A", "B"],
