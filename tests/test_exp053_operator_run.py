@@ -101,6 +101,8 @@ class SyntheticOperatorClaim(unittest.TestCase):
         """Isolated fake remote state: NOT independently operated or durable."""
         if self.witness_fault == "offline":
             raise ConnectionError("synthetic witness unavailable")
+        from exp053_witness_request_auth import verify_authenticated_request
+        verify_authenticated_request(request, self.pubsha)
         with self.highwater_lock:
             count, last = self.highwater
             if (request["schema"] != witness.REQUEST_SCHEMA or
@@ -149,6 +151,7 @@ class SyntheticOperatorClaim(unittest.TestCase):
             witness, "APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256",
             self.witness_pub_sha), patch.object(
             witness, "APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256", "e" * 64), patch.object(
+            witness, "APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256", self.pubsha), patch.object(
             witness, "_external_cas", self.synthetic_external_cas):
             return run.consume_unique_run(
                 self.auth_path if auth is None else auth,
@@ -161,6 +164,7 @@ class SyntheticOperatorClaim(unittest.TestCase):
         self.assertEqual(run.APPROVED_OPERATOR_CLAIM_LEDGER_PATH, "")
         self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256, "")
         self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256, "")
+        self.assertEqual(witness.APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256, "")
         self.assertEqual(witness.filehash(witness.SPEC), witness.SPEC_SHA256)
         self.assertEqual(run.filehash(run.SPEC), run.SPEC_SHA256)
         self.assertEqual(run.filehash(run.MARKER_SPEC), run.MARKER_SPEC_SHA256)
@@ -381,7 +385,7 @@ class SyntheticOperatorClaim(unittest.TestCase):
         from exp053_sqlite_cas_fixture import SQLiteCASFixture
         sqlite = SQLiteCASFixture.bootstrap(
             Path(self.tmp.name) / "fixture-witness-only.sqlite",
-            self.witness_key)
+            self.witness_key, self.pubsha)
         self.synthetic_external_cas = sqlite.cas
         self.sign()
         claim = self.consume()
@@ -434,6 +438,8 @@ class SyntheticOperatorClaim(unittest.TestCase):
             self.witness_pub_sha
         ), patch.object(
             witness, "APPROVED_EXTERNAL_WITNESS_ADAPTER_SHA256", "e" * 64
+        ), patch.object(
+            witness, "APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256", self.pubsha
         ), patch.object(witness, "_external_cas", self.synthetic_external_cas):
             with ThreadPoolExecutor(max_workers=2) as pool:
                 results = list(pool.map(lambda _: self._try_consume(), range(2)))
@@ -442,6 +448,7 @@ class SyntheticOperatorClaim(unittest.TestCase):
         self.assertEqual(json.loads(self.state_path.read_text())["last_sequence"], 1)
         self.assertEqual(run.APPROVED_OPERATOR_PUBLIC_KEY_SHA256, "")
         self.assertEqual(witness.APPROVED_EXTERNAL_WITNESS_PUBLIC_KEY_SHA256, "")
+        self.assertEqual(witness.APPROVED_WITNESS_OPERATOR_PUBLIC_KEY_SHA256, "")
 
     def _try_consume(self):
         try:

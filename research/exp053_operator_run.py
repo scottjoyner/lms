@@ -83,11 +83,12 @@ def _signed_authorization(path, private_dir, provenance, packet_sha256,
         Ed25519PublicKey.from_public_bytes(key).verify(signature, canonical(unsigned))
     except Exception as exc:
         _deny_invalid("operator signature/key invalid: " + type(exc).__name__)
-    return record, digest
+    return record, digest, data
 
 
 def _consume_claim(path, private_dir, authorization, authorization_sha256,
-                   *, operator_public_key_sha256, scorer_public_key_sha256):
+                   *, operator_public_key_sha256, scorer_public_key_sha256,
+                   operator_authorization_bytes):
     """Atomically serialize claims on one pre-existing human-owned state inode.
 
     Crash damage always fails closed. The operator must keep an independent
@@ -149,7 +150,8 @@ def _consume_claim(path, private_dir, authorization, authorization_sha256,
                     claim_sha256=authorization_sha256,
                     execution_id_sha256=authorization["runner_execution_id_sha256"],
                     operator_public_key_sha256=operator_public_key_sha256,
-                    scorer_public_key_sha256=scorer_public_key_sha256)
+                    scorer_public_key_sha256=scorer_public_key_sha256,
+                    operator_authorization_bytes=operator_authorization_bytes)
                 new_state = {
                     "schema": STATE_SCHEMA,
                     "last_sequence": authorization["sequence"],
@@ -217,11 +219,12 @@ def consume_unique_run(authorization_path, private_dir, *,
             provenance["runner_public_key_sha256"] or
             not hex_digest(packet_sha256)):
         _deny_invalid("operator root cannot substitute for scorer/candidate identity")
-    authorization, digest = _signed_authorization(
+    authorization, digest, signed_bytes = _signed_authorization(
         authorization_path, private_dir, provenance, packet_sha256,
         provenance["runner_public_key_sha256"])
     return _consume_claim(
         APPROVED_OPERATOR_CLAIM_LEDGER_PATH, private_dir,
         authorization, digest,
         operator_public_key_sha256=APPROVED_OPERATOR_PUBLIC_KEY_SHA256,
-        scorer_public_key_sha256=provenance["runner_public_key_sha256"])
+        scorer_public_key_sha256=provenance["runner_public_key_sha256"],
+        operator_authorization_bytes=signed_bytes)
