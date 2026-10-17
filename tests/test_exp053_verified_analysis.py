@@ -33,7 +33,16 @@ class VerifiedScoreReplay(unittest.TestCase):
              "option_order_sha256":v.digest(opts),
              "prompt_sha256":v.sha(v.prompt(cases[cid]["question"],opts,cases[cid]["article"])),
              "tokenizer_sha256":scan["models"][model]["tokenizer_json_sha256"]}
+        rec.update({"gold_label":"A","foil_label":"B",
+                    "checkpoint_sha256":"a"*64,"mode":"raw",
+                    "gold_logp":-1.5,"foil_logp":-2.0,
+                    "prompt_token_count":300,"gold_token_count":1,
+                    "foil_token_count":1})
         return packet,scan,approved,rec
+
+    @staticmethod
+    def weights(scan):
+        return {model:"a"*64 for model in scan["models"]}
 
     def test_no_independently_pinned_weight_receipt_denied(self):
         packet,scan,approved,rec=self.fixture()
@@ -43,7 +52,7 @@ class VerifiedScoreReplay(unittest.TestCase):
 
     def test_wrong_checkpoint_digest_denied_even_if_source_matches(self):
         packet,scan,approved,rec=self.fixture()
-        inventory={rec["model"]:"a"*64}
+        inventory=self.weights(scan)
         rec["checkpoint_sha256"]="b"*64
         with self.assertRaisesRegex(ValueError,"HOLD"):
             v.check_private_archive([rec],approved,packet,scan,inventory)
@@ -52,25 +61,25 @@ class VerifiedScoreReplay(unittest.TestCase):
 
     def test_only_source_exact_prompt_accepted_as_receipt(self):
         packet,scan,approved,rec=self.fixture()
-        self.assertEqual(v.check_private_archive([rec],approved,packet,scan),1)
+        self.assertEqual(v.check_private_archive([rec],approved,packet,scan,self.weights(scan)),1)
 
     def test_changed_prompt_hash_denied(self):
         packet,scan,approved,rec=self.fixture()
         rec["prompt_sha256"]="0"*64
         with self.assertRaisesRegex(ValueError,"HOLD"):
-            v.check_private_archive([rec],approved,packet,scan)
+            v.check_private_archive([rec],approved,packet,scan,self.weights(scan))
 
     def test_option_rotation_hash_denied(self):
         packet,scan,approved,rec=self.fixture()
         rec["option_order_sha256"]="0"*64
         with self.assertRaisesRegex(ValueError,"HOLD"):
-            v.check_private_archive([rec],approved,packet,scan)
+            v.check_private_archive([rec],approved,packet,scan,self.weights(scan))
 
     def test_tokenizer_misidentification_denied(self):
         packet,scan,approved,rec=self.fixture()
         rec["tokenizer_sha256"]="0"*64
         with self.assertRaisesRegex(ValueError,"HOLD"):
-            v.check_private_archive([rec],approved,packet,scan)
+            v.check_private_archive([rec],approved,packet,scan,self.weights(scan))
 
     def test_unapproved_paper_denied(self):
         packet,scan,approved,rec=self.fixture()
@@ -78,7 +87,7 @@ class VerifiedScoreReplay(unittest.TestCase):
         approved[sorted({c["case_id"] for c in packet["cases"]}-set(approved)-{rec["case_id"]})[0]]={
             "supported":"A","foil":"B"}
         with self.assertRaisesRegex(ValueError,"HOLD"):
-            v.check_private_archive([rec],approved,packet,scan)
+            v.check_private_archive([rec],approved,packet,scan,self.weights(scan))
 
     @unittest.skipUnless(HAS_PACKET,"private source not installed on hosted CI")
     def test_missing_human_review_refuses_report_before_scores(self):
