@@ -45,7 +45,11 @@ verify restored runtime health
 seal run state and manifest
 ```
 
-Any failure after candidate startup enters the recovery path immediately:
+Once the candidate-start stage is **attempted**, any failure (including a
+partially successful startup wrapper that times out or exits nonzero) enters
+the recovery path immediately. Cleanup and rollback wrappers must therefore
+be idempotent and safe even if no candidate actually started. A failed
+pre-start snapshot does not trigger candidate cleanup:
 
 ```text
 best-effort candidate stop -> rollback -> rollback health verification
@@ -179,3 +183,8 @@ This command proves the candidate can be introduced and removed safely on one
 node under the reviewed lifecycle wrappers. It does not prove power-loss
 recovery, kernel/GPU reset, network partition behavior, or multi-node rollout.
 Those remain explicit physical failure-injection drills.
+
+Soak probes run in an isolated process group. On timeout, the controller
+terminates that group before recording the failed sample; the resulting failed
+soak still triggers candidate rollback. This is a process-group boundary, not
+a guarantee against independently daemonized or reparented descendants.
