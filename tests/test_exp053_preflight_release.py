@@ -31,7 +31,7 @@ class SourceOnlyRelease(unittest.TestCase):
 
     def test_dry_run_never_writes(self):
         files=release.source_inventory(self.source)
-        self.assertEqual(len(files),2)
+        self.assertEqual(len(files),4)
         self.assertFalse(self.prefix.exists())
         self.assertEqual(len(release.release_id(files)),20)
 
@@ -45,6 +45,25 @@ class SourceOnlyRelease(unittest.TestCase):
         self.assertEqual(release.verify(installed)["release_id"],result["release_id"])
         self.assertEqual((installed/release.FILES[0]).stat().st_mode & 0o777,0o755)
         self.assertEqual((installed/release.FILES[1]).stat().st_mode & 0o777,0o644)
+        self.assertEqual((installed/release.FILES[2]).stat().st_mode & 0o777,0o755)
+        self.assertEqual((installed/release.FILES[3]).stat().st_mode & 0o777,0o644)
+
+    def test_both_installed_tools_identical_to_reviewed_sources(self):
+        result=self._install()
+        installed=Path(result["path"])
+        for name in ("exp053_witness_host_preflight.py",
+                     "exp053_ssh_custody_overlap.py"):
+            self.assertEqual(
+                (installed/name).read_bytes(), (self.source/name).read_bytes())
+        for key in ("scientific_execution_authorized", "NO_GO_RESEARCH_ONLY"):
+            self.assertIn(key,(installed/"exp053_ssh_custody_overlap.py").read_text())
+
+    def test_modified_custody_tool_fail_closed(self):
+        target=Path(self._install()["path"])
+        path=target/"exp053_ssh_custody_overlap.py"
+        path.write_bytes(path.read_bytes()+b"\n# unreviewed change\n")
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            release.verify(target)
 
     def test_repeated_install_idempotent_not_overwritten(self):
         first=self._install()

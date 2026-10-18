@@ -16,8 +16,14 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-FILES = ("exp053_witness_host_preflight.py",
-         "EXP053-OFFHOST-READONLY-PREFLIGHT-SPEC-2026-10-17.md")
+# A single immutable controller-only release includes both *non-authorizing*
+# diagnostics. Neither program installs remote software or enables a witness.
+FILES = (
+    "exp053_witness_host_preflight.py",
+    "EXP053-OFFHOST-READONLY-PREFLIGHT-SPEC-2026-10-17.md",
+    "exp053_ssh_custody_overlap.py",
+    "EXP053-CONTROLLER-SSH-CUSTODY-OVERLAP-HANDOFF-2026-10-18.md",
+)
 SCHEMA = "exp053-readonly-preflight-release-v1"
 MANIFEST = "release-manifest.json"
 
