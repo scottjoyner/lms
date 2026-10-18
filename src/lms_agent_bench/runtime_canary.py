@@ -604,6 +604,8 @@ def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str
         raise ValueError("runtime canary success does not match manifest")
     if bool(state.get("rollback_succeeded")) != bool(manifest.get("rollback_succeeded")):
         raise ValueError("runtime canary rollback status does not match manifest")
+    if state.get("recovery_failures") and state.get("rollback_succeeded") is True:
+        raise ValueError("runtime canary cannot claim successful rollback with recovery failures")
     if require_success and (manifest.get("success") is not True or manifest.get("rollback_succeeded") is not True):
         raise ValueError("runtime canary did not complete successfully with verified rollback")
     return {
@@ -681,13 +683,18 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
     except BaseException as exc:
         state["failure"] = {"type": type(exc).__name__, "message": str(exc), "stage": state.get("stage")}
         if candidate_start_attempted:
+            # Discard any prior success flag when entering a fresh recovery.
+            # Only the complete recovery sequence may re-establish it.
+            state["rollback_succeeded"] = False
             for name in ("stop_candidate", "rollback", "rollback_health"):
                 if name == "rollback":
                     state["rollback_attempted"] = True
                 try:
                     result = run_command(f"recovery-{name}", plan["commands"][name], cwd=Path(plan["working_directory"]), env=env, logs=run_dir / "logs")
                     state["commands"].append(result)
-                    if name == "rollback_health":
+                    if name == "rollback_health" and not state.get("recovery_failures"):
+                        # A green health probe cannot establish rollback if any
+                        # required recovery command failed or timed out.
                         state["rollback_succeeded"] = True
                 except BaseException as recovery_exc:
                     state.setdefault("recovery_failures", []).append(

@@ -57,7 +57,11 @@ best-effort candidate stop -> rollback -> rollback health verification
 
 The run remains failed even when rollback succeeds. The evidence distinguishes
 `success`, `rollback_attempted`, and `rollback_succeeded` so a failed experiment
-cannot be mistaken for a qualified candidate.
+cannot be mistaken for a qualified candidate. In recovery,
+`rollback_succeeded=true` requires **all three** successful stop, restore, and
+rollback-health commands; a healthy endpoint alone is insufficient. Any failed
+recovery stage sets `rollback_succeeded=false` and `rollback_failed`, and the
+manifest verifier refuses contradictory successful-rollback evidence.
 
 ## Plan safety
 
