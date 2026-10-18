@@ -537,10 +537,10 @@ def _artifact_entries(root: Path) -> List[Dict[str, Any]]:
         "runtime-canary-attestation.json",
     }
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name in excluded:
-            continue
         if path.is_symlink():
             raise ValueError(f"run artifact may not be a symlink: {path}")
+        if not path.is_file() or path.name in excluded:
+            continue
         relative = path.relative_to(root).as_posix()
         entries.append(
             {
@@ -571,6 +571,75 @@ def build_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     }
     _operator.write_json(root / "runtime-canary-manifest.json", manifest)
     return manifest
+
+
+def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Mapping[str, Any]) -> None:
+    """Require complete, internally consistent evidence before trusting success.
+
+    The manifest is not an independent trust root. Cryptographic signer policy
+    and off-host anti-rollback protection remain separate required approvals.
+    """
+    if state.get("stage") != "complete" or state.get("failure") is not None:
+        raise ValueError("successful canary evidence is not at the complete stage")
+    if any(state.get(key) is not True for key in (
+        "success", "candidate_start_attempted", "candidate_started",
+        "rollback_attempted", "rollback_succeeded",
+    )):
+        raise ValueError("successful canary evidence is missing lifecycle confirmations")
+    if state.get("recovery_failures") or state.get("admission") != {"admitted": False}:
+        raise ValueError("successful canary evidence contains recovery failures or admission")
+    if manifest.get("admission") != {"admitted": False}:
+        raise ValueError("canary manifest may not claim admission")
+
+    plan = _mapping(json.loads(_regular_file(root / "plan.normalized.json", "normalized plan").read_text(encoding="utf-8")), "normalized plan")
+    fingerprint = plan.get("plan_fingerprint")
+    if fingerprint != _operator.canonical_hash({key: value for key, value in plan.items() if key != "plan_fingerprint"}):
+        raise ValueError("normalized plan fingerprint mismatch")
+    for key in ("canary_id", "loadout_fingerprint", "plan_fingerprint"):
+        if plan.get(key) != state.get(key) or plan.get(key) != manifest.get(key):
+            raise ValueError(f"successful canary evidence {key} mismatch")
+    soak_policy = _mapping(plan.get("soak"), "normalized soak policy")
+
+    expected_stages = (
+        "snapshot", "start_candidate", "candidate_health", "qualification",
+        "stop_candidate", "rollback", "rollback_health",
+    )
+    history = state.get("commands")
+    if not isinstance(history, list) or [item.get("name") if isinstance(item, Mapping) else None for item in history] != list(expected_stages):
+        raise ValueError("successful canary evidence has missing or out-of-order commands")
+    for name, result in zip(expected_stages, history):
+        if result.get("returncode") != 0 or result.get("timed_out") is not False:
+            raise ValueError(f"successful canary evidence includes failed command: {name}")
+        for stream in ("stdout", "stderr"):
+            expected_log = f"{name}.{stream}.log"
+            if result.get(stream) != expected_log:
+                raise ValueError(f"successful canary evidence has missing {stream} log: {name}")
+            actual_hash = _operator.file_sha256(_regular_file(root / "logs" / expected_log, "canary log"))
+            if result.get(f"{stream}_sha256") != actual_hash:
+                raise ValueError(f"successful canary evidence {stream} hash mismatch: {name}")
+
+    soak = _mapping(state.get("soak"), "canary soak result")
+    samples_path = _regular_file(root / "soak-samples.jsonl", "raw soak samples")
+    if samples_path.stat().st_size > 32 * 1024 * 1024:
+        raise ValueError("canary soak sample evidence exceeds size limit")
+    if soak.get("samples_sha256") != _operator.file_sha256(samples_path):
+        raise ValueError("canary soak sample SHA-256 mismatch")
+    samples: List[Dict[str, Any]] = []
+    try:
+        with samples_path.open(encoding="utf-8") as source:
+            for line in source:
+                if len(samples) >= 100000:
+                    raise ValueError("canary soak contains too many samples")
+                samples.append(_mapping(json.loads(line), "canary soak sample"))
+        recomputed = summarize_soak(samples, soak_policy)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError("invalid raw canary soak samples") from exc
+    if soak.get("passed") is not True or not recomputed["passed"]:
+        raise ValueError("successful canary soak is not qualified")
+    if any(soak.get(key) != value for key, value in recomputed.items()):
+        raise ValueError("canary soak result is inconsistent with raw samples")
+    if _number(soak.get("duration_seconds"), "soak duration") < _number(soak_policy.get("duration_seconds"), "required soak duration"):
+        raise ValueError("successful canary soak duration is insufficient")
 
 
 def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str, Any]:
@@ -606,6 +675,12 @@ def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str
         raise ValueError("runtime canary rollback status does not match manifest")
     if state.get("recovery_failures") and state.get("rollback_succeeded") is True:
         raise ValueError("runtime canary cannot claim successful rollback with recovery failures")
+    # A recomputed, locally writable manifest hash must not allow an attacker to
+    # silently omit a run artifact or add undisclosed evidence after sealing.
+    if manifest.get("artifacts") != _artifact_entries(root):
+        raise ValueError("runtime canary manifest artifact inventory is incomplete or changed")
+    if manifest.get("success") is True:
+        _verify_success_evidence(root, state, manifest)
     if require_success and (manifest.get("success") is not True or manifest.get("rollback_succeeded") is not True):
         raise ValueError("runtime canary did not complete successfully with verified rollback")
     return {

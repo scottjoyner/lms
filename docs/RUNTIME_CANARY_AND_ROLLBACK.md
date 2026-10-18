@@ -194,3 +194,16 @@ even when the parent has already exited. A SIGTERM-ignoring child holding
 stdout open must not survive the timeout or block recovery. The failed soak
 still triggers candidate rollback. This process-group boundary does **not**
 guarantee termination of independently daemonized descendants.
+
+## Evidence completeness (draft hardening)
+
+The manifest verifier requires the exact sealed inventory of artifacts, with
+no omitted or newly added run files. For any claimed successful run, it also
+checks the normalized plan fingerprint, full ordered lifecycle command reports
+and their captured stdout/stderr hashes, and recomputes the soak policy result
+from the raw JSONL samples. Missing samples, omitted commands, or forged
+summary values fail closed even if a local actor recalculates the manifest's
+self-hash. A **locally recomputable SHA-256 fingerprint is not a signature**:
+reviewed operator signing keys, independent allowed-signers custody, and an
+off-host rollback-resistant witness remain required for scientific or physical
+approval. Existing failed runs remain readable as failed evidence.
