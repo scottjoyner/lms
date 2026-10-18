@@ -76,7 +76,16 @@ def _local_file_identity(path):
     """
     if not isinstance(path, str) or not path or any(c in path for c in ("%", "$", "\x00")):
         return None
-    expanded = os.path.expanduser(path)
+    # Fleet Commander and similar orchestrators can override HOME with an
+    # isolated sandbox. SSH's explicit ~/<path> is relative to the operating
+    # system account home, not necessarily the process environment HOME.
+    # Refuse ~another-user and unexpanded tokens rather than guessing.
+    if path.startswith("~/"):
+        expanded = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, path[2:])
+    elif path.startswith("~"):
+        return None
+    else:
+        expanded = path
     if not os.path.isabs(expanded):
         return None
     try:

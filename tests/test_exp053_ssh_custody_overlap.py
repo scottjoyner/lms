@@ -8,6 +8,8 @@ import subprocess
 import sys
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research"))
 import exp053_ssh_custody_overlap as audit
@@ -78,6 +80,37 @@ class ControllerCredentialOverlapTests(TestCase):
                             for x in got["hosts"]))
         self.assertFalse(got["scientific_execution_authorized"])
         self.assertNotIn("synthetic-one", json.dumps(got))
+
+    def test_tilde_path_uses_account_home_not_isolated_home(self):
+        with tempfile.TemporaryDirectory(prefix="exp053-canonical-home-") as tmp:
+            owner = Path(tmp) / "account"
+            isolated = Path(tmp) / "isolated"
+            owner.mkdir()
+            isolated.mkdir()
+            sshdir = owner / ".ssh"
+            sshdir.mkdir()
+            key = sshdir / "synthetic-key"
+            key.write_text("NOT A REAL KEY")
+            fixture = {"lenovo": config(key="~/.ssh/synthetic-key"),
+                       "xwing": config(key="~/.ssh/synthetic-key")}
+            with patch.dict(os.environ, {"HOME": str(isolated)}), patch.object(
+                    audit.pwd, "getpwuid", return_value=SimpleNamespace(
+                        pw_dir=str(owner), pw_name="scott")):
+                got = audit.evaluate(list(fixture), runner=runner_for(fixture),
+                                     controller_user="scott", agent_socket_probe=lambda: False)
+        self.assertEqual([x["locally_verified_regular_identity_path_count"]
+                          for x in got["hosts"]], [1, 1])
+        self.assertTrue(got["same_local_identity_file_inode_detected"])
+        self.assertTrue(all(not x["local_identity_path_observation_incomplete"]
+                            for x in got["hosts"]))
+        self.assertFalse(got["scientific_execution_authorized"])
+        self.assertNotIn(str(owner), json.dumps(got))
+        self.assertNotIn(str(isolated), json.dumps(got))
+
+    def test_unknown_tilde_user_never_resolved_or_exposed(self):
+        self.assertIsNone(audit._local_file_identity("~another/.ssh/key"))
+        self.assertIsNone(audit._local_file_identity("~"))
+        self.assertIsNone(audit._local_file_identity("%d/.ssh/key"))
 
     def test_missing_or_symlink_identity_is_unknown_not_independence(self):
         with tempfile.TemporaryDirectory(prefix="exp053-ssh-custody-") as tmp:
