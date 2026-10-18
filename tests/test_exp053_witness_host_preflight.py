@@ -55,6 +55,9 @@ class SourceOnlyReadOnlyRemotePreflight(unittest.TestCase):
         self.assertIn("ForwardAgent=no", cmd)
         self.assertIn("ClearAllForwardings=yes", cmd)
         self.assertIn("BatchMode=yes", cmd)
+        for required_guard in ("ControlMaster=no", "ControlPath=none",
+                               "UpdateHostKeys=no", "PermitLocalCommand=no"):
+            self.assertIn(required_guard, cmd)
         self.assertEqual(cmd[-2], "lenovo")
         self.assertIn("python3 -c ", cmd[-1])
         self.assertNotIn("sudo", cmd[-1])

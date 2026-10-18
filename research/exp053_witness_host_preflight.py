@@ -117,6 +117,10 @@ def probe(alias, *, runner=subprocess.run, challenge_source=secrets.token_hex):
     command = [
         "ssh", "-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
         "-o", "ForwardAgent=no", "-o", "ClearAllForwardings=yes",
+        # Force a fresh SSH handshake. Existing multiplexed masters may have
+        # negotiated host-key policy different from this pinned-key probe.
+        "-o", "ControlMaster=no", "-o", "ControlPath=none",
+        "-o", "UpdateHostKeys=no", "-o", "PermitLocalCommand=no",
         "-o", "ConnectTimeout=4", "-o", "ServerAliveInterval=3",
         alias, "python3 -c " + shlex.quote(source),
     ]
