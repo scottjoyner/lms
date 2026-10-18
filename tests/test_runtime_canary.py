@@ -213,3 +213,175 @@ def test_canary_manifest_can_be_signed_and_verified(tmp_path):
     assert verified["valid"] is True
     assert verified["rollback_succeeded"] is True
     assert verified["admission"]["admitted"] is False
+
+
+def test_command_executable_drift_refuses_dispatch(tmp_path):
+    script = tmp_path / "stage"
+    marker = tmp_path / "executed"
+    script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    script.chmod(0o700)
+    spec = canary._command({"argv": [str(script)], "timeout_seconds": 5}, "snapshot")
+    script.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
+    assert not marker.exists()
+
+
+def test_soak_probe_executable_drift_refuses_dispatch(tmp_path):
+    script = tmp_path / "probe"
+    marker = tmp_path / "executed"
+    script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    script.chmod(0o700)
+    spec = canary._command({"argv": [str(script)], "timeout_seconds": 5}, "soak_probe")
+    script.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert not marker.exists()
+
+
+def test_canary_symlink_retarget_refuses_dispatch(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    alias = tmp_path / "stage"
+    marker = tmp_path / "executed"
+    a.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    b.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    a.chmod(0o700)
+    b.chmod(0o700)
+    alias.symlink_to(a)
+    spec = canary._command({"argv": [str(alias)], "timeout_seconds": 5}, "snapshot")
+    alias.unlink()
+    alias.symlink_to(b)
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
+    assert not marker.exists()
+
+
+def test_failed_candidate_start_triggers_rollback(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    payload["commands"]["start_candidate"] = event_command("start-partial", events, fail=True)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=True"):
+        canary.execute(plan, tmp_path / "runs", "failed-start", False)
+    assert events.read_text().splitlines() == [
+        "snapshot", "start-partial", "stop", "rollback", "rollback-health"
+    ]
+    root = tmp_path / "runs" / "failed-start"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_started"] is False
+    assert state["candidate_start_attempted"] is True
+    assert state["rollback_attempted"] is True
+    assert state["rollback_succeeded"] is True
+    assert state["success"] is False
+    assert canary.verify_manifest(root)["valid"] is True
+    with pytest.raises(ValueError, match="did not complete successfully"):
+        canary.verify_manifest(root, require_success=True)
+
+
+def test_timed_out_candidate_start_triggers_rollback(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    script = ("from pathlib import Path;import time,sys;"
+              "p=Path(sys.argv[1]);p.write_text(p.read_text()+'start-timeout\\n');"
+              "time.sleep(10)")
+    payload["commands"]["start_candidate"] = command(script, str(events), timeout=0.1)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=True"):
+        canary.execute(plan, tmp_path / "runs", "timeout-start", False)
+    assert events.read_text().splitlines() == [
+        "snapshot", "start-timeout", "stop", "rollback", "rollback-health"
+    ]
+    root = tmp_path / "runs" / "timeout-start"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_start_attempted"] is True
+    assert state["rollback_succeeded"] is True
+    assert state["success"] is False
+
+
+def test_snapshot_failure_does_not_invoke_candidate_recovery(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    payload["commands"]["snapshot"] = event_command("snapshot-failed", events, fail=True)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=False"):
+        canary.execute(plan, tmp_path / "runs", "failed-snapshot", False)
+    assert events.read_text().splitlines() == ["snapshot-failed"]
+    root = tmp_path / "runs" / "failed-snapshot"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_started"] is False
+    assert state.get("candidate_start_attempted") is not True
+    assert state["rollback_attempted"] is False
+    assert state["success"] is False
+
+
+def test_timed_out_soak_probe_terminates_descendant(tmp_path):
+    import time
+
+    marker = tmp_path / "late-write"
+    child = (
+        "import sys,time;from pathlib import Path;"
+        "time.sleep(0.65);Path(sys.argv[1]).write_text('descendant-survived')"
+    )
+    parent = (
+        "import subprocess,sys,time;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]);"
+        "time.sleep(5)"
+    )
+    spec = canary._command(command(parent, child, str(marker), timeout=0.12), "soak_probe")
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert sample["timed_out"] is True
+    assert sample["ok"] is False
+    time.sleep(0.85)
+    assert not marker.exists(), "timed-out soak probe left a live child process"
+
+
+def test_probe_parent_exits_descendant_keeps_pipe(tmp_path):
+    import time
+
+    marker = tmp_path / "late-write-after-parent-exit"
+    child = (
+        "import sys,time;from pathlib import Path;"
+        "time.sleep(0.65);Path(sys.argv[1]).write_text('descendant-survived')"
+    )
+    # The child inherits the parent's stdout pipe. The parent exits first.
+    parent = (
+        "import subprocess,sys;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]])"
+    )
+    spec = canary._command(command(parent, child, str(marker), timeout=0.12), "soak_probe")
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert sample["timed_out"] is True
+    assert sample["ok"] is False
+    time.sleep(0.85)
+    assert not marker.exists(), "parent exit left a soak probe descendant running"
+
+
+@pytest.mark.parametrize("parent_exits", [False, True])
+def test_probe_timeout_kills_sigterm_resistant_child(tmp_path, parent_exits):
+    import time
+
+    late = tmp_path / "late-sigterm-ignored"
+    ready = tmp_path / "child-ready"
+    child = (
+        "import signal,sys,time;from pathlib import Path;"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN);"
+        "Path(sys.argv[1]).write_text('ready');"
+        "time.sleep(0.7);Path(sys.argv[2]).write_text('child-survived')"
+    )
+    # The parent waits for the child's ready marker so SIGTERM cannot beat
+    # the child's signal handler registration and make the test vacuous.
+    parent = (
+        "import subprocess,sys,time;from pathlib import Path;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]]);"
+        "ready=Path(sys.argv[2]);deadline=time.monotonic()+0.4;"
+        "exec('while not ready.exists() and time.monotonic()<deadline: time.sleep(0.005)')"
+    ) + ("" if parent_exits else ";time.sleep(5)")
+    spec = canary._command(
+        command(parent, child, str(ready), str(late), timeout=0.16), "soak_probe"
+    )
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert ready.exists(), "SIGTERM-ignore handler was not established"
+    assert sample["timed_out"] is True and sample["ok"] is False
+    time.sleep(0.82)
+    assert not late.exists(), "SIGTERM-ignoring probe descendant survived timeout"
