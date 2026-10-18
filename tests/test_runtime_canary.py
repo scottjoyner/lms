@@ -385,3 +385,30 @@ def test_probe_timeout_kills_sigterm_resistant_child(tmp_path, parent_exits):
     assert sample["timed_out"] is True and sample["ok"] is False
     time.sleep(0.82)
     assert not late.exists(), "SIGTERM-ignoring probe descendant survived timeout"
+
+
+@pytest.mark.parametrize("failed_stage", ["stop_candidate", "rollback"])
+def test_recovery_command_failure_does_not_claim_rollback(tmp_path, failed_stage):
+    # Recovery health may succeed without proving that stop or restore did.
+    plan, events = make_plan(tmp_path, fail_qualification=True)
+    payload = json.loads(plan.read_text())
+    payload["commands"][failed_stage] = event_command(failed_stage + "-failed", events, fail=True)
+    plan.write_text(json.dumps(payload))
+    workspace = tmp_path / "runs"
+    with pytest.raises(RuntimeError, match="rollback_succeeded=False"):
+        canary.execute(plan, workspace, "recovery-unsafe", False)
+    state = json.loads((workspace / "recovery-unsafe" / "runtime-canary-state.json").read_text())
+    assert state["success"] is False
+    assert state["stage"] == "rollback_failed"
+    assert state["rollback_attempted"] is True
+    assert state["rollback_succeeded"] is False
+    assert [x["command"] for x in state["recovery_failures"]] == [failed_stage]
+    assert events.read_text().splitlines()[-3:] == [
+        "stop_candidate-failed" if failed_stage == "stop_candidate" else "stop",
+        "rollback-failed" if failed_stage == "rollback" else "rollback",
+        "rollback-health",
+    ]
+    report = canary.verify_manifest(workspace / "recovery-unsafe")
+    assert report["valid"] and not report["rollback_succeeded"]
+    with pytest.raises(ValueError, match="did not complete successfully"):
+        canary.verify_manifest(workspace / "recovery-unsafe", require_success=True)
