@@ -185,6 +185,8 @@ recovery, kernel/GPU reset, network partition behavior, or multi-node rollout.
 Those remain explicit physical failure-injection drills.
 
 Soak probes run in an isolated process group. On timeout, the controller
-terminates that group before recording the failed sample; the resulting failed
-soak still triggers candidate rollback. This is a process-group boundary, not
-a guarantee against independently daemonized or reparented descendants.
+sends SIGTERM to the group and then SIGKILL after a bounded parent wait,
+even when the parent has already exited. A SIGTERM-ignoring child holding
+stdout open must not survive the timeout or block recovery. The failed soak
+still triggers candidate rollback. This process-group boundary does **not**
+guarantee termination of independently daemonized descendants.

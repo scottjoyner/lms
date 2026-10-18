@@ -355,3 +355,33 @@ def test_probe_parent_exits_descendant_keeps_pipe(tmp_path):
     assert sample["ok"] is False
     time.sleep(0.85)
     assert not marker.exists(), "parent exit left a soak probe descendant running"
+
+
+@pytest.mark.parametrize("parent_exits", [False, True])
+def test_probe_timeout_kills_sigterm_resistant_child(tmp_path, parent_exits):
+    import time
+
+    late = tmp_path / "late-sigterm-ignored"
+    ready = tmp_path / "child-ready"
+    child = (
+        "import signal,sys,time;from pathlib import Path;"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN);"
+        "Path(sys.argv[1]).write_text('ready');"
+        "time.sleep(0.7);Path(sys.argv[2]).write_text('child-survived')"
+    )
+    # The parent waits for the child's ready marker so SIGTERM cannot beat
+    # the child's signal handler registration and make the test vacuous.
+    parent = (
+        "import subprocess,sys,time;from pathlib import Path;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2],sys.argv[3]]);"
+        "ready=Path(sys.argv[2]);deadline=time.monotonic()+0.4;"
+        "exec('while not ready.exists() and time.monotonic()<deadline: time.sleep(0.005)')"
+    ) + ("" if parent_exits else ";time.sleep(5)")
+    spec = canary._command(
+        command(parent, child, str(ready), str(late), timeout=0.16), "soak_probe"
+    )
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert ready.exists(), "SIGTERM-ignore handler was not established"
+    assert sample["timed_out"] is True and sample["ok"] is False
+    time.sleep(0.82)
+    assert not late.exists(), "SIGTERM-ignoring probe descendant survived timeout"

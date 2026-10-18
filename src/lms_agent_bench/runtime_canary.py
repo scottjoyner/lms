@@ -254,20 +254,24 @@ def _environment(names: Sequence[str]) -> Dict[str, str]:
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:
-    # The group may still contain live children after the leader has exited.
-    # All callers create a new session, so group-wide cleanup is deliberate.
+    # A probe's child may ignore SIGTERM or retain its stdout pipe even after
+    # the leader exits. Terminate the whole session, then escalate for remaining
+    # group members regardless of the leader's individual exit status.
+    # All callers start a new session; independently daemonized children remain
+    # outside this process-group cleanup guarantee.
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
+        pass
     try:
-        process.wait(timeout=5)
+        process.wait(timeout=0.25)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait(timeout=5)
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait(timeout=5)
 
 
 def _verified_command_argv(spec: Mapping[str, Any]) -> List[str]:
