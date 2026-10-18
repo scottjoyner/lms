@@ -183,3 +183,8 @@ This command proves the candidate can be introduced and removed safely on one
 node under the reviewed lifecycle wrappers. It does not prove power-loss
 recovery, kernel/GPU reset, network partition behavior, or multi-node rollout.
 Those remain explicit physical failure-injection drills.
+
+Soak probes run in an isolated process group. On timeout, the controller
+terminates that group before recording the failed sample; the resulting failed
+soak still triggers candidate rollback. This is a process-group boundary, not
+a guarantee against independently daemonized or reparented descendants.

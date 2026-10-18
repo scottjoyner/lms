@@ -254,8 +254,8 @@ def _environment(names: Sequence[str]) -> Dict[str, str]:
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
+    # The group may still contain live children after the leader has exited.
+    # All callers create a new session, so group-wide cleanup is deliberate.
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -346,24 +346,23 @@ def run_command(
 def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) -> Dict[str, Any]:
     argv = _verified_command_argv(spec)
     started = time.monotonic()
-    try:
-        process = subprocess.run(
-            argv,
-            cwd=str(cwd),
-            env=dict(env),
-            capture_output=True,
-            timeout=float(spec["timeout_seconds"]),
-            check=False,
-        )
+    # A timed-out probe can spawn descendants. Keep its entire process group
+    # isolated so timeout cleanup reaches children, not only the probe parent.
+    with subprocess.Popen(
+        argv,
+        cwd=str(cwd),
+        env=dict(env),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    ) as process:
         timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        process = None
-        timed_out = True
-        stdout = exc.stdout or b""
-        stderr = exc.stderr or b""
-    else:
-        stdout = process.stdout
-        stderr = process.stderr
+        try:
+            stdout, stderr = process.communicate(timeout=float(spec["timeout_seconds"]))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _terminate(process)
+            stdout, stderr = process.communicate(timeout=2)
     if len(stdout) > _MAX_CAPTURE_BYTES or len(stderr) > _MAX_CAPTURE_BYTES:
         raise RuntimeError("soak probe output exceeded one MiB")
     payload: Dict[str, Any] = {}
@@ -380,7 +379,7 @@ def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) 
             parse_error = str(exc)
     else:
         parse_error = "probe produced no JSON output"
-    returncode = process.returncode if process is not None else -signal.SIGKILL
+    returncode = process.returncode if process.returncode is not None else -signal.SIGKILL
     ok = returncode == 0 and not timed_out and parse_error is None and payload.get("ok") is True
     sample = {
         "captured_at_utc": utc_now(),

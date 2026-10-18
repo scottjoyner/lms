@@ -313,3 +313,45 @@ def test_snapshot_failure_does_not_invoke_candidate_recovery(tmp_path):
     assert state.get("candidate_start_attempted") is not True
     assert state["rollback_attempted"] is False
     assert state["success"] is False
+
+
+def test_timed_out_soak_probe_terminates_descendant(tmp_path):
+    import time
+
+    marker = tmp_path / "late-write"
+    child = (
+        "import sys,time;from pathlib import Path;"
+        "time.sleep(0.65);Path(sys.argv[1]).write_text('descendant-survived')"
+    )
+    parent = (
+        "import subprocess,sys,time;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]]);"
+        "time.sleep(5)"
+    )
+    spec = canary._command(command(parent, child, str(marker), timeout=0.12), "soak_probe")
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert sample["timed_out"] is True
+    assert sample["ok"] is False
+    time.sleep(0.85)
+    assert not marker.exists(), "timed-out soak probe left a live child process"
+
+
+def test_probe_parent_exits_descendant_keeps_pipe(tmp_path):
+    import time
+
+    marker = tmp_path / "late-write-after-parent-exit"
+    child = (
+        "import sys,time;from pathlib import Path;"
+        "time.sleep(0.65);Path(sys.argv[1]).write_text('descendant-survived')"
+    )
+    # The child inherits the parent's stdout pipe. The parent exits first.
+    parent = (
+        "import subprocess,sys;"
+        "subprocess.Popen([sys.executable,'-c',sys.argv[1],sys.argv[2]])"
+    )
+    spec = canary._command(command(parent, child, str(marker), timeout=0.12), "soak_probe")
+    sample = canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert sample["timed_out"] is True
+    assert sample["ok"] is False
+    time.sleep(0.85)
+    assert not marker.exists(), "parent exit left a soak probe descendant running"
