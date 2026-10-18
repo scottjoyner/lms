@@ -412,3 +412,66 @@ def test_recovery_command_failure_does_not_claim_rollback(tmp_path, failed_stage
     assert report["valid"] and not report["rollback_succeeded"]
     with pytest.raises(ValueError, match="did not complete successfully"):
         canary.verify_manifest(workspace / "recovery-unsafe", require_success=True)
+
+
+def _reseal_structural_manifest_for_negative_test(root: Path):
+    # Deliberately forge an UNSIGNED local manifest to test structural checks.
+    manifest_path = root / "runtime-canary-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for item in manifest["artifacts"]:
+        path = root / item["path"]
+        item["size_bytes"] = path.stat().st_size
+        item["sha256"] = canary._operator.file_sha256(path)
+    core = {key: value for key, value in manifest.items() if key not in {"created_at_utc", "manifest_fingerprint"}}
+    manifest["manifest_fingerprint"] = canary._operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest
+
+
+def test_rehashed_manifest_missing_soak_evidence_rejected(tmp_path):
+    plan, _ = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "missing-soak", False)
+    root = workspace / "missing-soak"
+    (root / "soak-samples.jsonl").unlink()
+    manifest_path = root / "runtime-canary-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["artifacts"] = [x for x in manifest["artifacts"] if x["path"] != "soak-samples.jsonl"]
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    _reseal_structural_manifest_for_negative_test(root)
+    with pytest.raises(ValueError, match="missing|soak|incomplete"):
+        canary.verify_manifest(root, require_success=True)
+
+
+def test_rehashed_manifest_with_empty_command_history_rejected(tmp_path):
+    plan, _ = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "missing-commands", False)
+    root = workspace / "missing-commands"
+    state_path = root / "runtime-canary-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["commands"] = []
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    _reseal_structural_manifest_for_negative_test(root)
+    with pytest.raises(ValueError, match="commands|evidence|incomplete"):
+        canary.verify_manifest(root, require_success=True)
+
+
+def test_rehashed_soak_samples_contradict_success_summary_rejected(tmp_path):
+    plan, _ = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "forged-soak", False)
+    root = workspace / "forged-soak"
+    samples_path = root / "soak-samples.jsonl"
+    rows = [json.loads(line) for line in samples_path.read_text(encoding="utf-8").splitlines()]
+    assert rows and rows[0]["ok"] is True
+    rows[0]["ok"] = False
+    samples_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
+    # Update the state-stored digest as well, as a locally controlled attacker could.
+    state_path = root / "runtime-canary-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["soak"]["samples_sha256"] = canary._operator.file_sha256(samples_path)
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    _reseal_structural_manifest_for_negative_test(root)
+    with pytest.raises(ValueError, match="soak|sample|inconsistent"):
+        canary.verify_manifest(root, require_success=True)
