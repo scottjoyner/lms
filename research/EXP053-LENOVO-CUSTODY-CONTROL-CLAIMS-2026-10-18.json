@@ -1,0 +1,34 @@
+{
+  "schema": "exp053-custody-boundary-claims-v1",
+  "candidate_alias": "lenovo",
+  "claims": [
+    {
+      "domain": "witness_remote_login",
+      "principal": "scorer_operator",
+      "access": "CAN",
+      "evidence_sha256": "ce82af3f9df092de502166e46df6adcdc776867e150a3cc654e2ff55378366e7",
+      "evidence_origin": "operator_observation"
+    },
+    {
+      "domain": "witness_root_administration",
+      "principal": "scorer_operator",
+      "access": "UNKNOWN",
+      "evidence_sha256": null,
+      "evidence_origin": "none"
+    },
+    {
+      "domain": "witness_snapshot_restore",
+      "principal": "scorer_operator",
+      "access": "UNKNOWN",
+      "evidence_sha256": null,
+      "evidence_origin": "none"
+    },
+    {
+      "domain": "witness_signing_key_custody",
+      "principal": "scorer_operator",
+      "access": "UNKNOWN",
+      "evidence_sha256": null,
+      "evidence_origin": "none"
+    }
+  ]
+}
