@@ -45,7 +45,11 @@ verify restored runtime health
 seal run state and manifest
 ```
 
-Any failure after candidate startup enters the recovery path immediately:
+Once the candidate-start stage is **attempted**, any failure (including a
+partially successful startup wrapper that times out or exits nonzero) enters
+the recovery path immediately. Cleanup and rollback wrappers must therefore
+be idempotent and safe even if no candidate actually started. A failed
+pre-start snapshot does not trigger candidate cleanup:
 
 ```text
 best-effort candidate stop -> rollback -> rollback health verification

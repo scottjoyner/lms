@@ -255,3 +255,61 @@ def test_canary_symlink_retarget_refuses_dispatch(tmp_path):
     with pytest.raises(ValueError, match="executable .*changed"):
         canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
     assert not marker.exists()
+
+
+def test_failed_candidate_start_triggers_rollback(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    payload["commands"]["start_candidate"] = event_command("start-partial", events, fail=True)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=True"):
+        canary.execute(plan, tmp_path / "runs", "failed-start", False)
+    assert events.read_text().splitlines() == [
+        "snapshot", "start-partial", "stop", "rollback", "rollback-health"
+    ]
+    root = tmp_path / "runs" / "failed-start"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_started"] is False
+    assert state["candidate_start_attempted"] is True
+    assert state["rollback_attempted"] is True
+    assert state["rollback_succeeded"] is True
+    assert state["success"] is False
+    assert canary.verify_manifest(root)["valid"] is True
+    with pytest.raises(ValueError, match="did not complete successfully"):
+        canary.verify_manifest(root, require_success=True)
+
+
+def test_timed_out_candidate_start_triggers_rollback(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    script = ("from pathlib import Path;import time,sys;"
+              "p=Path(sys.argv[1]);p.write_text(p.read_text()+'start-timeout\\n');"
+              "time.sleep(10)")
+    payload["commands"]["start_candidate"] = command(script, str(events), timeout=0.1)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=True"):
+        canary.execute(plan, tmp_path / "runs", "timeout-start", False)
+    assert events.read_text().splitlines() == [
+        "snapshot", "start-timeout", "stop", "rollback", "rollback-health"
+    ]
+    root = tmp_path / "runs" / "timeout-start"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_start_attempted"] is True
+    assert state["rollback_succeeded"] is True
+    assert state["success"] is False
+
+
+def test_snapshot_failure_does_not_invoke_candidate_recovery(tmp_path):
+    plan, events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    payload["commands"]["snapshot"] = event_command("snapshot-failed", events, fail=True)
+    plan.write_text(json.dumps(payload))
+    with pytest.raises(RuntimeError, match="rollback_succeeded=False"):
+        canary.execute(plan, tmp_path / "runs", "failed-snapshot", False)
+    assert events.read_text().splitlines() == ["snapshot-failed"]
+    root = tmp_path / "runs" / "failed-snapshot"
+    state = json.loads((root / "runtime-canary-state.json").read_text())
+    assert state["candidate_started"] is False
+    assert state.get("candidate_start_attempted") is not True
+    assert state["rollback_attempted"] is False
+    assert state["success"] is False
