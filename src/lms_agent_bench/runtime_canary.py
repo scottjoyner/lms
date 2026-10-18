@@ -270,6 +270,30 @@ def _terminate(process: subprocess.Popen[bytes]) -> None:
         process.wait(timeout=5)
 
 
+def _verified_command_argv(spec: Mapping[str, Any]) -> List[str]:
+    """Refuse a changed lifecycle executable before each dispatch.
+
+    This limits post-validation drift (including symlink retargeting), but is
+    not an atomic guarantee against privileged concurrent modification.
+    Operator-approved, owner-protected lifecycle wrappers remain required.
+    """
+    argv = list(spec["argv"])
+    try:
+        resolved = Path(argv[0]).resolve(strict=True)
+        if (
+            str(resolved) != spec["executable_resolved"]
+            or not resolved.is_file()
+            or not os.access(resolved, os.X_OK)
+            or _operator.file_sha256(resolved) != spec["executable_sha256"]
+        ):
+            raise ValueError("lifecycle executable identity changed after plan validation")
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("lifecycle executable changed or is unavailable") from exc
+    # Retain the requested launcher path: virtualenv Python binaries may be
+    # symlinks, and executing their resolved targets can lose venv semantics.
+    return argv
+
+
 def run_command(
     name: str,
     spec: Mapping[str, Any],
@@ -278,12 +302,13 @@ def run_command(
     env: Mapping[str, str],
     logs: Path,
 ) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     stdout_path = logs / f"{name}.stdout.log"
     stderr_path = logs / f"{name}.stderr.log"
     started = time.monotonic()
     with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
         process = subprocess.Popen(
-            list(spec["argv"]),
+            argv,
             cwd=str(cwd),
             env=dict(env),
             stdout=stdout,
@@ -319,10 +344,11 @@ def run_command(
 
 
 def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     started = time.monotonic()
     try:
         process = subprocess.run(
-            list(spec["argv"]),
+            argv,
             cwd=str(cwd),
             env=dict(env),
             capture_output=True,

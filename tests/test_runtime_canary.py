@@ -213,3 +213,45 @@ def test_canary_manifest_can_be_signed_and_verified(tmp_path):
     assert verified["valid"] is True
     assert verified["rollback_succeeded"] is True
     assert verified["admission"]["admitted"] is False
+
+
+def test_command_executable_drift_refuses_dispatch(tmp_path):
+    script = tmp_path / "stage"
+    marker = tmp_path / "executed"
+    script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    script.chmod(0o700)
+    spec = canary._command({"argv": [str(script)], "timeout_seconds": 5}, "snapshot")
+    script.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
+    assert not marker.exists()
+
+
+def test_soak_probe_executable_drift_refuses_dispatch(tmp_path):
+    script = tmp_path / "probe"
+    marker = tmp_path / "executed"
+    script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    script.chmod(0o700)
+    spec = canary._command({"argv": [str(script)], "timeout_seconds": 5}, "soak_probe")
+    script.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert not marker.exists()
+
+
+def test_canary_symlink_retarget_refuses_dispatch(tmp_path):
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    alias = tmp_path / "stage"
+    marker = tmp_path / "executed"
+    a.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    b.write_text("#!/bin/sh\ntouch " + str(marker) + "\n", encoding="utf-8")
+    a.chmod(0o700)
+    b.chmod(0o700)
+    alias.symlink_to(a)
+    spec = canary._command({"argv": [str(alias)], "timeout_seconds": 5}, "snapshot")
+    alias.unlink()
+    alias.symlink_to(b)
+    with pytest.raises(ValueError, match="executable .*changed"):
+        canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
+    assert not marker.exists()
