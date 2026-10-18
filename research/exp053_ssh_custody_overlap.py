@@ -11,9 +11,10 @@ import os
 import pwd
 import re
 import subprocess
+import stat
 from itertools import combinations
 
-SCHEMA = "exp053-controller-ssh-custody-overlap-v1"
+SCHEMA = "exp053-controller-ssh-custody-overlap-v2"
 HOST_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,62}\Z")
 MAX_STDOUT = 65536
 MAX_HOSTS = 12
@@ -67,7 +68,39 @@ def inspect(alias, *, runner=subprocess.run):
         return None
 
 
-def evaluate(aliases, *, runner=subprocess.run, controller_user=None):
+def _local_file_identity(path):
+    """Optional inode observation; no key bytes, contents or symlinks read.
+
+    Unknown, missing, tokenized or nonregular paths cannot confirm identity.
+    Never turn an absent/unreadable configured file into proof of isolation.
+    """
+    if not isinstance(path, str) or not path or any(c in path for c in ("%", "$", "\x00")):
+        return None
+    expanded = os.path.expanduser(path)
+    if not os.path.isabs(expanded):
+        return None
+    try:
+        item = os.lstat(expanded)
+    except OSError:
+        return None
+    if not stat.S_ISREG(item.st_mode):
+        return None
+    return (item.st_dev, item.st_ino)
+
+
+def _controller_agent_socket_present():
+    """Only records whether an agent-like local socket exists, not key usage."""
+    candidate = os.environ.get("SSH_AUTH_SOCK", "")
+    if not candidate or not os.path.isabs(candidate):
+        return False
+    try:
+        return stat.S_ISSOCK(os.stat(candidate).st_mode)
+    except OSError:
+        return False
+
+
+def evaluate(aliases, *, runner=subprocess.run, controller_user=None,
+             identity_probe=_local_file_identity, agent_socket_probe=_controller_agent_socket_present):
     if (not isinstance(aliases, (list, tuple)) or not 1 <= len(aliases) <= MAX_HOSTS or
             len(aliases) != len(set(aliases)) or
             any(not isinstance(a, str) or not HOST_RE.fullmatch(a) for a in aliases)):
@@ -75,12 +108,29 @@ def evaluate(aliases, *, runner=subprocess.run, controller_user=None):
     if controller_user is None:
         controller_user = pwd.getpwuid(os.getuid()).pw_name
     observed = {a: inspect(a, runner=runner) for a in aliases}
+    # Local stat evidence is supplemental. Remote authentication may still use
+    # agent-held keys or other credential sources not observable through -G.
+    local_files = {}
+    local_stat_count = {}
+    local_stat_incomplete = {}
+    for alias, record in observed.items():
+        identities = ([identity_probe(path) for path in record["identities"]]
+                      if record is not None else [])
+        local_files[alias] = {item for item in identities if item is not None}
+        local_stat_count[alias] = sum(item is not None for item in identities)
+        local_stat_incomplete[alias] = any(item is None for item in identities)
+    inode_overlap = {a: False for a in aliases}
     overlap = {a: False for a in aliases}
     for a, b in combinations(aliases, 2):
         if (observed[a] is not None and observed[b] is not None and
                 observed[a]["identities"] & observed[b]["identities"]):
             overlap[a] = True
             overlap[b] = True
+        if (observed[a] is not None and observed[b] is not None and
+                local_files[a] & local_files[b]):
+            inode_overlap[a] = True
+            inode_overlap[b] = True
+    agent_socket_present = agent_socket_probe()
     hosts = []
     for alias in aliases:
         entry = observed[alias]
@@ -90,6 +140,10 @@ def evaluate(aliases, *, runner=subprocess.run, controller_user=None):
             "same_controller_login": entry["user"] == controller_user if entry else None,
             "configured_identity_path_count": len(entry["identities"]) if entry else None,
             "configured_path_overlap_with_candidates": overlap[alias] if entry else None,
+            "locally_verified_regular_identity_path_count": local_stat_count[alias] if entry else None,
+            "local_identity_path_observation_incomplete": local_stat_incomplete[alias] if entry else None,
+            "same_local_identity_file_inode_with_candidates": (
+                inode_overlap[alias] if entry and local_files[alias] else None),
             "independent_administration_approved": False,
             "scientific_execution_authorized": False,
         })
@@ -99,7 +153,11 @@ def evaluate(aliases, *, runner=subprocess.run, controller_user=None):
         "scientific_execution_authorized": False,
         "independent_administration_approved": False,
         "configured_identity_path_overlap_detected": any(overlap.values()),
-        "qualification_scope": "local SSH config path overlap; not actual key use, privileges or custody",
+        "same_local_identity_file_inode_detected": any(inode_overlap.values()),
+        "controller_ssh_agent_socket_present": bool(agent_socket_present),
+        "qualification_scope": (
+            "controller-only configured paths, local file metadata and agent socket presence; "
+            "not authenticated key use, privileges or independent custody"),
         "hosts": hosts,
     }
 

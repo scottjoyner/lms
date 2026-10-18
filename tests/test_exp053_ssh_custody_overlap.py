@@ -1,5 +1,7 @@
 """Offline, source-only tests; SSH is always mocked."""
 import contextlib
+import os
+import tempfile
 import io
 import json
 import subprocess
@@ -57,6 +59,57 @@ class ControllerCredentialOverlapTests(TestCase):
         parsed = audit.parse_effective_config(raw)
         self.assertEqual(parsed["user"], "scott")
         self.assertEqual(len(parsed["identities"]), 1)
+
+    def test_hardlinked_synthetic_files_detected_even_with_different_paths(self):
+        with tempfile.TemporaryDirectory(prefix="exp053-ssh-custody-") as tmp:
+            one = Path(tmp) / "synthetic-one"
+            two = Path(tmp) / "synthetic-two"
+            one.write_text("NOT A REAL KEY")
+            os.link(one, two)
+            data = {"lenovo": config(key=str(one)),
+                    "destroyer": config(key=str(two))}
+            got = audit.evaluate(list(data), runner=runner_for(data),
+                                 controller_user="scott", agent_socket_probe=lambda: False)
+        self.assertFalse(got["configured_identity_path_overlap_detected"])
+        self.assertTrue(got["same_local_identity_file_inode_detected"])
+        self.assertEqual([x["locally_verified_regular_identity_path_count"] for x in got["hosts"]],
+                         [1, 1])
+        self.assertTrue(all(x["same_local_identity_file_inode_with_candidates"]
+                            for x in got["hosts"]))
+        self.assertFalse(got["scientific_execution_authorized"])
+        self.assertNotIn("synthetic-one", json.dumps(got))
+
+    def test_missing_or_symlink_identity_is_unknown_not_independence(self):
+        with tempfile.TemporaryDirectory(prefix="exp053-ssh-custody-") as tmp:
+            regular = Path(tmp) / "synthetic"
+            regular.write_text("NOT A REAL KEY")
+            alias = Path(tmp) / "alias"
+            alias.symlink_to(regular)
+            nonexistent = Path(tmp) / "no-file"
+            data = {"lenovo": config(key=str(alias)),
+                    "destroyer": config(key=str(nonexistent))}
+            got = audit.evaluate(list(data), runner=runner_for(data),
+                                 controller_user="scott", agent_socket_probe=lambda: True)
+        self.assertTrue(got["controller_ssh_agent_socket_present"])
+        self.assertEqual([x["locally_verified_regular_identity_path_count"] for x in got["hosts"]],
+                         [0, 0])
+        self.assertTrue(all(x["local_identity_path_observation_incomplete"] for x in got["hosts"]))
+        self.assertTrue(all(x["same_local_identity_file_inode_with_candidates"] is None
+                            for x in got["hosts"]))
+        self.assertFalse(got["independent_administration_approved"])
+
+    def test_two_paths_same_inode_are_both_observed(self):
+        with tempfile.TemporaryDirectory(prefix="exp053-ssh-custody-") as tmp:
+            one = Path(tmp) / "one"
+            two = Path(tmp) / "two"
+            one.write_text("NOT A REAL KEY")
+            os.link(one, two)
+            data = {"lenovo": config(key=str(one), extra="identityfile " + str(two) + "\n")}
+            got = audit.evaluate(["lenovo"], runner=runner_for(data),
+                                 controller_user="scott", agent_socket_probe=lambda: False)
+        self.assertEqual(got["hosts"][0]["locally_verified_regular_identity_path_count"], 2)
+        self.assertFalse(got["hosts"][0]["local_identity_path_observation_incomplete"])
+        self.assertFalse(got["scientific_execution_authorized"])
 
     def test_failed_host_not_dropped_or_misclassified(self):
         def fake(command, **_):
