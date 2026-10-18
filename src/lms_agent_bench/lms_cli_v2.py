@@ -29,19 +29,19 @@ import sys
 from pathlib import Path
 from typing import List, Optional
 
-import lms_agent_brief
-import lms_artifact_validate
-import lms_cli
-import lms_config
-import lms_decide
-import lms_endpoint_registry
-import lms_history
-import lms_history_decide
-import lms_manifest_validate
-import lms_model_fit
-import lms_run_audit
-import lms_skill_export
-import lms_support_bundle
+from . import lms_agent_brief
+from . import lms_artifact_validate
+from . import lms_cli
+from . import lms_config
+from . import lms_decide
+from . import lms_endpoint_registry
+from . import lms_history
+from . import lms_history_decide
+from . import lms_manifest_validate
+from . import lms_model_fit
+from . import lms_run_audit
+from . import lms_skill_export
+from . import lms_support_bundle
 
 
 VERSION = "lms-agent-cli 0.17.0"
