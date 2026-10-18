@@ -254,20 +254,48 @@ def _environment(names: Sequence[str]) -> Dict[str, str]:
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
+    # A probe's child may ignore SIGTERM or retain its stdout pipe even after
+    # the leader exits. Terminate the whole session, then escalate for remaining
+    # group members regardless of the leader's individual exit status.
+    # All callers start a new session; independently daemonized children remain
+    # outside this process-group cleanup guarantee.
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
+        pass
     try:
-        process.wait(timeout=5)
+        process.wait(timeout=0.25)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait(timeout=5)
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait(timeout=5)
+
+
+def _verified_command_argv(spec: Mapping[str, Any]) -> List[str]:
+    """Refuse a changed lifecycle executable before each dispatch.
+
+    This limits post-validation drift (including symlink retargeting), but is
+    not an atomic guarantee against privileged concurrent modification.
+    Operator-approved, owner-protected lifecycle wrappers remain required.
+    """
+    argv = list(spec["argv"])
+    try:
+        resolved = Path(argv[0]).resolve(strict=True)
+        if (
+            str(resolved) != spec["executable_resolved"]
+            or not resolved.is_file()
+            or not os.access(resolved, os.X_OK)
+            or _operator.file_sha256(resolved) != spec["executable_sha256"]
+        ):
+            raise ValueError("lifecycle executable identity changed after plan validation")
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("lifecycle executable changed or is unavailable") from exc
+    # Retain the requested launcher path: virtualenv Python binaries may be
+    # symlinks, and executing their resolved targets can lose venv semantics.
+    return argv
 
 
 def run_command(
@@ -278,12 +306,13 @@ def run_command(
     env: Mapping[str, str],
     logs: Path,
 ) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     stdout_path = logs / f"{name}.stdout.log"
     stderr_path = logs / f"{name}.stderr.log"
     started = time.monotonic()
     with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
         process = subprocess.Popen(
-            list(spec["argv"]),
+            argv,
             cwd=str(cwd),
             env=dict(env),
             stdout=stdout,
@@ -319,25 +348,25 @@ def run_command(
 
 
 def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     started = time.monotonic()
-    try:
-        process = subprocess.run(
-            list(spec["argv"]),
-            cwd=str(cwd),
-            env=dict(env),
-            capture_output=True,
-            timeout=float(spec["timeout_seconds"]),
-            check=False,
-        )
+    # A timed-out probe can spawn descendants. Keep its entire process group
+    # isolated so timeout cleanup reaches children, not only the probe parent.
+    with subprocess.Popen(
+        argv,
+        cwd=str(cwd),
+        env=dict(env),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    ) as process:
         timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        process = None
-        timed_out = True
-        stdout = exc.stdout or b""
-        stderr = exc.stderr or b""
-    else:
-        stdout = process.stdout
-        stderr = process.stderr
+        try:
+            stdout, stderr = process.communicate(timeout=float(spec["timeout_seconds"]))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _terminate(process)
+            stdout, stderr = process.communicate(timeout=2)
     if len(stdout) > _MAX_CAPTURE_BYTES or len(stderr) > _MAX_CAPTURE_BYTES:
         raise RuntimeError("soak probe output exceeded one MiB")
     payload: Dict[str, Any] = {}
@@ -354,7 +383,7 @@ def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) 
             parse_error = str(exc)
     else:
         parse_error = "probe produced no JSON output"
-    returncode = process.returncode if process is not None else -signal.SIGKILL
+    returncode = process.returncode if process.returncode is not None else -signal.SIGKILL
     ok = returncode == 0 and not timed_out and parse_error is None and payload.get("ok") is True
     sample = {
         "captured_at_utc": utc_now(),
@@ -486,6 +515,7 @@ def _state_payload(run_id: str, plan: Mapping[str, Any]) -> Dict[str, Any]:
         "stage": "validated",
         "success": False,
         "candidate_started": False,
+        "candidate_start_attempted": False,
         "rollback_attempted": False,
         "rollback_succeeded": False,
         "commands": [],
@@ -574,6 +604,8 @@ def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str
         raise ValueError("runtime canary success does not match manifest")
     if bool(state.get("rollback_succeeded")) != bool(manifest.get("rollback_succeeded")):
         raise ValueError("runtime canary rollback status does not match manifest")
+    if state.get("recovery_failures") and state.get("rollback_succeeded") is True:
+        raise ValueError("runtime canary cannot claim successful rollback with recovery failures")
     if require_success and (manifest.get("success") is not True or manifest.get("rollback_succeeded") is not True):
         raise ValueError("runtime canary did not complete successfully with verified rollback")
     return {
@@ -599,7 +631,7 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         raise ValueError(f"runtime canary run already exists: {run_dir}")
     lock: Optional[Path] = None
     state = _state_payload(run_id, plan)
-    candidate_started = False
+    candidate_start_attempted = False
     env = _environment(plan["environment_names"])
     try:
         lock = acquire_lock(workspace, run_id, recover_stale_lock)
@@ -613,11 +645,15 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
 
         for name in ("snapshot", "start_candidate", "candidate_health", "qualification"):
             state["stage"] = name
+            if name == "start_candidate":
+                # A failing start wrapper may have already spawned the model.
+                # Arm cleanup BEFORE launching it, not only on exit zero.
+                candidate_start_attempted = True
+                state["candidate_start_attempted"] = True
             _write_state(state_path, state)
             result = run_command(name, plan["commands"][name], cwd=cwd, env=env, logs=logs)
             state["commands"].append(result)
             if name == "start_candidate":
-                candidate_started = True
                 state["candidate_started"] = True
             _write_state(state_path, state)
 
@@ -646,14 +682,19 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         state["stage"] = "complete"
     except BaseException as exc:
         state["failure"] = {"type": type(exc).__name__, "message": str(exc), "stage": state.get("stage")}
-        if candidate_started:
+        if candidate_start_attempted:
+            # Discard any prior success flag when entering a fresh recovery.
+            # Only the complete recovery sequence may re-establish it.
+            state["rollback_succeeded"] = False
             for name in ("stop_candidate", "rollback", "rollback_health"):
                 if name == "rollback":
                     state["rollback_attempted"] = True
                 try:
                     result = run_command(f"recovery-{name}", plan["commands"][name], cwd=Path(plan["working_directory"]), env=env, logs=run_dir / "logs")
                     state["commands"].append(result)
-                    if name == "rollback_health":
+                    if name == "rollback_health" and not state.get("recovery_failures"):
+                        # A green health probe cannot establish rollback if any
+                        # required recovery command failed or timed out.
                         state["rollback_succeeded"] = True
                 except BaseException as recovery_exc:
                     state.setdefault("recovery_failures", []).append(

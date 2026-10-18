@@ -45,7 +45,11 @@ verify restored runtime health
 seal run state and manifest
 ```
 
-Any failure after candidate startup enters the recovery path immediately:
+Once the candidate-start stage is **attempted**, any failure (including a
+partially successful startup wrapper that times out or exits nonzero) enters
+the recovery path immediately. Cleanup and rollback wrappers must therefore
+be idempotent and safe even if no candidate actually started. A failed
+pre-start snapshot does not trigger candidate cleanup:
 
 ```text
 best-effort candidate stop -> rollback -> rollback health verification
@@ -53,7 +57,11 @@ best-effort candidate stop -> rollback -> rollback health verification
 
 The run remains failed even when rollback succeeds. The evidence distinguishes
 `success`, `rollback_attempted`, and `rollback_succeeded` so a failed experiment
-cannot be mistaken for a qualified candidate.
+cannot be mistaken for a qualified candidate. In recovery,
+`rollback_succeeded=true` requires **all three** successful stop, restore, and
+rollback-health commands; a healthy endpoint alone is insufficient. Any failed
+recovery stage sets `rollback_succeeded=false` and `rollback_failed`, and the
+manifest verifier refuses contradictory successful-rollback evidence.
 
 ## Plan safety
 
@@ -179,3 +187,10 @@ This command proves the candidate can be introduced and removed safely on one
 node under the reviewed lifecycle wrappers. It does not prove power-loss
 recovery, kernel/GPU reset, network partition behavior, or multi-node rollout.
 Those remain explicit physical failure-injection drills.
+
+Soak probes run in an isolated process group. On timeout, the controller
+sends SIGTERM to the group and then SIGKILL after a bounded parent wait,
+even when the parent has already exited. A SIGTERM-ignoring child holding
+stdout open must not survive the timeout or block recovery. The failed soak
+still triggers candidate rollback. This process-group boundary does **not**
+guarantee termination of independently daemonized descendants.
