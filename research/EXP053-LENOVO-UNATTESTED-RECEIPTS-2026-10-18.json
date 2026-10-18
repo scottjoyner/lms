@@ -1,0 +1,8 @@
+{
+  "candidate_alias": "lenovo",
+  "checkpoint_reference_sha256": null,
+  "observer_public_key_b64": null,
+  "plan_sha256": "84d0841ff4be060d79667951a6f34a15172ab6cd4c9907fdbb9b4bbf5eef0666",
+  "receipts": [],
+  "schema": "exp053-custody-negative-receipt-bundle-v1"
+}
