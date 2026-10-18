@@ -26,7 +26,7 @@ class SourceOnlyRelease(unittest.TestCase):
             (self.source/name).write_bytes((ROOT/"research"/name).read_bytes())
 
     def _install(self):
-        with patch.object(Path,"home",return_value=self.home):
+        with patch.object(release,"_account_home",return_value=self.home):
             return release.install(self.prefix,source_dir=self.source)
 
     def test_dry_run_never_writes(self):
@@ -68,7 +68,7 @@ class SourceOnlyRelease(unittest.TestCase):
             release.verify(installed)
 
     def test_outside_user_home_denied_before_creation(self):
-        with patch.object(Path,"home",return_value=self.home):
+        with patch.object(release,"_account_home",return_value=self.home):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 release.install(self.home.parent/"external-research",source_dir=self.source)
         self.assertFalse((self.home.parent/"external-research").exists())
@@ -87,7 +87,7 @@ class SourceOnlyRelease(unittest.TestCase):
         real.mkdir()
         link=self.home/"link"
         link.symlink_to(real,target_is_directory=True)
-        with patch.object(Path,"home",return_value=self.home):
+        with patch.object(release,"_account_home",return_value=self.home):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 release.install(link/"research-preflight",source_dir=self.source)
 

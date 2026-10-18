@@ -9,6 +9,7 @@ import argparse
 import hashlib
 import json
 import os
+import pwd
 import shutil
 import stat
 import tempfile
@@ -52,13 +53,17 @@ def release_id(files):
     return digest(json.dumps(files,sort_keys=True,separators=(",",":")).encode())[:20]
 
 
+def _account_home():
+    return Path(pwd.getpwuid(os.getuid()).pw_dir).resolve()
+
+
 def _owner_prefix(prefix):
     candidate = Path(prefix).expanduser()
     if not candidate.is_absolute():
         fail("prefix must be an absolute local path")
     # Refuse all symlinked path segments. Do not install as root or outside
     # the caller's home; this tool is NOT a system-wide service installer.
-    home = Path.home().resolve()
+    home = _account_home()
     resolved = candidate.resolve(strict=False)
     if resolved == home or not resolved.is_relative_to(home):
         fail("prefix must be a subdirectory of user's home")
@@ -144,7 +149,7 @@ def install(prefix, *, source_dir=ROOT):
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--prefix",type=Path,
-        default=Path.home()/".local/share/lms-exp053-readonly-preflight")
+        default=_account_home()/".exp053-readonly-preflight")
     p.add_argument("--verify",type=Path,default=None)
     p.add_argument("--install",action="store_true")
     args=p.parse_args(argv)
