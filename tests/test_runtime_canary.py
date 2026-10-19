@@ -513,3 +513,62 @@ def test_rehashed_success_command_must_match_authorized_plan(tmp_path, field):
     _reseal_structural_manifest_for_negative_test(root)
     with pytest.raises(ValueError, match="does not match normalized plan"):
         canary.verify_manifest(root, require_success=True)
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tps", None),
+        ("rss_bytes", None),
+        ("latency_seconds", None),
+        ("tps", 0.0),
+        ("rss_bytes", -1.0),
+        ("latency_seconds", -0.5),
+        ("tps", float("nan")),
+    ],
+)
+def test_successful_soak_requires_valid_measurements(field, value):
+    policy = {
+        "minimum_samples": 3,
+        "minimum_success_rate": 1.0,
+        "max_consecutive_failures": 0,
+        "max_p95_latency_seconds": 1.0,
+        "max_rss_growth_bytes": 500,
+        "minimum_terminal_tps_ratio": 0.8,
+        "max_temperature_c": 80.0,
+    }
+    samples = [
+        {"ok": True, "latency_seconds": 0.1,
+         "rss_bytes": 1024.0, "tps": 20.0, "temperature_c": 50.0}
+        for _ in range(3)
+    ]
+    if value is None:
+        del samples[1][field]
+    else:
+        samples[1][field] = value
+    summary = canary.summarize_soak(samples, policy)
+    assert summary["passed"] is False
+    assert f"invalid_{field}" in summary["failures"]
+
+
+@pytest.mark.parametrize(
+    ("field", "literal"),
+    [
+        ("tps", "'tps': 20.0, "),
+        ("rss_bytes", "'rss_bytes': 1000+n, "),
+    ],
+)
+def test_real_canary_soak_missing_required_metric_triggers_rollback(tmp_path, field, literal):
+    plan, events = make_plan(tmp_path)
+    raw = json.loads(plan.read_text(encoding="utf-8"))
+    argv = raw["commands"]["soak_probe"]["argv"]
+    assert argv[2].count(literal) == 1
+    argv[2] = argv[2].replace(literal, "")
+    plan.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="soak gate failed"):
+        canary.execute(plan, tmp_path / "runs", f"missing-{field}", False)
+    assert events.read_text().splitlines()[-3:] == [
+        "stop", "rollback", "rollback-health",
+    ]
+    report = canary.verify_manifest(tmp_path / "runs" / f"missing-{field}")
+    assert report["success"] is False
+    assert report["rollback_succeeded"] is True
+    assert report["admission"]["admitted"] is False

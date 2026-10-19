@@ -218,3 +218,15 @@ unsigned manifest hashes cannot conceal a different recorded invocation.
 This is structural cross-checking, **not cryptographic proof of what executed**.
 Independently controlled signing, allowed-signers custody, anti-rollback
 witnesses, and signed physical recovery are still required.
+
+
+## Required soak telemetry
+
+Every successful soak probe must provide finite, nonnegative latency and
+temperature (when temperature is gated), positive RSS, and positive measured
+tokens per second. A missing, zero, negative, nonnumeric, or nonfinite required
+measurement fails the soak qualification rather than silently bypassing the
+corresponding resource-growth or throughput-retention gate. At least two
+valid RSS and TPS observations are needed to assess growth and retention.
+This remains local evidence; it does not establish an independently signed
+physical run or stable model identity.
