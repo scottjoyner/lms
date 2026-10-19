@@ -672,7 +672,10 @@ def _control_files(root: Path) -> List[Dict[str, Any]]:
 
 
 def _archive_references(
-    root: Path, *, require_results: bool = False
+    root: Path,
+    *,
+    require_results: bool = False,
+    expected_success_nodes: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     results_path = root / "observe" / "rollout_results.json"
     if not results_path.exists():
@@ -696,6 +699,34 @@ def _archive_references(
         not isinstance(item, Mapping) for item in entries
     ):
         raise ValueError("rollout results must contain a list of node objects")
+    # The execution gate is a separate process; validate successful rollout
+    # coverage again against the operator state before sealing a manifest.
+    # Failed runs deliberately preserve partial diagnostic node results.
+    if expected_success_nodes is not None:
+        expected = list(expected_success_nodes)
+        if not expected or any(
+            not isinstance(node, str) or not node.strip() for node in expected
+        ) or len(set(expected)) != len(expected):
+            raise ValueError("rollout results have invalid expected node identities")
+        received = [item.get("node_id") for item in entries]
+        if any(
+            not isinstance(node, str) or not node.strip() for node in received
+        ) or len(received) != len(set(received)):
+            raise ValueError("rollout results have duplicate or invalid node identities")
+        if len(received) != len(expected) or set(received) != set(expected):
+            raise ValueError("rollout results do not cover expected nodes exactly")
+        for item in entries:
+            if (
+                item.get("returncode") != 0
+                or item.get("scp_returncode") != 0
+                or item.get("timed_out") is True
+                or item.get("scp_timed_out") is True
+                or not item.get("collected_artifact")
+            ):
+                raise ValueError(
+                    "rollout results lack successful collected evidence "
+                    f"for node {item.get('node_id')!r}"
+                )
     references: List[Dict[str, Any]] = []
     normalized_root = Path(root).expanduser().resolve()
     for item in entries:
@@ -748,6 +779,11 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
             root,
             require_results=state.get("success") is True
             and (state.get("rollout") is not None or (root / "observe").is_dir()),
+            expected_success_nodes=(
+                list(state.get("node_ids") or [])
+                if state.get("success") is True and state.get("phase") == "observe"
+                else None
+            ),
         ),
         "admission": {"admitted": False},
     }
