@@ -250,3 +250,15 @@ synthetic I/O errors without executing models. This protects availability
 after the process exits; it is **not** crash-proof cross-host fencing, an
 independent lease authority, or a substitute for operator-controlled
 recovery and external anti-rollback checks.
+
+## Bounded soak-probe output capture
+
+A soak probe's stdout and stderr are drained incrementally with a monotonic
+per-command deadline. Each stream is bounded to one MiB **during capture**,
+not only after subprocess completion. An extra sentinel byte triggers an
+immediate fail-closed error and process-group cleanup; controller memory
+cannot grow in proportion to malicious probe output. Timeout handling still
+kills the probe's process group even if the parent exited while a child
+retained its pipe. Independently daemonized descendants remain outside this
+process-group safety boundary. This is an offline controller test, not a
+physical runtime qualification or production admission.

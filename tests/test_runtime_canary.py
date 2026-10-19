@@ -648,3 +648,20 @@ def test_lock_owner_write_failure_removes_unowned_lock(tmp_path, monkeypatch):
         canary.execute(plan, workspace, "lock-owner-io-failure", False)
     assert not (workspace / ".runtime-canary.lock").exists()
     assert not (workspace / "lock-owner-io-failure").exists()
+
+
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+def test_oversize_soak_probe_output_is_stopped_before_completion(tmp_path, stream):
+    # An 8MiB flood is harmless in the test, but an unlimited communicate()
+    # reads the entire stream before applying the claimed one-MiB limit.
+    finished = tmp_path / "probe_finished"
+    script = (
+        "import sys;from pathlib import Path;"
+        "out=getattr(sys,sys.argv[1]).buffer;"
+        "out.write(b'x'*(8*1024*1024));out.flush();"
+        "Path(sys.argv[2]).write_text('completed')"
+    )
+    spec = canary._command(command(script, stream, str(finished), timeout=3), "soak_probe")
+    with pytest.raises(RuntimeError, match="soak probe output exceeded one MiB"):
+        canary._captured_probe(spec, cwd=tmp_path, env={})
+    assert not finished.exists(), "oversized probe was allowed to finish flooding output"
