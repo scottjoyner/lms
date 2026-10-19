@@ -16,7 +16,11 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import lms_history
+if __package__:
+    from . import lms_history
+else:
+    # Legacy direct-module test/import compatibility; canonical code is packaged.
+    from lms_agent_bench import lms_history
 
 
 def int_or_none(value: Any) -> Optional[int]:
