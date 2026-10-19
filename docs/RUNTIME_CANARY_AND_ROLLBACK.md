@@ -275,3 +275,15 @@ successful lifecycle stage. The monotonic deadline and descendant cleanup
 continue to apply to both log pipes. This does not prevent all disk exhaustion
 outside these controller-owned log files, or descendants that explicitly
 escape the process group.
+
+## Producer-side soak evidence budgets
+
+The soak runner now enforces the verifier's hard ceilings **before writing**
+more than 100,000 samples or 32 MiB of JSONL evidence. The controller also
+rejects a plan whose required sample minimum exceeds that bound, and refuses
+to append to a nonempty prior soak evidence path. A fast or zero-interval
+probe cannot silently accumulate arbitrarily large in-memory sample arrays.
+Budget exhaustion fails the soak and enters the existing rollback sequence,
+rather than allowing a successful canary or an unbounded evidence collection.
+Independent signer custody, off-host monotonic checkpoints and physical
+recovery approval are still separate requirements.

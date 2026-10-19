@@ -38,6 +38,8 @@ _REQUIRED_COMMANDS = (
 _SECRET_FLAGS = ("--api-key", "--token", "--password", "--secret")
 _SAFE_BASE_ENV = ("HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL", "TMPDIR")
 _MAX_CAPTURE_BYTES = 1024 * 1024
+_MAX_SOAK_SAMPLES = 100000
+_MAX_SOAK_BYTES = 32 * 1024 * 1024
 _MAX_COMMAND_LOG_BYTES = 4 * _MAX_CAPTURE_BYTES
 
 
@@ -167,6 +169,8 @@ def load_plan(path: Path) -> Dict[str, Any]:
     }
     if soak["minimum_success_rate"] > 1 or soak["minimum_terminal_tps_ratio"] > 1:
         raise ValueError("soak rates must not exceed 1")
+    if soak["minimum_samples"] > _MAX_SOAK_SAMPLES:
+        raise ValueError("soak.minimum_samples exceeds evidence sample limit")
     if soak_raw.get("max_temperature_c") is not None:
         soak["max_temperature_c"] = _number(soak_raw["max_temperature_c"], "soak.max_temperature_c", minimum=0.0)
     normalized = {
@@ -601,13 +605,24 @@ def run_soak(
     deadline = started + float(policy["duration_seconds"])
     samples: List[Dict[str, Any]] = []
     consecutive = 0
+    evidence_bytes = output.stat().st_size if output.exists() else 0
+    if evidence_bytes:
+        raise RuntimeError("soak evidence output is not empty")
     while len(samples) < int(policy["minimum_samples"]) or time.monotonic() < deadline:
+        # Enforce verifier limits *during* production. Otherwise a fast probe
+        # with interval_seconds=0 can fill both memory and evidence disk.
+        if len(samples) >= _MAX_SOAK_SAMPLES:
+            raise RuntimeError("soak sample count limit exceeded")
         sample = _captured_probe(spec, cwd, env)
-        samples.append(sample)
-        with output.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(sample, sort_keys=True) + "\n")
+        encoded = (json.dumps(sample, sort_keys=True) + "\n").encode("utf-8")
+        if evidence_bytes + len(encoded) > _MAX_SOAK_BYTES:
+            raise RuntimeError("soak evidence size limit exceeded")
+        with output.open("ab") as handle:
+            handle.write(encoded)
             handle.flush()
             os.fsync(handle.fileno())
+        evidence_bytes += len(encoded)
+        samples.append(sample)
         consecutive = 0 if sample["ok"] else consecutive + 1
         if consecutive > int(policy["max_consecutive_failures"]):
             break
@@ -755,7 +770,7 @@ def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Map
 
     soak = _mapping(state.get("soak"), "canary soak result")
     samples_path = _regular_file(root / "soak-samples.jsonl", "raw soak samples")
-    if samples_path.stat().st_size > 32 * 1024 * 1024:
+    if samples_path.stat().st_size > _MAX_SOAK_BYTES:
         raise ValueError("canary soak sample evidence exceeds size limit")
     if soak.get("samples_sha256") != _operator.file_sha256(samples_path):
         raise ValueError("canary soak sample SHA-256 mismatch")
@@ -763,7 +778,7 @@ def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Map
     try:
         with samples_path.open(encoding="utf-8") as source:
             for line in source:
-                if len(samples) >= 100000:
+                if len(samples) >= _MAX_SOAK_SAMPLES:
                     raise ValueError("canary soak contains too many samples")
                 sample = _mapping(json.loads(line), "canary soak sample")
                 # Success claims must agree with the actual probe execution
