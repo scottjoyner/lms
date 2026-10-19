@@ -31,9 +31,9 @@ class RosterAncestorRaceSynthetic(unittest.TestCase):
             "blind_assignments_confirmed": True,
             "slots": {
                 "A": {"reviewer_id": "synthetic_reviewer_A", "role": "independent",
-                      "public_key_b64": base64.b64encode(b"A" * 32).decode()},
+                      "public_key_b64": base64.b64encode(bytes.fromhex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")).decode()},
                 "B": {"reviewer_id": "synthetic_reviewer_B", "role": "independent",
-                      "public_key_b64": base64.b64encode(b"B" * 32).decode()},
+                      "public_key_b64": base64.b64encode(bytes.fromhex("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c")).decode()},
             },
         }
         self.data = json.dumps(self.payload, sort_keys=True).encode()
