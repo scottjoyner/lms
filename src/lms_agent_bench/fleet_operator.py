@@ -706,7 +706,9 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     return manifest
 
 
-def _pinned_control_file_identity(root: Path, relative: Path) -> Tuple[int, str]:
+def _pinned_control_file_identity(
+    root: Path, relative: Path, *, label: str = "control file"
+) -> Tuple[int, str]:
     """Hash run-local regular evidence through one descriptor-anchored read.
 
     O_NOFOLLOW applies to both parent directories and the final file. A
@@ -731,9 +733,9 @@ def _pinned_control_file_identity(root: Path, relative: Path) -> Tuple[int, str]
         opened.append(file_fd)
         before = os.fstat(file_fd)
         if not stat.S_ISREG(before.st_mode):
-            raise ValueError(f"operator control file is not regular: {relative}")
+            raise ValueError(f"operator {label} is not regular: {relative}")
         if before.st_nlink != 1:
-            raise ValueError(f"operator control file has multiple hard links: {relative}")
+            raise ValueError(f"operator {label} has multiple hard links: {relative}")
         digest = hashlib.sha256()
         size = 0
         while True:
@@ -752,13 +754,13 @@ def _pinned_control_file_identity(root: Path, relative: Path) -> Tuple[int, str]
             or after.st_nlink != 1
             or size != after.st_size
         ):
-            raise ValueError(f"operator control file changed during read: {relative}")
+            raise ValueError(f"operator {label} changed during read: {relative}")
         return size, "sha256:" + digest.hexdigest()
     except OSError as exc:
         if exc.errno == errno.ENOENT:
-            raise ValueError(f"operator control file is missing: {relative}") from exc
+            raise ValueError(f"operator {label} is missing: {relative}") from exc
         raise ValueError(
-            f"operator control file contains symlink or unsafe path: {relative}"
+            f"operator {label} contains symlink or unsafe path: {relative}"
         ) from exc
     finally:
         for fd in reversed(opened):
@@ -792,13 +794,23 @@ def verify_run_manifest(
             raise ValueError(f"operator control file size mismatch: {relative}")
         if digest != entry.get("sha256"):
             raise ValueError(f"operator control file hash mismatch: {relative}")
+    normalized_root = Path(root).expanduser().resolve()
     for archive in manifest.get("archives", []):
         archive_path = Path(str(archive.get("path") or ""))
-        if not archive_path.is_file():
-            raise ValueError(f"collected archive is missing: {archive_path}")
-        if archive_path.stat().st_size != int(archive.get("size_bytes")):
+        if not archive_path.is_absolute():
+            raise ValueError(f"collected archive path must be absolute: {archive_path}")
+        try:
+            relative = archive_path.relative_to(normalized_root)
+        except ValueError as exc:
+            raise ValueError(f"collected archive escapes run directory: {archive_path}") from exc
+        if not relative.parts or ".." in relative.parts:
+            raise ValueError(f"collected archive has unsafe path: {archive_path}")
+        size, digest = _pinned_control_file_identity(
+            normalized_root, relative, label="archive"
+        )
+        if size != int(archive.get("size_bytes")):
             raise ValueError(f"collected archive size mismatch: {archive_path}")
-        if file_sha256(archive_path) != archive.get("sha256"):
+        if digest != archive.get("sha256"):
             raise ValueError(f"collected archive hash mismatch: {archive_path}")
     if require_success and manifest.get("success") is not True:
         raise ValueError("operator run did not complete successfully")

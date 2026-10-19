@@ -325,3 +325,67 @@ def test_signed_control_evidence_cannot_alias_external_file(tmp_path, monkeypatc
         attestation.sign_run(root, key, require_success=True)
     with pytest.raises(ValueError, match="operator control file .*"):
         fleet_operator.verify_run_manifest(root, require_success=True)
+@pytest.mark.parametrize("attack", ["outside_hardlink", "replace_during_hash"])
+def test_signed_archive_evidence_cannot_alias_external_file(tmp_path, monkeypatch, attack):
+    root = make_run(tmp_path)
+    outside = tmp_path / "outside-original.tar.gz"
+    outside.write_bytes(b"EXTERNAL")
+    archives = root / "archives"
+    archives.mkdir()
+    claimed = archives / "collected.tar.gz"
+    if attack == "outside_hardlink":
+        claimed.hardlink_to(outside)
+    else:
+        claimed.write_bytes(b"INTERNAL")
+    manifest_path = root / "operator-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["archives"] = [{
+        "node_id": "synthetic-node",
+        "path": str(claimed),
+        "size_bytes": outside.stat().st_size,
+        "sha256": fleet_operator.file_sha256(outside),
+    }]
+    core = {k: v for k, v in manifest.items()
+            if k not in {"created_at_utc", "operator_manifest_fingerprint"}}
+    manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    key, _allowed = make_key(tmp_path)
+    if attack == "replace_during_hash":
+        original_hash = fleet_operator.file_sha256
+
+        def replace_file_at_hash(path):
+            if Path(path) == claimed:
+                claimed.unlink()
+                claimed.symlink_to(outside)
+            return original_hash(path)
+
+        monkeypatch.setattr(fleet_operator, "file_sha256", replace_file_at_hash)
+    with pytest.raises(ValueError, match="operator archive .*|collected archive hash mismatch"):
+        attestation.sign_run(root, key, require_success=True)
+    with pytest.raises(ValueError, match="operator archive .*|collected archive hash mismatch"):
+        fleet_operator.verify_run_manifest(root, require_success=True)
+def test_signed_fleet_archive_inside_run_verifies(tmp_path):
+    root = make_run(tmp_path)
+    collected = root / "archives" / "collected.tar.gz"
+    collected.parent.mkdir()
+    collected.write_bytes(b"genuine collected archive bytes")
+    manifest_path = root / "operator-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["archives"] = [{
+        "node_id": "synthetic-node",
+        "path": str(collected),
+        "size_bytes": collected.stat().st_size,
+        "sha256": fleet_operator.file_sha256(collected),
+    }]
+    core = {k: v for k, v in manifest.items()
+            if k not in {"created_at_utc", "operator_manifest_fingerprint"}}
+    manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    key, allowed = make_key(tmp_path)
+    result = attestation.sign_run(root, key, require_success=True)
+    assert result["signing_key_fingerprint"] == attestation._key_fingerprint(key)
+    report = attestation.verify_attestation(
+        root, allowed, "operator", require_success=True
+    )
+    assert report["valid"] is True
+    assert fleet_operator.verify_run_manifest(root, require_success=True)["archive_count"] == 1
