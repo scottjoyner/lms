@@ -196,3 +196,60 @@ def test_fleet_attestation_uses_same_signature_bytes_for_verify_and_attribution(
     with pytest.raises(ValueError, match="signing key fingerprint"):
         attestation.verify_attestation(root, allowed, "operator", require_success=True)
     assert swapped, "OpenSSH verification was not exercised"
+def test_signed_manifest_must_be_the_same_content_that_was_structurally_validated(
+    tmp_path, monkeypatch,
+):
+    root = make_run(tmp_path)
+    signing_key, allowed = make_key(tmp_path)
+    attestation.sign_run(root, signing_key, require_success=True)
+    manifest_path = root / "operator-manifest.json"
+    signature_path = root / "operator-manifest.json.sig"
+    attestation_path = root / "operator-attestation.json"
+
+    forged_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    forged_manifest["control_files"].append({
+        "path": "missing-proof.json", "size_bytes": 9,
+        "sha256": "sha256:" + "0" * 64,
+    })
+    core = {
+        key: value for key, value in forged_manifest.items()
+        if key not in {"created_at_utc", "operator_manifest_fingerprint"}
+    }
+    forged_manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    candidate = tmp_path / "invalid-but-signed-manifest"
+    candidate.write_text(json.dumps(forged_manifest), encoding="utf-8")
+    subprocess.run(
+        ["ssh-keygen", "-Y", "sign", "-f", str(signing_key),
+         "-n", attestation.DEFAULT_NAMESPACE, str(candidate)],
+        capture_output=True, check=True,
+    )
+    forged_manifest_bytes = candidate.read_bytes()
+    forged_signature_bytes = Path(str(candidate) + ".sig").read_bytes()
+    metadata = json.loads(attestation_path.read_text(encoding="utf-8"))
+    metadata["manifest_sha256"] = "sha256:" + __import__("hashlib").sha256(
+        forged_manifest_bytes
+    ).hexdigest()
+    metadata["signature_sha256"] = "sha256:" + __import__("hashlib").sha256(
+        forged_signature_bytes
+    ).hexdigest()
+    attestation_core = {
+        key: value for key, value in metadata.items()
+        if key not in {"created_at_utc", "attestation_fingerprint"}
+    }
+    metadata["attestation_fingerprint"] = fleet_operator.canonical_hash(attestation_core)
+
+    actual_validate = fleet_operator.verify_run_manifest
+    changes = []
+
+    def replace_validated_manifest(*args, **kwargs):
+        report = actual_validate(*args, **kwargs)
+        manifest_path.write_bytes(forged_manifest_bytes)
+        signature_path.write_bytes(forged_signature_bytes)
+        attestation_path.write_text(json.dumps(metadata), encoding="utf-8")
+        changes.append(True)
+        return report
+
+    monkeypatch.setattr(attestation._operator, "verify_run_manifest", replace_validated_manifest)
+    with pytest.raises(ValueError, match="control file is missing"):
+        attestation.verify_attestation(root, allowed, "operator", require_success=True)
+    assert changes, "the structurally valid manifest was not checked first"

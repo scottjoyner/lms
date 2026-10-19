@@ -833,10 +833,16 @@ def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Map
         raise ValueError("successful canary soak duration is insufficient")
 
 
-def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str, Any]:
+def verify_manifest(
+    run_dir: Path, *, require_success: bool = False, manifest_bytes: Optional[bytes] = None
+) -> Dict[str, Any]:
     root = _safe_directory(run_dir, "canary run directory")
     manifest_path = _regular_file(root / "runtime-canary-manifest.json", "canary manifest")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    # For attested verification, use the same manifest bytes that OpenSSH saw.
+    manifest = json.loads(
+        manifest_path.read_text(encoding="utf-8") if manifest_bytes is None
+        else manifest_bytes.decode("utf-8")
+    )
     if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise ValueError("unsupported runtime canary manifest schema")
     core = {key: value for key, value in manifest.items() if key not in {"created_at_utc", "manifest_fingerprint"}}
