@@ -253,3 +253,36 @@ def test_signed_manifest_must_be_the_same_content_that_was_structurally_validate
     with pytest.raises(ValueError, match="control file is missing"):
         attestation.verify_attestation(root, allowed, "operator", require_success=True)
     assert changes, "the structurally valid manifest was not checked first"
+@pytest.mark.parametrize("symlink_kind", ["file", "directory"])
+def test_signed_fleet_control_files_must_reside_inside_run(tmp_path, symlink_kind):
+    # All test keys and files are disposable; no physical fleet activity.
+    root = make_run(tmp_path)
+    outside = tmp_path / "outside-evidence"
+    outside.mkdir()
+    real_proof = outside / "proof.json"
+    real_proof.write_text('{"untrusted": true}\n', encoding="utf-8")
+    if symlink_kind == "file":
+        name = "claimed-proof.json"
+        (root / name).symlink_to(real_proof)
+    else:
+        name = "claimed-evidence/proof.json"
+        (root / "claimed-evidence").symlink_to(outside, target_is_directory=True)
+    manifest_path = root / "operator-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["control_files"] = [{
+        "path": name,
+        "size_bytes": real_proof.stat().st_size,
+        "sha256": fleet_operator.file_sha256(real_proof),
+    }]
+    core = {
+        key: value for key, value in manifest.items()
+        if key not in {"created_at_utc", "operator_manifest_fingerprint"}
+    }
+    manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    key, allowed = make_key(tmp_path)
+    with pytest.raises(ValueError, match="control file.*(symlink|escapes)"):
+        attestation.sign_run(root, key, require_success=True)
+    # Even direct manifest verification must reject the external reference.
+    with pytest.raises(ValueError, match="control file.*(symlink|escapes)"):
+        fleet_operator.verify_run_manifest(root, require_success=True)
