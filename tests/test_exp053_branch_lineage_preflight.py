@@ -53,6 +53,7 @@ class DisposableGitTopology(unittest.TestCase):
         self.synthetic_commit("research/read_only_note.txt")
         value = lineage.inspect(self.root)
         self.assertEqual(value["lineage"], {"main": "CONNECTED", "pr32": "CONNECTED"})
+        self.assertEqual(value["repository_history"], "COMPLETE")
         self.assertEqual(value["tree_delta_counts"]["main"]["A"], 1)
         self.assertEqual(value["target_pr_base_ref_status"], "MISSING")
         self.assertEqual(value["source_only_handoff_file_presence"], {"local": [], "pr32": []})
@@ -71,9 +72,46 @@ class DisposableGitTopology(unittest.TestCase):
         after = self.run_git("rev-parse", "HEAD").stdout.strip()
         self.assertEqual(before, after)
         self.assertEqual(result["lineage"], {"main": "DISCONNECTED", "pr32": "DISCONNECTED"})
+        self.assertEqual(result["repository_history"], "COMPLETE")
         self.assertEqual(result["references"]["origin_main"], "FOUND")
         self.assertGreater(result["tree_delta_counts"]["pr32"]["A"], 0)
         self.assertGreater(result["tree_delta_counts"]["pr32"]["D"], 0)
+        self.assertFalse(result["integration_authorized"])
+
+    def test_shallow_history_with_hidden_parent_is_unverified_not_disconnected(self):
+        # Reproduce Fleet Commander's real shallow clone failure mode in an
+        # isolated, disposable Git fixture. Git retains the object's parent
+        # but refuses traversal across the marked shallow boundary.
+        self.synthetic_commit("research/shallow_child.txt")
+        head = self.run_git("rev-parse", "HEAD").stdout.strip()
+        shallow = Path(self.run_git("rev-parse", "--git-path", "shallow").stdout.strip())
+        if not shallow.is_absolute():
+            shallow = self.root / shallow
+        shallow.write_text(head + "\n")
+        self.assertEqual(self.run_git("rev-parse", "--is-shallow-repository").stdout.strip(),
+                         "true")
+        result = lineage.inspect(self.root)
+        self.assertEqual(result["repository_history"], "SHALLOW")
+        self.assertEqual(result["lineage"], {
+            "main": "UNVERIFIED_SHALLOW_HISTORY",
+            "pr32": "UNVERIFIED_SHALLOW_HISTORY",
+        })
+        self.assertFalse(result["integration_authorized"])
+        self.assertFalse(result["scientific_execution_authorized"])
+
+    def test_shallow_history_with_visible_merge_base_still_connected(self):
+        # Even in a shallow repo, a visible common base is positive evidence.
+        self.synthetic_commit("research/shallow_child.txt")
+        head = self.run_git("rev-parse", "HEAD").stdout.strip()
+        shallow = Path(self.run_git("rev-parse", "--git-path", "shallow").stdout.strip())
+        if not shallow.is_absolute():
+            shallow = self.root / shallow
+        shallow.write_text(self.base + "\n")
+        self.run_git("update-ref", lineage.PR32_REF, head)
+        result = lineage.inspect(self.root)
+        self.assertEqual(result["repository_history"], "SHALLOW")
+        self.assertEqual(result["lineage"]["pr32"], "CONNECTED")
+        self.assertEqual(result["lineage"]["main"], "CONNECTED")
         self.assertFalse(result["integration_authorized"])
 
     def test_missing_pr_ref_stays_unresolved_not_connected(self):

@@ -1,9 +1,28 @@
 # EXP-053 integration lineage — read-only NO-GO handoff (2026-10-19)
 
+> **CORRECTION (2026-10-19):** The earlier DISCONNECTED conclusions below
+> were **false negatives from shallow Git history**, NOT evidence of unrelated
+> branch roots. The shared repository has a `.git/shallow` file containing
+> PR #32 head `d14b1dcc...`; Git's merge-base does not traverse beyond that
+> boundary. An isolated read-only GitHub fetch recovered the PR #32 parent
+> history and the EXP-052 base `a04c9bb...`: PR #32 is **95 commits ahead,
+> 0 behind** its declared EXP-052 base, with exactly 107 files changed. It
+> shares ancestor `d0cf7a242f9d57bf068892eb825127d6c5e3cc3c` with
+> `main` (PR #32 is 161 ahead/2 behind current `main` in the fetched graph).
+> **Use `EXP053-BRANCH-LINEAGE-NEGATIVE-PREFLIGHT-V2-SPEC-2026-10-19.md`**
+> and v2 `exp053_branch_lineage_preflight.py`; it explicitly returns
+> `UNVERIFIED_SHALLOW_HISTORY` instead of the misleading `DISCONNECTED`.
+> Original below is retained as historical context but its disconnected-ancestry
+> interpretation and resulting recommendation to avoid all integration are
+> superseded. The 8-file isolated handoff review candidate is safely based on
+> exact PR #32 head. This correction does NOT approve publication, merging or
+> scientific execution. PR #32 is still a **DRAFT stacked research PR**.
+
+
 **NO_GO_RESEARCH_ONLY. No pushes, merges, approvals, model execution or remote
 host changes are authorized by this report.** Research code and a source-free
-human custodian packet exist in a LOCAL Git history unrelated to the existing
-remote `scottjoyner/lms` PR #32 history.
+human custodian packet exist in a LOCAL shallow Git object history whose common ancestry was initially
+unknown before the isolated history fetch confirmed it (see correction above).
 
 ## Verified local object-graph relationship
 

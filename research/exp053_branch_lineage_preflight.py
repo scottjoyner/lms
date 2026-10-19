@@ -9,9 +9,9 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SPEC = ROOT / "EXP053-BRANCH-LINEAGE-NEGATIVE-PREFLIGHT-SPEC-2026-10-19.md"
-SPEC_SHA256 = "ec5805ba4b51d2d318250d61fea0f184ed07bf8ff75a199163c270b978a53fe8"
-SCHEMA = "exp053-branch-lineage-negative-preflight-v1"
+SPEC = ROOT / "EXP053-BRANCH-LINEAGE-NEGATIVE-PREFLIGHT-V2-SPEC-2026-10-19.md"
+SPEC_SHA256 = "f330ae0c6ac9ec332e9b31b44250940f0cfe8623ea4440cc1a02b18dda613bd2"
+SCHEMA = "exp053-branch-lineage-negative-preflight-v2"
 MAIN_REF = "refs/remotes/origin/main"
 PR32_REF = "refs/remotes/origin/research/exp053-race-human-review-gate-20261016"
 PR32_BASE_REF = "refs/remotes/origin/research/k2-minicpm-v47-exp052-20261016"
@@ -54,11 +54,13 @@ def _ref(repo, ref):
     return candidate
 
 
-def _lineage(repo, src, dst):
+def _lineage(repo, src, dst, *, shallow):
     if src is None or dst is None:
         return "UNRESOLVED"
     result = _git(repo, "merge-base", src, dst, ok=(0, 1))
-    return "DISCONNECTED" if result.returncode == 1 else "CONNECTED"
+    if result.returncode == 0:
+        return "CONNECTED"
+    return "UNVERIFIED_SHALLOW_HISTORY" if shallow else "DISCONNECTED"
 
 
 def _tree_delta(repo, src, dst):
@@ -90,13 +92,19 @@ def inspect(repo):
     refs = {name: _ref(repo, ref) for name, ref in sources.items()}
     if refs["head"] is None:
         raise Hold("HEAD is not a valid commit")
+    shallow_result = _git(repo, "rev-parse", "--is-shallow-repository")
+    shallow_text = shallow_result.stdout.strip()
+    if shallow_text not in {"true", "false"}:
+        raise Hold("unrecognized Git shallow-history observation")
+    shallow = shallow_text == "true"
     tracked = _git(repo, "status", "--porcelain=v1", "--untracked-files=no")
     return {
         "schema": SCHEMA,
+        "repository_history": "SHALLOW" if shallow else "COMPLETE",
         "references": {name: "FOUND" if val else "MISSING" for name, val in refs.items()},
         "lineage": {
-            "main": _lineage(repo, refs["head"], refs["origin_main"]),
-            "pr32": _lineage(repo, refs["head"], refs["pr32"]),
+            "main": _lineage(repo, refs["head"], refs["origin_main"], shallow=shallow),
+            "pr32": _lineage(repo, refs["head"], refs["pr32"], shallow=shallow),
         },
         "tree_delta_counts": {
             "main": _tree_delta(repo, refs["origin_main"], refs["head"]),
