@@ -254,20 +254,48 @@ def _environment(names: Sequence[str]) -> Dict[str, str]:
 
 
 def _terminate(process: subprocess.Popen[bytes]) -> None:
-    if process.poll() is not None:
-        return
+    # A probe's child may ignore SIGTERM or retain its stdout pipe even after
+    # the leader exits. Terminate the whole session, then escalate for remaining
+    # group members regardless of the leader's individual exit status.
+    # All callers start a new session; independently daemonized children remain
+    # outside this process-group cleanup guarantee.
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
+        pass
     try:
-        process.wait(timeout=5)
+        process.wait(timeout=0.25)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait(timeout=5)
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait(timeout=5)
+
+
+def _verified_command_argv(spec: Mapping[str, Any]) -> List[str]:
+    """Refuse a changed lifecycle executable before each dispatch.
+
+    This limits post-validation drift (including symlink retargeting), but is
+    not an atomic guarantee against privileged concurrent modification.
+    Operator-approved, owner-protected lifecycle wrappers remain required.
+    """
+    argv = list(spec["argv"])
+    try:
+        resolved = Path(argv[0]).resolve(strict=True)
+        if (
+            str(resolved) != spec["executable_resolved"]
+            or not resolved.is_file()
+            or not os.access(resolved, os.X_OK)
+            or _operator.file_sha256(resolved) != spec["executable_sha256"]
+        ):
+            raise ValueError("lifecycle executable identity changed after plan validation")
+    except (OSError, RuntimeError) as exc:
+        raise ValueError("lifecycle executable changed or is unavailable") from exc
+    # Retain the requested launcher path: virtualenv Python binaries may be
+    # symlinks, and executing their resolved targets can lose venv semantics.
+    return argv
 
 
 def run_command(
@@ -278,12 +306,13 @@ def run_command(
     env: Mapping[str, str],
     logs: Path,
 ) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     stdout_path = logs / f"{name}.stdout.log"
     stderr_path = logs / f"{name}.stderr.log"
     started = time.monotonic()
     with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
         process = subprocess.Popen(
-            list(spec["argv"]),
+            argv,
             cwd=str(cwd),
             env=dict(env),
             stdout=stdout,
@@ -319,25 +348,25 @@ def run_command(
 
 
 def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) -> Dict[str, Any]:
+    argv = _verified_command_argv(spec)
     started = time.monotonic()
-    try:
-        process = subprocess.run(
-            list(spec["argv"]),
-            cwd=str(cwd),
-            env=dict(env),
-            capture_output=True,
-            timeout=float(spec["timeout_seconds"]),
-            check=False,
-        )
+    # A timed-out probe can spawn descendants. Keep its entire process group
+    # isolated so timeout cleanup reaches children, not only the probe parent.
+    with subprocess.Popen(
+        argv,
+        cwd=str(cwd),
+        env=dict(env),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    ) as process:
         timed_out = False
-    except subprocess.TimeoutExpired as exc:
-        process = None
-        timed_out = True
-        stdout = exc.stdout or b""
-        stderr = exc.stderr or b""
-    else:
-        stdout = process.stdout
-        stderr = process.stderr
+        try:
+            stdout, stderr = process.communicate(timeout=float(spec["timeout_seconds"]))
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _terminate(process)
+            stdout, stderr = process.communicate(timeout=2)
     if len(stdout) > _MAX_CAPTURE_BYTES or len(stderr) > _MAX_CAPTURE_BYTES:
         raise RuntimeError("soak probe output exceeded one MiB")
     payload: Dict[str, Any] = {}
@@ -354,7 +383,7 @@ def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) 
             parse_error = str(exc)
     else:
         parse_error = "probe produced no JSON output"
-    returncode = process.returncode if process is not None else -signal.SIGKILL
+    returncode = process.returncode if process.returncode is not None else -signal.SIGKILL
     ok = returncode == 0 and not timed_out and parse_error is None and payload.get("ok") is True
     sample = {
         "captured_at_utc": utc_now(),
@@ -399,16 +428,45 @@ def summarize_soak(samples: Sequence[Mapping[str, Any]], policy: Mapping[str, An
         else:
             current += 1
             max_consecutive = max(max_consecutive, current)
-    latencies = [float(sample["latency_seconds"]) for sample in successes if "latency_seconds" in sample]
-    rss = [float(sample["rss_bytes"]) for sample in successes if "rss_bytes" in sample]
-    temperatures = [float(sample["temperature_c"]) for sample in successes if "temperature_c" in sample]
-    tps = [float(sample["tps"]) for sample in successes if "tps" in sample and float(sample["tps"]) > 0]
+    # Missing or invalid measurements may not silently disable RSS growth or
+    # throughput retention checks. All successful probes must report usable
+    # latency, RSS, and positive TPS; temperature is required when gated.
+    def usable(sample: Mapping[str, Any], key: str, *, positive: bool = False) -> bool:
+        value = sample.get(key)
+        return type(value) in (int, float) and math.isfinite(value) and (
+            value > 0 if positive else value >= 0
+        )
+
+    latencies = [
+        float(s["latency_seconds"]) for s in successes if usable(s, "latency_seconds")
+    ]
+    rss = [float(s["rss_bytes"]) for s in successes if usable(s, "rss_bytes", positive=True)]
+    tps = [float(s["tps"]) for s in successes if usable(s, "tps", positive=True)]
+    temperatures = [
+        float(s["temperature_c"]) for s in successes if usable(s, "temperature_c")
+    ]
     p95 = _percentile(latencies, 0.95)
     rss_growth = max(0.0, rss[-1] - rss[0]) if len(rss) >= 2 else 0.0
     baseline_tps = _median_window(tps, first=True)
     terminal_tps = _median_window(tps, first=False)
     terminal_ratio = terminal_tps / baseline_tps if baseline_tps and terminal_tps is not None else None
     failures: List[str] = []
+    for key in ("latency_seconds", "rss_bytes", "tps"):
+        positive = key in {"rss_bytes", "tps"}
+        if any(not usable(s, key, positive=positive) for s in successes):
+            failures.append(f"invalid_{key}")
+    if any(
+        "temperature_c" in s and not usable(s, "temperature_c")
+        for s in successes
+    ) or (
+        policy.get("max_temperature_c") is not None
+        and any(not usable(s, "temperature_c") for s in successes)
+    ):
+        failures.append("invalid_temperature_c")
+    if len(rss) < 2:
+        failures.append("insufficient_rss_samples")
+    if len(tps) < 2:
+        failures.append("insufficient_tps_samples")
     if len(samples) < int(policy["minimum_samples"]):
         failures.append("insufficient_samples")
     if success_rate < float(policy["minimum_success_rate"]):
@@ -486,6 +544,7 @@ def _state_payload(run_id: str, plan: Mapping[str, Any]) -> Dict[str, Any]:
         "stage": "validated",
         "success": False,
         "candidate_started": False,
+        "candidate_start_attempted": False,
         "rollback_attempted": False,
         "rollback_succeeded": False,
         "commands": [],
@@ -507,10 +566,10 @@ def _artifact_entries(root: Path) -> List[Dict[str, Any]]:
         "runtime-canary-attestation.json",
     }
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name in excluded:
-            continue
         if path.is_symlink():
             raise ValueError(f"run artifact may not be a symlink: {path}")
+        if not path.is_file() or path.name in excluded:
+            continue
         relative = path.relative_to(root).as_posix()
         entries.append(
             {
@@ -541,6 +600,133 @@ def build_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     }
     _operator.write_json(root / "runtime-canary-manifest.json", manifest)
     return manifest
+
+
+def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Mapping[str, Any]) -> None:
+    """Require complete, internally consistent evidence before trusting success.
+
+    The manifest is not an independent trust root. Cryptographic signer policy
+    and off-host anti-rollback protection remain separate required approvals.
+    """
+    if state.get("stage") != "complete" or state.get("failure") is not None:
+        raise ValueError("successful canary evidence is not at the complete stage")
+    if any(state.get(key) is not True for key in (
+        "success", "candidate_start_attempted", "candidate_started",
+        "rollback_attempted", "rollback_succeeded",
+    )):
+        raise ValueError("successful canary evidence is missing lifecycle confirmations")
+    if state.get("recovery_failures") or state.get("admission") != {"admitted": False}:
+        raise ValueError("successful canary evidence contains recovery failures or admission")
+    if manifest.get("admission") != {"admitted": False}:
+        raise ValueError("canary manifest may not claim admission")
+
+    plan = _mapping(json.loads(_regular_file(root / "plan.normalized.json", "normalized plan").read_text(encoding="utf-8")), "normalized plan")
+    fingerprint = plan.get("plan_fingerprint")
+    if fingerprint != _operator.canonical_hash({key: value for key, value in plan.items() if key != "plan_fingerprint"}):
+        raise ValueError("normalized plan fingerprint mismatch")
+    for key in ("canary_id", "loadout_fingerprint", "plan_fingerprint"):
+        if plan.get(key) != state.get(key) or plan.get(key) != manifest.get(key):
+            raise ValueError(f"successful canary evidence {key} mismatch")
+    soak_policy = _mapping(plan.get("soak"), "normalized soak policy")
+
+    expected_stages = (
+        "snapshot", "start_candidate", "candidate_health", "qualification",
+        "stop_candidate", "rollback", "rollback_health",
+    )
+    history = state.get("commands")
+    if not isinstance(history, list) or [item.get("name") if isinstance(item, Mapping) else None for item in history] != list(expected_stages):
+        raise ValueError("successful canary evidence has missing or out-of-order commands")
+    normalized_commands = _mapping(plan.get("commands"), "normalized lifecycle commands")
+    for name, result in zip(expected_stages, history):
+        if result.get("returncode") != 0 or result.get("timed_out") is not False:
+            raise ValueError(f"successful canary evidence includes failed command: {name}")
+        approved = _mapping(normalized_commands.get(name), f"normalized command {name}")
+        # Recorded success and log hashes alone do not establish the approved invocation.
+        for field, expected_type in (
+            ("argv", list),
+            ("executable_resolved", str),
+            ("executable_sha256", str),
+            ("timeout_seconds", float),
+        ):
+            pinned = approved.get(field)
+            recorded = result.get(field)
+            if (
+                type(pinned) is not expected_type
+                or type(recorded) is not expected_type
+                or pinned != recorded
+            ):
+                raise ValueError(f"successful canary command {name} {field} does not match normalized plan")
+        for stream in ("stdout", "stderr"):
+            expected_log = f"{name}.{stream}.log"
+            if result.get(stream) != expected_log:
+                raise ValueError(f"successful canary evidence has missing {stream} log: {name}")
+            actual_hash = _operator.file_sha256(_regular_file(root / "logs" / expected_log, "canary log"))
+            if result.get(f"{stream}_sha256") != actual_hash:
+                raise ValueError(f"successful canary evidence {stream} hash mismatch: {name}")
+
+    soak = _mapping(state.get("soak"), "canary soak result")
+    samples_path = _regular_file(root / "soak-samples.jsonl", "raw soak samples")
+    if samples_path.stat().st_size > 32 * 1024 * 1024:
+        raise ValueError("canary soak sample evidence exceeds size limit")
+    if soak.get("samples_sha256") != _operator.file_sha256(samples_path):
+        raise ValueError("canary soak sample SHA-256 mismatch")
+    samples: List[Dict[str, Any]] = []
+    try:
+        with samples_path.open(encoding="utf-8") as source:
+            for line in source:
+                if len(samples) >= 100000:
+                    raise ValueError("canary soak contains too many samples")
+                sample = _mapping(json.loads(line), "canary soak sample")
+                # Success claims must agree with the actual probe execution
+                # receipt; a rehashed summary must not conceal failed probes.
+                required = (
+                    "ok", "returncode", "timed_out", "parse_error",
+                    "duration_seconds", "captured_at_utc",
+                )
+                if any(key not in sample for key in required):
+                    raise ValueError("canary soak sample is missing execution status")
+                if (
+                    type(sample["ok"]) is not bool
+                    or type(sample["returncode"]) is not int
+                    or type(sample["timed_out"]) is not bool
+                    or not (
+                        sample["parse_error"] is None
+                        or isinstance(sample["parse_error"], str)
+                    )
+                ):
+                    raise ValueError("canary soak sample has invalid execution status")
+                duration = sample["duration_seconds"]
+                if (
+                    type(duration) not in (int, float)
+                    or not math.isfinite(duration)
+                    or duration < 0
+                ):
+                    raise ValueError("canary soak sample has invalid duration")
+                timestamp = sample["captured_at_utc"]
+                if not isinstance(timestamp, str):
+                    raise ValueError("canary soak sample has invalid timestamp")
+                try:
+                    captured = dt.datetime.fromisoformat(timestamp)
+                except ValueError as exc:
+                    raise ValueError("canary soak sample has invalid timestamp") from exc
+                if captured.tzinfo is None or captured.utcoffset() != dt.timedelta(0):
+                    raise ValueError("canary soak sample timestamp must be UTC")
+                if sample["ok"] and (
+                    sample["returncode"] != 0
+                    or sample["timed_out"]
+                    or sample["parse_error"] is not None
+                ):
+                    raise ValueError("canary soak sample success contradicts execution")
+                samples.append(sample)
+        recomputed = summarize_soak(samples, soak_policy)
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise ValueError("invalid raw canary soak samples") from exc
+    if soak.get("passed") is not True or not recomputed["passed"]:
+        raise ValueError("successful canary soak is not qualified")
+    if any(soak.get(key) != value for key, value in recomputed.items()):
+        raise ValueError("canary soak result is inconsistent with raw samples")
+    if _number(soak.get("duration_seconds"), "soak duration") < _number(soak_policy.get("duration_seconds"), "required soak duration"):
+        raise ValueError("successful canary soak duration is insufficient")
 
 
 def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str, Any]:
@@ -574,6 +760,14 @@ def verify_manifest(run_dir: Path, *, require_success: bool = False) -> Dict[str
         raise ValueError("runtime canary success does not match manifest")
     if bool(state.get("rollback_succeeded")) != bool(manifest.get("rollback_succeeded")):
         raise ValueError("runtime canary rollback status does not match manifest")
+    if state.get("recovery_failures") and state.get("rollback_succeeded") is True:
+        raise ValueError("runtime canary cannot claim successful rollback with recovery failures")
+    # A recomputed, locally writable manifest hash must not allow an attacker to
+    # silently omit a run artifact or add undisclosed evidence after sealing.
+    if manifest.get("artifacts") != _artifact_entries(root):
+        raise ValueError("runtime canary manifest artifact inventory is incomplete or changed")
+    if manifest.get("success") is True:
+        _verify_success_evidence(root, state, manifest)
     if require_success and (manifest.get("success") is not True or manifest.get("rollback_succeeded") is not True):
         raise ValueError("runtime canary did not complete successfully with verified rollback")
     return {
@@ -599,7 +793,7 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         raise ValueError(f"runtime canary run already exists: {run_dir}")
     lock: Optional[Path] = None
     state = _state_payload(run_id, plan)
-    candidate_started = False
+    candidate_start_attempted = False
     env = _environment(plan["environment_names"])
     try:
         lock = acquire_lock(workspace, run_id, recover_stale_lock)
@@ -613,11 +807,15 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
 
         for name in ("snapshot", "start_candidate", "candidate_health", "qualification"):
             state["stage"] = name
+            if name == "start_candidate":
+                # A failing start wrapper may have already spawned the model.
+                # Arm cleanup BEFORE launching it, not only on exit zero.
+                candidate_start_attempted = True
+                state["candidate_start_attempted"] = True
             _write_state(state_path, state)
             result = run_command(name, plan["commands"][name], cwd=cwd, env=env, logs=logs)
             state["commands"].append(result)
             if name == "start_candidate":
-                candidate_started = True
                 state["candidate_started"] = True
             _write_state(state_path, state)
 
@@ -646,14 +844,19 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         state["stage"] = "complete"
     except BaseException as exc:
         state["failure"] = {"type": type(exc).__name__, "message": str(exc), "stage": state.get("stage")}
-        if candidate_started:
+        if candidate_start_attempted:
+            # Discard any prior success flag when entering a fresh recovery.
+            # Only the complete recovery sequence may re-establish it.
+            state["rollback_succeeded"] = False
             for name in ("stop_candidate", "rollback", "rollback_health"):
                 if name == "rollback":
                     state["rollback_attempted"] = True
                 try:
                     result = run_command(f"recovery-{name}", plan["commands"][name], cwd=Path(plan["working_directory"]), env=env, logs=run_dir / "logs")
                     state["commands"].append(result)
-                    if name == "rollback_health":
+                    if name == "rollback_health" and not state.get("recovery_failures"):
+                        # A green health probe cannot establish rollback if any
+                        # required recovery command failed or timed out.
                         state["rollback_succeeded"] = True
                 except BaseException as recovery_exc:
                     state.setdefault("recovery_failures", []).append(
