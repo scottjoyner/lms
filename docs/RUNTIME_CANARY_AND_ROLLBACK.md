@@ -239,3 +239,14 @@ flags, and parsed-status fields. A raw sample claiming \`ok=true\` while
 reporting a nonzero exit code, timeout, or parser error is rejected even
 when all unsigned local hashes have been recomputed. These are structural
 checks, not independently witnessed runtime execution.
+
+## Lock lifetime under evidence I/O failures
+
+Lock owner-record publication and final run evidence sealing are both
+fallible. The controller releases its own workspace lock if owner metadata
+cannot be written, and uses nested finalization to release the lock even
+when the final state write or manifest seal raises. These tests inject
+synthetic I/O errors without executing models. This protects availability
+after the process exits; it is **not** crash-proof cross-host fencing, an
+independent lease authority, or a substitute for operator-controlled
+recovery and external anti-rollback checks.

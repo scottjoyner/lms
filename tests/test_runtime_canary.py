@@ -606,3 +606,45 @@ def test_rehashed_success_soak_rejects_contradictory_probe_receipt(tmp_path, fie
     _reseal_structural_manifest_for_negative_test(root)
     with pytest.raises(ValueError, match="soak sample"):
         canary.verify_manifest(root, require_success=True)
+@pytest.mark.parametrize("failing_step", ["state_write", "manifest_write"])
+def test_artifact_seal_failure_releases_runtime_canary_lock(tmp_path, monkeypatch, failing_step):
+    plan, events = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    if failing_step == "state_write":
+        original = canary._write_state
+
+        def failing_state(path, state):
+            if state.get("completed_at_utc") is not None:
+                raise OSError("injected final state write failure")
+            return original(path, state)
+
+        monkeypatch.setattr(canary, "_write_state", failing_state)
+    else:
+        def failing_manifest(_root, _state):
+            raise OSError("injected manifest seal failure")
+
+        monkeypatch.setattr(canary, "build_manifest", failing_manifest)
+
+    with pytest.raises(OSError, match="injected"):
+        canary.execute(plan, workspace, "seal-io-failure", False)
+    assert events.read_text().splitlines()[-3:] == [
+        "stop", "rollback", "rollback-health",
+    ]
+    assert not (workspace / ".runtime-canary.lock").exists()
+
+
+def test_lock_owner_write_failure_removes_unowned_lock(tmp_path, monkeypatch):
+    plan, _events = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    original = canary._operator.write_json
+
+    def failing_owner(path, content):
+        if Path(path).name == "owner.json":
+            raise OSError("injected lock owner write failure")
+        return original(path, content)
+
+    monkeypatch.setattr(canary._operator, "write_json", failing_owner)
+    with pytest.raises(RuntimeError, match="injected lock owner"):
+        canary.execute(plan, workspace, "lock-owner-io-failure", False)
+    assert not (workspace / ".runtime-canary.lock").exists()
+    assert not (workspace / "lock-owner-io-failure").exists()

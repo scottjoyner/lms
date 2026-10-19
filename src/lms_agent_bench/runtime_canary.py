@@ -219,17 +219,23 @@ def acquire_lock(workspace: Path, run_id: str, recover_stale: bool) -> Path:
         archived = workspace / f".runtime-canary.lock.stale.{int(time.time())}.{os.getpid()}"
         os.replace(lock_dir, archived)
         lock_dir.mkdir()
-    _operator.write_json(
-        lock_dir / "owner.json",
-        {
-            "schema_version": "runtime_canary_lock.v1",
-            "run_id": run_id,
-            "hostname": socket.gethostname(),
-            "pid": os.getpid(),
-            "boot_id": _boot_id(),
-            "started_at_utc": utc_now(),
-        },
-    )
+    try:
+        _operator.write_json(
+            lock_dir / "owner.json",
+            {
+                "schema_version": "runtime_canary_lock.v1",
+                "run_id": run_id,
+                "hostname": socket.gethostname(),
+                "pid": os.getpid(),
+                "boot_id": _boot_id(),
+                "started_at_utc": utc_now(),
+            },
+        )
+    except BaseException:
+        # The directory is already ours, but execute() has not yet received
+        # its path. Do not orphan an ownerless lock on an interrupted write.
+        release_lock(lock_dir)
+        raise
     return lock_dir
 
 
@@ -864,11 +870,15 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
                     )
         state["stage"] = "failed" if state.get("rollback_succeeded") else "rollback_failed"
     finally:
-        if run_dir.exists():
-            state["completed_at_utc"] = utc_now()
-            _write_state(run_dir / "runtime-canary-state.json", state)
-            build_manifest(run_dir, state)
-        release_lock(lock)
+        try:
+            if run_dir.exists():
+                state["completed_at_utc"] = utc_now()
+                _write_state(run_dir / "runtime-canary-state.json", state)
+                build_manifest(run_dir, state)
+        finally:
+            # Sealing itself can fail (disk full, read-only FS, I/O error).
+            # Never strand this run's lock during evidence finalization.
+            release_lock(lock)
     if not state["success"]:
         failure = state.get("failure") or {}
         raise RuntimeError(
