@@ -58,3 +58,15 @@ Zero independently admitted human reviews, no third-party adjudication,
 no 40 approved source-distinct articles, and no independently controlled
 witness/replay authority. PR #37 and this stacked PR must remain draft.
 Do not merge or deploy. **NO_GO_RESEARCH_ONLY**.
+
+## Public manifest hash/read atomicity correction (October 19)
+
+A synthetic swap between the two historical `filehash(MANIFEST)` and
+`MANIFEST.read_text()` operations showed that the roster could receive a
+substitute `packet_sha256` despite a successful check of *other* manifest
+bytes. The draft now calls `_read_pinned_public_manifest()`, which checks
+exact pinned SHA-256 and strict JSON against the same bounded, stable fd
+buffer before private roster lookup. Added no-follow ancestry, final inode
+recheck and synthetic mismatch/duplicate/mutation tests. Review
+`EXP053-PINNED-PUBLIC-MANIFEST-ATOMIC-READ-SPEC-2026-10-19.md`, finding,
+and `tests/test_exp053_public_manifest_atomic.py`. No science approval.

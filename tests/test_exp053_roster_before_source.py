@@ -59,7 +59,7 @@ class ReviewRosterBeforeLicensedSource(unittest.TestCase):
              patch.object(review, "filehash", side_effect=hash_callback):
             with self.assertRaisesRegex(ValueError, "HOLD EXP053 ROSTER"):
                 review.verified_admission(self.private_dir, self.keys)
-        self.assertEqual(calls, [review.MANIFEST])
+        self.assertEqual(calls, [])  # Manifest now hashes its own FD buffer.
         self.assertFalse(self.private_dir.exists())
 
     def test_owner_pin_shape_without_private_roster_does_not_read_source(self):
@@ -97,23 +97,17 @@ class ReviewRosterBeforeLicensedSource(unittest.TestCase):
              patch.object(review, "filehash", side_effect=mismatch):
             with self.assertRaisesRegex(ValueError, "^HOLD EXP053: source authority changed"):
                 review.verified_admission(self.private_dir, self.keys)
-        self.assertEqual(observed, [review.MANIFEST, self.source])
+        self.assertEqual(observed, [self.source])
         self.assertFalse(self.private_dir.exists())
 
     def test_pinned_public_manifest_failure_denied_before_any_roster_or_source(self):
-        real_hash = review.filehash
-        observed = []
-        def damaged_manifest(path):
-            observed.append(Path(path))
-            if Path(path) == review.MANIFEST:
-                return "0" * 64
-            return real_hash(path)
         with patch.object(review, "APPROVED_REVIEWER_ROSTER_SHA256", "a" * 64), \
              patch.object(review, "SOURCE", self.source), \
-             patch.object(review, "filehash", side_effect=damaged_manifest):
+             patch.object(review, "MANIFEST_SHA", "0" * 64), \
+             patch.object(review, "filehash", side_effect=AssertionError(
+                 "source may not be hashed when public pin mismatches")):
             with self.assertRaisesRegex(ValueError, "^HOLD EXP053: immutable public manifest"):
                 review.verified_admission(self.private_dir, self.keys)
-        self.assertEqual(observed, [review.MANIFEST])
 
 
 if __name__ == "__main__":

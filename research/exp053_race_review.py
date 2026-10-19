@@ -34,6 +34,7 @@ def filehash(p):
 def deny(msg):raise ValueError("HOLD EXP053: "+msg)
 
 PRIVATE_JSON_LIMIT = 8_000_000
+PUBLIC_MANIFEST_LIMIT = 1_000_000
 
 
 def _unique_private_fields(pairs):
@@ -115,6 +116,67 @@ def _read_private_admission_json(path):
     if not isinstance(result, dict):
         deny("private admission JSON must be an object")
     return result
+
+
+def _read_pinned_public_manifest():
+    """Hash and parse precisely the SAME anchored public manifest bytes.
+
+    This public file has no RACE passage, human response, or private key.
+    Only its exact preregistered bytes may bind the private roster packet.
+    """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not all(getattr(os, flag, 0) for flag in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("immutable public manifest cannot be opened safely")
+    if (not isinstance(MANIFEST_SHA, str) or len(MANIFEST_SHA) != 64 or
+            any(c not in "0123456789abcdef" for c in MANIFEST_SHA)):
+        deny("immutable public manifest has invalid pinned digest")
+    absolute = Path(os.path.abspath(os.fspath(MANIFEST)))
+    try:
+        intended = absolute.resolve(strict=True)
+        fd = _open_no_symlink_ancestors(absolute)
+        try:
+            before = os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
+                    not 1 <= before.st_size <= PUBLIC_MANIFEST_LIMIT):
+                deny("immutable public manifest is not a bounded single-link file")
+            payload = bytearray()
+            while len(payload) < PUBLIC_MANIFEST_LIMIT + 1:
+                part = os.read(fd, min(65536, PUBLIC_MANIFEST_LIMIT + 1 - len(payload)))
+                if not part:
+                    break
+                payload.extend(part)
+            after = os.fstat(fd)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if len(payload) != before.st_size or identity(before) != identity(after):
+                deny("immutable public manifest changed while reading")
+            if hashlib.sha256(payload).hexdigest() != MANIFEST_SHA:
+                deny("immutable public manifest is absent or modified")
+            if absolute.resolve(strict=True) != intended:
+                deny("immutable public manifest pathname changed while reading")
+            final_fd = _open_no_symlink_ancestors(absolute)
+            try:
+                last = os.fstat(final_fd)
+                if (last.st_dev, last.st_ino) != (before.st_dev, before.st_ino):
+                    deny("immutable public manifest inode changed while reading")
+            finally:
+                os.close(final_fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        deny("immutable public manifest unavailable or unsafe")
+    try:
+        manifest = json.loads(payload.decode("utf-8"),
+                              object_pairs_hook=_unique_private_fields,
+                              parse_constant=_invalid_private_constant,
+                              parse_float=_finite_private_float)
+    except (ValueError, UnicodeError, RecursionError, OverflowError):
+        deny("immutable public manifest cannot be parsed safely")
+    if not isinstance(manifest, dict):
+        deny("immutable public manifest must be a JSON object")
+    return manifest
 
 
 def corpus():
@@ -309,12 +371,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     # The source-free public manifest is itself pinned by the preregistered
     # SHA. Its packet digest is the trust anchor for checking the separately
     # owner-pinned private A/B roster BEFORE reading licensed source bytes.
-    if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:
-        deny("immutable public manifest is absent or modified")
-    try:
-        manifest=json.loads(MANIFEST.read_text())
-    except (ValueError, UnicodeError, OSError, RecursionError):
-        deny("immutable public manifest cannot be parsed safely")
+    manifest=_read_pinned_public_manifest()
     packet_pin=manifest.get("packet_sha256") if isinstance(manifest,dict) else None
     if (not isinstance(packet_pin,str) or len(packet_pin)!=64 or
             any(c not in "0123456789abcdef" for c in packet_pin)):

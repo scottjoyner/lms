@@ -66,7 +66,7 @@ class UnapprovedRosterCannotReadSource(unittest.TestCase):
              patch.object(review, "filehash", side_effect=protected_hash):
             with self.assertRaisesRegex(ValueError, "HOLD EXP053 ROSTER"):
                 review.verified_admission(self.private, self.roster)
-        self.assertEqual(seen, [review.MANIFEST])
+        self.assertEqual(seen, [])  # Public manifest uses anchored bytes, not filehash.
         self.assertFalse(self.result.exists())
 
     def test_live_unapproved_pin_remains_empty_without_opening_live_corpus(self):
