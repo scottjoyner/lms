@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 import os
 import stat
 from pathlib import Path
@@ -31,6 +32,91 @@ def filehash(p):
         for b in iter(lambda:f.read(1<<20),b""):h.update(b)
     return h.hexdigest()
 def deny(msg):raise ValueError("HOLD EXP053: "+msg)
+
+PRIVATE_JSON_LIMIT = 8_000_000
+
+
+def _unique_private_fields(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            deny("ambiguous duplicate field in private admission JSON")
+        value[key] = item
+    return value
+
+
+def _invalid_private_constant(_value):
+    deny("invalid numeric constant in private admission JSON")
+
+
+def _finite_private_float(value):
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        deny("non-finite number in private admission JSON")
+    return parsed
+
+
+def _read_private_admission_json(path):
+    """Read stable, source-protected owner-private JSON without symlink walks.
+
+    No actual human record or RACE source is accessed by unit tests. The
+    independently pinned roster must already pass before admission uses this.
+    """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not all(getattr(os, name, 0) for name in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("secure private admission file access unavailable")
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    try:
+        root = Path(__file__).resolve().parents[1]
+        intended = absolute.resolve(strict=True)
+        if intended.is_relative_to(root):
+            deny("private admission input inside public source checkout")
+        fd = _open_no_symlink_ancestors(absolute)
+        try:
+            before = os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid() or
+                    before.st_nlink != 1 or before.st_mode & 0o077 or
+                    not 1 <= before.st_size <= PRIVATE_JSON_LIMIT):
+                deny("private admission input is not an owner-private bounded file")
+            data = bytearray()
+            while len(data) < PRIVATE_JSON_LIMIT + 1:
+                part = os.read(fd, min(65536, PRIVATE_JSON_LIMIT + 1 - len(data)))
+                if not part:
+                    break
+                data.extend(part)
+            after = os.fstat(fd)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if len(data) != before.st_size or identity(after) != identity(before):
+                deny("private admission input changed during descriptor read")
+            if (absolute.resolve(strict=True) != intended or
+                    intended.is_relative_to(root)):
+                deny("private admission pathname changed during read")
+            final_fd = _open_no_symlink_ancestors(absolute)
+            try:
+                last = os.fstat(final_fd)
+                if (last.st_dev, last.st_ino) != (before.st_dev, before.st_ino):
+                    deny("private admission inode changed during read")
+            finally:
+                os.close(final_fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        deny("private admission file unavailable or unsafe")
+    try:
+        result = json.loads(data.decode("utf-8"),
+                            object_pairs_hook=_unique_private_fields,
+                            parse_constant=_invalid_private_constant,
+                            parse_float=_finite_private_float)
+    except (ValueError, UnicodeError, RecursionError, OverflowError):
+        deny("private admission JSON malformed or ambiguous")
+    if not isinstance(result, dict):
+        deny("private admission JSON must be an object")
+    return result
+
+
 def corpus():
     if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority mismatch")
     if filehash(PROTOCOL)!=PROTOCOL_SHA:deny("preregistered protocol drift")
@@ -350,8 +436,8 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     # existing SOURCE/protocol/private packet/sealed-answer checks to start.
     if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
     if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
-    packet=json.loads((private_dir/"packet.json").read_text())
-    seal=json.loads((private_dir/"sealed_exam_key.json").read_text())
+    packet=_read_private_admission_json(private_dir/"packet.json")
+    seal=_read_private_admission_json(private_dir/"sealed_exam_key.json")
     if packet.get("source_sha256")!=SOURCE_SHA or packet.get("protocol_sha256")!=PROTOCOL_SHA:
         deny("packet custody mismatch")
     if digest(packet)!=manifest["packet_sha256"]:deny("packet differs from manifest")
@@ -361,7 +447,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     trust=roster["keys"]
     observations=[];signer_ids=[]
     for slot in ("A","B"):
-        review=json.loads((private_dir/("reviewer_"+slot+".json")).read_text())
+        review=_read_private_admission_json(private_dir/("reviewer_"+slot+".json"))
         rid=require_owner_assigned_signer(review,trust,roster["slots"],slot)
         signer_ids.append(rid)
         observations.append(decisions_for(review,packet))
@@ -382,7 +468,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
             deny(str(len(unresolved))+" disputed items require independent third review")
         if "ADJ" not in roster["slots"]:
             deny("third independent adjudicator has not been owner-enrolled")
-        third=json.loads(adjudicator_file.read_text())
+        third=_read_private_admission_json(adjudicator_file)
         third_id=require_owner_assigned_signer(third,trust,roster["slots"],"ADJ")
         if third_id in signer_ids:
             deny("adjudicator must be independent of both reviewers")

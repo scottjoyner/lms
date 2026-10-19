@@ -214,3 +214,16 @@ prime-order points before importing the crypto backend and requires one
 lowercase-hex receipt encoding. See EXP053-TRUST-REGISTRY-CANONICAL-SPEC
 -2026-10-19.md, its finding and synthetic tests. No independent review or
 scientific execution was approved. NO_GO_RESEARCH_ONLY.
+
+## Protected scientific admission JSON reader (October 19)
+
+The private blinded packet, sealed answer-key and A/B/adjudicator records
+were previously read through unbounded `Path.read_text()` + ambiguous
+`json.loads()`. A synthetic symlink and duplicate-key fixture reproduced
+the risk. The unified local branch now checks private source path ancestry,
+owner, link count, mode, bounded size, stable file inode and unique JSON
+fields before examining any private packet or human receipt. These tests
+contain no licensed source data. See
+`EXP053-PRIVATE-ADMISSION-JSON-BOUNDARY-SPEC-2026-10-19.md`, its finding and
+`tests/test_exp053_private_admission_json.py`. Independent human custody and
+model authorization remain NO_GO_RESEARCH_ONLY.
