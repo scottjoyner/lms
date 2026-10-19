@@ -607,9 +607,26 @@ def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Map
     history = state.get("commands")
     if not isinstance(history, list) or [item.get("name") if isinstance(item, Mapping) else None for item in history] != list(expected_stages):
         raise ValueError("successful canary evidence has missing or out-of-order commands")
+    normalized_commands = _mapping(plan.get("commands"), "normalized lifecycle commands")
     for name, result in zip(expected_stages, history):
         if result.get("returncode") != 0 or result.get("timed_out") is not False:
             raise ValueError(f"successful canary evidence includes failed command: {name}")
+        approved = _mapping(normalized_commands.get(name), f"normalized command {name}")
+        # Recorded success and log hashes alone do not establish the approved invocation.
+        for field, expected_type in (
+            ("argv", list),
+            ("executable_resolved", str),
+            ("executable_sha256", str),
+            ("timeout_seconds", float),
+        ):
+            pinned = approved.get(field)
+            recorded = result.get(field)
+            if (
+                type(pinned) is not expected_type
+                or type(recorded) is not expected_type
+                or pinned != recorded
+            ):
+                raise ValueError(f"successful canary command {name} {field} does not match normalized plan")
         for stream in ("stdout", "stderr"):
             expected_log = f"{name}.{stream}.log"
             if result.get(stream) != expected_log:

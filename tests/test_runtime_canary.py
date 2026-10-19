@@ -475,3 +475,41 @@ def test_rehashed_soak_samples_contradict_success_summary_rejected(tmp_path):
     _reseal_structural_manifest_for_negative_test(root)
     with pytest.raises(ValueError, match="soak|sample|inconsistent"):
         canary.verify_manifest(root, require_success=True)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "argv",
+        "argv_missing",
+        "executable_resolved",
+        "executable_sha256",
+        "timeout_seconds",
+        "timeout_seconds_type",
+    ],
+)
+def test_rehashed_success_command_must_match_authorized_plan(tmp_path, field):
+    # Recalculate local UNSIGNED manifest hashes after altering the receipt.
+    plan, _ = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "forged-command", False)
+    root = workspace / "forged-command"
+    state_path = root / "runtime-canary-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    record = state["commands"][1]
+    if field == "argv":
+        record["argv"] = [*record["argv"], "--unapproved"]
+    elif field == "argv_missing":
+        del record["argv"]
+    elif field == "executable_resolved":
+        record["executable_resolved"] += "-unapproved"
+    elif field == "executable_sha256":
+        record["executable_sha256"] = "sha256:" + "0" * 64
+    elif field == "timeout_seconds":
+        record["timeout_seconds"] += 2.0
+    elif field == "timeout_seconds_type":
+        record["timeout_seconds"] = True
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    _reseal_structural_manifest_for_negative_test(root)
+    with pytest.raises(ValueError, match="does not match normalized plan"):
+        canary.verify_manifest(root, require_success=True)

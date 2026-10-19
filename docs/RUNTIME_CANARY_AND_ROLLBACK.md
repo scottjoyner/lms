@@ -207,3 +207,14 @@ self-hash. A **locally recomputable SHA-256 fingerprint is not a signature**:
 reviewed operator signing keys, independent allowed-signers custody, and an
 off-host rollback-resistant witness remain required for scientific or physical
 approval. Existing failed runs remain readable as failed evidence.
+
+## Approved-command receipt binding
+
+A successful canary manifest verifies that each recorded lifecycle invocation
+matches the normalized, plan-fingerprint-bound command specification. It
+compares the exact argument vector, resolved executable, executable SHA-256,
+and timeout value/type for each lifecycle command. Locally recalculated
+unsigned manifest hashes cannot conceal a different recorded invocation.
+This is structural cross-checking, **not cryptographic proof of what executed**.
+Independently controlled signing, allowed-signers custody, anti-rollback
+witnesses, and signed physical recovery are still required.
