@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -111,3 +112,37 @@ def test_require_success_rejects_failed_run(tmp_path):
     key, _allowed = make_key(tmp_path)
     with pytest.raises(ValueError, match="did not complete successfully"):
         attestation.sign_run(root, key, require_success=True)
+def test_verified_fleet_signer_fingerprint_cannot_be_rewritten_to_other_allowed_key(tmp_path):
+    root = make_run(tmp_path)
+    primary, allowed = make_key(tmp_path)
+    other = tmp_path / "another-operator-key"
+    generated = subprocess.run(
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(other)],
+        capture_output=True,
+        check=False,
+    )
+    assert generated.returncode == 0, generated.stderr.decode(errors="replace")
+    other.chmod(0o600)
+    # Both keys are authorized for the same identity; a valid signature by
+    # primary must never be attributed to 'other' via an unsigned JSON edit.
+    with allowed.open("a", encoding="utf-8") as stream:
+        stream.write("operator " + other.with_suffix(".pub").read_text(encoding="utf-8"))
+    attestation.sign_run(root, primary, require_success=True)
+    expected = attestation._key_fingerprint(primary)
+    unrelated = attestation._key_fingerprint(other)
+    assert expected != unrelated
+    genuine = attestation.verify_attestation(root, allowed, "operator", require_success=True)
+    assert genuine["signing_key_fingerprint"] == expected
+
+    evidence_path = root / "operator-attestation.json"
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["signing_key_fingerprint"] = unrelated
+    core = {
+        key: value for key, value in evidence.items()
+        if key not in {"created_at_utc", "attestation_fingerprint"}
+    }
+    evidence["attestation_fingerprint"] = fleet_operator.canonical_hash(core)
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="signing key fingerprint"):
+        attestation.verify_attestation(root, allowed, "operator", require_success=True)
