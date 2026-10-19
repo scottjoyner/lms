@@ -30,6 +30,8 @@ def load_roster(path, packet_sha256, pinned_sha256, repo_root):
     """Validate exact owner-pinned private bytes and A/B/adjudicator slots."""
     if not lower_sha(pinned_sha256):
         deny("the owner has not independently approved any reviewer roster")
+    if not getattr(os, "O_NOFOLLOW", 0) or not getattr(os, "O_NONBLOCK", 0):
+        deny("secure nonfollowing roster file access unavailable")
     path = Path(path)
     # Read through a single non-following file descriptor to prevent a path
     # substitution between the permission check and the fingerprinted bytes.
@@ -37,12 +39,13 @@ def load_roster(path, packet_sha256, pinned_sha256, repo_root):
         resolved = path.resolve(strict=True)
         if resolved.is_relative_to(Path(repo_root).resolve()):
             deny("private reviewer roster must not reside in the public repository")
-        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
+        flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW
         fd = os.open(path, flags)
         try:
             before = os.fstat(fd)
-            if not stat.S_ISREG(before.st_mode) or before.st_mode & 0o077:
-                deny("roster must be a private regular file (mode 0600)")
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid() or
+                    before.st_nlink != 1 or before.st_mode & 0o077):
+                deny("roster must be an owner-private, single-link regular file")
             if not 1 <= before.st_size <= MAX_ROSTER_BYTES:
                 deny("private reviewer roster size outside allowed limit")
             with os.fdopen(fd, "rb", closefd=False) as handle:

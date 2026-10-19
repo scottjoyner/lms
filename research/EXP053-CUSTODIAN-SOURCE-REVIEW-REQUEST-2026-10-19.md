@@ -160,3 +160,12 @@ before probing/hashing the licensed RACE corpus, private packet or sealed
 answers. Confirm that wrong owner/packet pins and unsafe rosters HOLD and that
 real source SHA, human signatures and 40-item thresholds remain mandatory.
 Passing unit tests cannot independently enroll humans or approve model runs.
+
+## Owner roster final-component no-follow and ownership (October 19)
+
+The unified review candidate adds a fail-closed OS capability check and
+owner/link-count guard in `exp053_reviewer_roster.load_roster()`. An external
+technical reviewer should inspect the synthetic tests in
+`tests/test_exp053_roster_nofollow_failclosed.py` and verify that no OS fallback
+can silently follow a substituted private roster symlink. An exact valid
+roster SHA alone still cannot establish a human signer's independence.

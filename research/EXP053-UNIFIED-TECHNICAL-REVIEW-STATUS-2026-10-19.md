@@ -147,3 +147,15 @@ mismatched or unsafe synthetic rosters refuse before any source access; a
 valid synthetic roster still cannot bypass the source hash. See
 `EXP053-ROSTER-BEFORE-SOURCE-CUSTODY-SPEC-2026-10-19.md` and
 `EXP053-ROSTER-BEFORE-SOURCE-CUSTODY-FINDING-2026-10-19.md`.
+
+## Reviewer roster reader refuses missing non-following kernel flags (October 19)
+
+The private human owner-roster loader previously permitted opening an owner-
+pinned roster without `O_NOFOLLOW` when that OS feature was unavailable.
+The source-only fix now requires `O_NOFOLLOW|O_NONBLOCK` and checks matching
+owner uid and single-link identity before reading. Synthetic tests cover
+missing flags, symlinks, hardlinks, owner mismatch, invalid pins and public-
+repository placement. The actual owner approval pin is still EMPTY; this
+is NOT independent human enrollment. See
+`EXP053-ROSTER-NOFOLLOW-FAILCLOSED-SPEC-2026-10-19.md` and
+`EXP053-ROSTER-NOFOLLOW-FAILCLOSED-FINDING-2026-10-19.md`.
