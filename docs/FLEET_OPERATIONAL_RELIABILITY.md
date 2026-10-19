@@ -524,3 +524,16 @@ a success manifest. Standalone artifacts that have no rollout context may
 still emit manifests; they are not evidence of a physical fleet rollout.
 This prevents a local state-label bypass but does not grant authority to
 declare a genuine physical run successful or replace independent custody.
+
+### Persisted operator-state binding for signed manifests
+
+When \`operator-state.json\` is present in a run, the manifest must include
+it as a control-file entry. The verifier now captures that state from the
+**same descriptor** used for its size and SHA-256 validation, with a 1 MiB
+capture bound, and checks schema, run ID, boolean success, and denied
+admission against the signed manifest. It rejects signing a purported
+successful run whose persisted state is failed, or a manifest whose signed
+control-file set omits existing state. This is a **local semantic
+cross-check**, not independent approval or evidence that a model actually
+executed. Standalone manifest verification without operator state remains
+supported, but is not evidence of physical fleet qualification.

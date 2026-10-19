@@ -389,3 +389,38 @@ def test_signed_fleet_archive_inside_run_verifies(tmp_path):
     )
     assert report["valid"] is True
     assert fleet_operator.verify_run_manifest(root, require_success=True)["archive_count"] == 1
+@pytest.mark.parametrize(
+    "attack", ["promote_failed_run", "rewrite_run_id", "omit_state_proof"]
+)
+def test_signed_operator_manifest_must_bind_persisted_run_state(tmp_path, attack):
+    root = make_run(tmp_path, success=(attack != "promote_failed_run"))
+    manifest_path = root / "operator-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if attack == "promote_failed_run":
+        manifest["success"] = True
+    elif attack == "rewrite_run_id":
+        manifest["run_id"] = "other-run"
+    else:
+        manifest["control_files"] = [
+            item for item in manifest["control_files"]
+            if item.get("path") != "operator-state.json"
+        ]
+    core = {
+        k: v for k, v in manifest.items()
+        if k not in {"created_at_utc", "operator_manifest_fingerprint"}
+    }
+    manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    key, _allowed = make_key(tmp_path)
+    with pytest.raises(ValueError, match="operator state|operator-state"):
+        attestation.sign_run(root, key, require_success=True)
+    assert not (root / "operator-manifest.json.sig").exists()
+
+
+def test_correct_persisted_operator_state_remains_signable(tmp_path):
+    root = make_run(tmp_path)
+    key, allowed = make_key(tmp_path)
+    attestation.sign_run(root, key, require_success=True)
+    assert attestation.verify_attestation(
+        root, allowed, "operator", require_success=True
+    )["valid"]
