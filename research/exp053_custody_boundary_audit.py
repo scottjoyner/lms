@@ -69,8 +69,10 @@ def parse(raw):
         manifest = json.loads(raw.decode("utf-8", errors="strict"),
                               object_pairs_hook=_duplicates,
                               parse_constant=_reject_nonfinite)
-    except (UnicodeError, ValueError, TypeError) as exc:
-        raise Hold("malformed or ambiguous UTF-8 JSON") from exc
+    except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
+        # Very deep but still bounded JSON must remain a sanitized NO-GO,
+        # not an unhandled parser exception with an internal traceback.
+        raise Hold("malformed, ambiguous or deeply nested UTF-8 JSON") from exc
     if (type(manifest) is not dict or
             set(manifest) != {"schema", "candidate_alias", "claims"} or
             manifest["schema"] != SCHEMA or

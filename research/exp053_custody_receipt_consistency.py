@@ -51,7 +51,12 @@ def _frozen():
 
 
 def _canonical(value):
-    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    except (RecursionError, ValueError, TypeError, OverflowError) as exc:
+        # Canonicalization is also applied before some callers validate the
+        # exact source-free shape. Untrusted nested JSON must fail closed.
+        raise custody.Hold("unusable or deeply nested canonical JSON") from exc
 
 
 def _read(path):
@@ -73,8 +78,8 @@ def _strict_load(raw):
         return json.loads(raw.decode("utf-8", errors="strict"),
                           object_pairs_hook=custody._duplicates,
                           parse_constant=custody._reject_nonfinite)
-    except (ValueError, TypeError, UnicodeError) as exc:
-        raise custody.Hold("malformed or ambiguous receipt bundle") from exc
+    except (ValueError, TypeError, UnicodeError, RecursionError) as exc:
+        raise custody.Hold("malformed, ambiguous or deeply nested receipt bundle") from exc
 
 
 def _utc(value):
