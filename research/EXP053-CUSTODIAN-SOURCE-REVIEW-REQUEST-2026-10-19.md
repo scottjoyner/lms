@@ -140,3 +140,13 @@ adjudicator case IDs, and denial **before** private signer key access. This
 is a source-only integrity hardening patch, not evidence that a real reviewer
 has been enrolled, agreed or signed. See the frozen specification and
 reproducible finding named `EXP053-SIGNER-INPUT-BOUNDARY-*.md`.
+
+## Reviewer admission early-denial source access (October 19)
+
+Inspect the entry of `verified_admission` and tests in
+`tests/test_exp053_early_roster_pin_no_source.py`. A blank or invalid
+approved reviewer-roster pin must HOLD before any source hash, public
+manifest, private packet, review form or answer-key read. A valid-format
+fake pin does not bypass downstream checks. Synthetic tests and the status
+report do NOT attest independently enrolled humans, 40 approved articles,
+or external witness custody.

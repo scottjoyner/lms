@@ -298,6 +298,13 @@ def decisions_for(review,packet,required_ids=None):
     if set(out)!=expected:deny("unexpected decision scope")
     return out
 def verified_admission(private_dir,keys_path,adjudicator_file=None):
+    # There is no scientific authorization without an independently approved
+    # owner roster. Refuse BEFORE hashing licensed source bytes or opening
+    # private reviewer/answer-key files when the pin is still unset.
+    pin = APPROVED_REVIEWER_ROSTER_SHA256
+    if (not isinstance(pin, str) or len(pin) != 64 or
+            any(c not in "0123456789abcdef" for c in pin)):
+        deny("owner has not approved any independent human reviewer roster")
     if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
     if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
     if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:

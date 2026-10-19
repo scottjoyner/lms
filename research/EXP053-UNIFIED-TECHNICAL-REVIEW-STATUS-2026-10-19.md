@@ -125,3 +125,14 @@ opening a signing key. Synthetic adversarial tests cover the refusal
 boundary and a valid synthetic signature; owner enrollment and model
 admission remain unapproved. See `EXP053-SIGNER-INPUT-BOUNDARY-SPEC-2026-10-19.md`
 and `EXP053-SIGNER-INPUT-BOUNDARY-FINDING-2026-10-19.md`.
+
+## Unapproved reviewer roster refuses before source hashing (October 19)
+
+The offline scientific review gate previously hashed licensed RACE source and
+read private packet/sealed answer-key inputs before detecting the empty human
+owner enrollment pin. The corrected entrypoint refuses blank/malformed owner
+pins first; source/protocol/manifest and owner-pinned roster checks remain
+mandatory if an exact hex pin is configured. Negative tests instrument
+public-safe synthetic paths to prove no sensitive-file access without
+approval. See `EXP053-EARLY-OWNER-PIN-FAIL-CLOSED-SPEC-2026-10-19.md` and
+`EXP053-EARLY-OWNER-PIN-FAIL-CLOSED-FINDING-2026-10-19.md`.
