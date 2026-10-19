@@ -180,3 +180,12 @@ roster was accepted. The candidate uses an `O_PATH` nonfollowing component
 walk plus path/inode stability checks. Inspect the explicit limitations in
 `EXP053-ROSTER-ANCESTOR-RACE-FINDING-2026-10-19.md`; tests do not supply an
 independently approved real reviewer identity or model authorization.
+
+## Reviewer-roster directory descriptor handoff (October 19)
+
+Please inspect `exp053_reviewer_roster._open_no_symlink_ancestors()` and the
+synthetic error/KeyboardInterrupt tests in
+`tests/test_exp053_roster_ancestor_race.py`. The handoff now closes newly
+opened but not-yet-owned directory fds on an old-parent close error and closes
+the leaf on a final parent close failure. Linux close-error ambiguity remains
+a documented limitation; this is not independent scientific approval.

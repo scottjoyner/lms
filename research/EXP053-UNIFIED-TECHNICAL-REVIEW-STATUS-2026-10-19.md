@@ -169,3 +169,13 @@ components are now walked through nonfollowing `O_PATH` directory descriptors,
 and the opened file is rechecked against the original named inode after
 reading. This is a source-only custody-path fix, NOT a real human approval.
 See `EXP053-ROSTER-ANCESTOR-RACE-SPEC-2026-10-19.md` and its finding.
+
+## Directory-fd cleanup after failed parent release (October 19)
+
+Synthetic close-failure injection found that the no-follow roster ancestry
+reader leaked a directory fd when intermediate/final parent release failed.
+It now closes untransferred `next_dir` and unopened-to-caller leaf fds, with
+identity-checked best-effort retry for an ambiguously failed last parent
+close. No real roster or RACE text was read. See the frozen
+`EXP053-ROSTER-DIRFD-CLEANUP-SPEC-2026-10-19.md`,
+`EXP053-ROSTER-DIRFD-CLEANUP-FINDING-2026-10-19.md`, and synthetic tests.

@@ -158,6 +158,89 @@ class RosterAncestorRaceSynthetic(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "HOLD EXP053 ROSTER"):
             self.read()
 
+    def test_failed_intermediate_parent_close_does_not_leak_next_dir(self):
+        real_open = os.open
+        real_close = os.close
+        opened = []
+        failed = False
+
+        def track_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+
+        def fail_first_close(fd):
+            nonlocal failed
+            if not failed:
+                failed = True
+                raise OSError("synthetic interrupted ancestor handoff")
+            return real_close(fd)
+
+        with patch.object(roster.os, "open", side_effect=track_open), patch.object(
+                roster.os, "close", side_effect=fail_first_close):
+            with self.assertRaises(OSError):
+                roster._open_no_symlink_ancestors(self.path)
+        self.assertTrue(failed)
+        self.assertGreaterEqual(len(opened), 2)
+        for fd in opened:
+            with self.subTest(fd=fd), self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_failed_final_parent_close_does_not_leak_opened_leaf(self):
+        real_open = os.open
+        real_close = os.close
+        opened = []
+        failed = False
+        leaf_opened = False
+
+        def track_open(*args, **kwargs):
+            nonlocal leaf_opened
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            if fd is not None and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                leaf_opened = True
+            return fd
+
+        def fail_parent_once(fd):
+            nonlocal failed
+            if leaf_opened and not failed:
+                failed = True
+                raise OSError("synthetic failed final parent close")
+            return real_close(fd)
+
+        with patch.object(roster.os, "open", side_effect=track_open), patch.object(
+                roster.os, "close", side_effect=fail_parent_once):
+            with self.assertRaises(OSError):
+                roster._open_no_symlink_ancestors(self.path)
+        self.assertTrue(leaf_opened)
+        self.assertTrue(failed)
+        for fd in opened:
+            with self.subTest(fd=fd), self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_keyboard_interrupt_at_intermediate_parent_release_closes_next_dir(self):
+        real_open, real_close = os.open, os.close
+        opened = []
+        failed = False
+        def track_open(*args, **kwargs):
+            fd = real_open(*args, **kwargs)
+            opened.append(fd)
+            return fd
+        def interrupt(fd):
+            nonlocal failed
+            if not failed:
+                failed = True
+                raise KeyboardInterrupt("synthetic research-only interruption")
+            return real_close(fd)
+        with patch.object(roster.os, "open", side_effect=track_open), patch.object(
+                roster.os, "close", side_effect=interrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                roster._open_no_symlink_ancestors(self.path)
+        self.assertTrue(failed)
+        for fd in opened:
+            with self.subTest(fd=fd), self.assertRaises(OSError):
+                os.fstat(fd)
+
     def test_missing_opath_fails_before_any_descriptor(self):
         with patch.object(roster.os, "O_PATH", 0), patch.object(
                 roster.os, "open", side_effect=AssertionError("no fd on unsupported OS")):

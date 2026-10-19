@@ -39,15 +39,46 @@ def _open_no_symlink_ancestors(path):
         deny("invalid private reviewer roster pathname")
     dflags = os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW
     parent = os.open("/", dflags)
+    leaf = None
     try:
         for component in parts[1:-1]:
             next_dir = os.open(component, dflags, dir_fd=parent)
-            os.close(parent)
+            try:
+                os.close(parent)
+            except BaseException:
+                # Ownership of next_dir has not been transferred. If the old
+                # parent cannot be released, never strand the newly opened fd.
+                os.close(next_dir)
+                raise
             parent = next_dir
-        return os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
                        dir_fd=parent)
+        return leaf
     finally:
-        os.close(parent)
+        # Close(2) failures are ambiguous: on Linux EINTR may have already
+        # released the descriptor. A blind retry could close a reused fd.
+        try:
+            parent_identity = os.fstat(parent)
+        except OSError:
+            parent_identity = None
+        try:
+            os.close(parent)
+        except BaseException:
+            # The caller did not receive the leaf on this error path.
+            if leaf is not None:
+                try:
+                    os.close(leaf)
+                except OSError:
+                    pass
+            if parent_identity is not None:
+                try:
+                    current = os.fstat(parent)
+                    if (current.st_dev, current.st_ino) == (
+                            parent_identity.st_dev, parent_identity.st_ino):
+                        os.close(parent)  # Only retry if same opened inode.
+                except OSError:
+                    pass
+            raise
 
 
 def load_roster(path, packet_sha256, pinned_sha256, repo_root):
