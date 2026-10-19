@@ -15,7 +15,7 @@ import exp053_race_review as review
 
 SCHEMA = "exp053-review-owner-readiness-v1"
 SPEC = Path(__file__).resolve().parent / "EXP053-REVIEW-OWNER-READINESS-SPEC-2026-10-19.md"
-SPEC_SHA = "f07806c897e035f6c9c73413c4334c14a98e488d4acac68fb548c1cadbee46a8"
+SPEC_SHA = "0b7b828369ba51597e49cb1367e6010f8cc9fc5c679cecafcb557ecbbc5a623c"
 PRIVATE_DIR = Path("/media/scott/SSD_4TB/exp053-private-20261016")
 PRIVATE_FILES = ("packet.json", "sealed_exam_key.json", "reviewer_A.json", "reviewer_B.json")
 REQUIRED_KEYS = {"schema", "source", "source_sha256", "protocol_sha256", "packet_sha256",
@@ -39,19 +39,29 @@ def _hex(value, n=64):
 
 
 def _public_bytes(path, max_size):
+    if not getattr(os, "O_NOFOLLOW", 0) or not getattr(os, "O_NONBLOCK", 0):
+        raise Hold("safe non-following public artifact read unavailable")
     try:
         path = Path(path)
         if path.is_symlink():
             raise Hold("public reviewed artifact unavailable")
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | os.O_NONBLOCK)
-        with os.fdopen(fd, "rb") as inp:
-            info = os.fstat(inp.fileno())
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        try:
+            reader = os.fdopen(fd, "rb")
+        except BaseException:
+            # fdopen has not adopted fd if wrapping fails. In particular,
+            # a repeated transient failure must not accumulate raw OS fds.
+            os.close(fd)
+            raise
+        with reader:
+            info = os.fstat(reader.fileno())
             if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= max_size:
                 raise Hold("public reviewed artifact invalid")
-            data = inp.read(max_size + 1)
-            after = os.fstat(inp.fileno())
-            if (len(data) != info.st_size or info.st_dev != after.st_dev or
-                    info.st_ino != after.st_ino or info.st_mtime_ns != after.st_mtime_ns):
+            data = reader.read(max_size + 1)
+            after = os.fstat(reader.fileno())
+            identity = lambda st: (st.st_dev, st.st_ino, st.st_size,
+                                   st.st_mtime_ns, st.st_ctime_ns)
+            if len(data) != info.st_size or identity(info) != identity(after):
                 raise Hold("public reviewed artifact changed")
         return data
     except OSError as exc:

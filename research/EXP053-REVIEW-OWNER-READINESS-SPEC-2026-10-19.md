@@ -13,6 +13,14 @@ enrollment, independent witness, or permission to start scientific inference.
   the target or declaring it a verified regular corpus. Never open, read,
   hash, render, or copy private packet/exam key, reviewer forms or corpus bytes.
   Never output private absolute paths, RACE text, key materials or identities.
+- Public reviewed manifest/protocol/spec bytes must be read through a
+  regular-file, size-bounded `O_NOFOLLOW|O_NONBLOCK` open. Require both OS
+  safety flags rather than silently using unprotected path-following reads.
+  Transfer file-descriptor ownership to `fdopen` only on success; close the
+  raw descriptor if wrapping fails. On all refusal paths do not leak an open
+  descriptor or emit private source bytes. Check stable device, inode, size,
+  mtime and ctime surrounding readback. An unrecognized/symlinked public
+  input is a source-free HOLD, never a fallback to unpinned content.
 - Validate public SHA pin, schema, exact 64 candidate records, distinct case
   and article hash identities, human_reviewed_articles==0 in frozen manifest,
   min_reviewed==40, evaluation_admitted==false, source/protocol pin binding,

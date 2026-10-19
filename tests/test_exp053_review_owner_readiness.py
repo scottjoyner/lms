@@ -209,12 +209,58 @@ class ReviewOwnerPreflight(unittest.TestCase):
         self.assertFalse(result["scientific_execution_authorized"])
 
     def test_missing_secure_directory_flags_refuses_private_presence(self):
-        for name in ("O_DIRECTORY", "O_NOFOLLOW"):
-            with self.subTest(name=name), patch.object(ready.os, name, 0):
-                result = self.inspect()
-                self.assertTrue(all(x == "BLOCKED_UNVERIFIED"
-                                    for x in result["private_assets_metadata_only"].values()))
-                self.assertFalse(result["independent_human_review_authorized"])
+        with patch.object(ready.os, "O_DIRECTORY", 0):
+            result = self.inspect()
+        self.assertTrue(all(x == "BLOCKED_UNVERIFIED"
+                            for x in result["private_assets_metadata_only"].values()))
+        self.assertFalse(result["independent_human_review_authorized"])
+
+    def test_missing_public_nofollow_or_nonblocking_flag_denies_all_reads(self):
+        for name in ("O_NOFOLLOW", "O_NONBLOCK"):
+            with self.subTest(flag=name), patch.object(ready.os, name, 0):
+                with self.assertRaises(ready.Hold):
+                    self.inspect()
+
+    def test_public_fdopen_failure_does_not_leak_a_descriptor(self):
+        original = os.fdopen
+        captured = []
+        def refuse(fd, mode="r", *args, **kwargs):
+            if mode == "rb":
+                captured.append(fd)
+                raise OSError("synthetic public file wrapper failure")
+            return original(fd, mode, *args, **kwargs)
+        with patch.object(ready.os, "fdopen", side_effect=refuse):
+            with self.assertRaises(ready.Hold):
+                self.inspect()
+        self.assertTrue(captured)
+        for fd in captured:
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_public_fdopen_keyboard_interrupt_closes_fd_and_propagates(self):
+        original = os.fdopen
+        captured = []
+        def refuse(fd, mode="r", *args, **kwargs):
+            if mode == "rb":
+                captured.append(fd)
+                raise KeyboardInterrupt("synthetic SIGINT during read wrapper")
+            return original(fd, mode, *args, **kwargs)
+        with patch.object(ready.os, "fdopen", side_effect=refuse):
+            with self.assertRaises(KeyboardInterrupt):
+                self.inspect()
+        self.assertTrue(captured)
+        for fd in captured:
+            with self.assertRaises(OSError):
+                os.fstat(fd)
+
+    def test_public_file_symlink_is_not_followed(self):
+        original = self.root / "original-spec"
+        spec = self.root / "symlink-spec"
+        original.write_bytes(ready.SPEC.read_bytes())
+        spec.symlink_to(original)
+        with self.assertRaises(ready.Hold):
+            ready.inspect(spec_path=spec)
+
 
     def test_nested_json_parser_ambiguous_fields_rejected(self):
         raw = self.manifest.read_bytes()

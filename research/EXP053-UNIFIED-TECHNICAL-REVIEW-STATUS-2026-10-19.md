@@ -52,3 +52,23 @@ fingerprint is empty, and no independent human review has been admitted is
 independent accountable human study owner/custodian can establish external
 trust, consent and custody. Until then keep both the scientific workflow and
 production deployment blocked.
+
+## Source-free readiness public-file descriptor failure (automated follow-up)
+
+One reproducible **resource leak** existed in the owner-readiness checker:
+`_public_bytes` opened its frozen public specification/manifest, then called
+`os.fdopen` without closing the original descriptor if Python rejected the
+wrapper. An injected `OSError` left a descriptor open despite a sanitized
+HOLD response; repeated failures could consume the worker's file descriptor
+limit. The revision gives the new descriptor to the file wrapper only after
+successful ownership transfer, and otherwise closes it even on an injected
+`KeyboardInterrupt`. It also requires `O_NOFOLLOW|O_NONBLOCK` rather than
+silently degrading to unprotected public-file open flags on unsupported
+platforms. The public-file readback metadata check now includes size and
+ctime alongside device/inode/mtime.
+
+Negative tests inject descriptor-wrap failures, KeyboardInterrupt, missing
+kernel flags and symlinked public protocol paths; all fail closed. They do
+not read licensed RACE passages, reviewer decisions or private keys, and
+cannot grant human authority. The frozen source-only manifest, review count,
+and researcher approval pin remain unchanged.
