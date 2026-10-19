@@ -208,3 +208,14 @@ malformed/weak Ed25519 public keys BEFORE attempting that import; a valid
 key with an unavailable signing backend still returns HOLD. The synthetic
 negative test mocks the unavailable module. No approval pin or model gate
 was changed. This local backport matches the draft review branch fix.
+
+## Direct reviewer trust-map canonicality (October 19)
+
+Synthetic reproduction showed that two distinct base64 strings can decode
+to the identical Ed25519 key. The direct verifier also accepted a weak
+second roster key and threw TypeError on unhashable trust entries. The
+source-only repair validates all 2–3 public keys as distinct canonical
+prime-order points before importing the crypto backend and requires one
+lowercase-hex receipt encoding. See EXP053-TRUST-REGISTRY-CANONICAL-SPEC
+-2026-10-19.md, its finding and synthetic tests. No independent review or
+scientific execution was approved. NO_GO_RESEARCH_ONLY.

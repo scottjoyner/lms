@@ -202,8 +202,8 @@ def verify_signed(review,trust):
               "decisions","signature"}
     if not isinstance(review,dict) or set(review)!=required:
         deny("review fields missing or unexpected")
-    if not isinstance(trust,dict) or len(trust)<2:
-        deny("private reviewer trust store invalid")
+    if not isinstance(trust,dict) or len(trust) not in (2,3):
+        deny("private reviewer trust store must contain two signers and optional adjudicator")
     if review["schema"]!="exp053-review-v1":deny("unexpected review schema")
     rid=review["reviewer_id"]
     if not isinstance(rid,str) or rid not in trust:deny("untrusted reviewer key")
@@ -211,27 +211,40 @@ def verify_signed(review,trust):
         deny("invalid signed review role")
     if review.get("attestation")!="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me.":
         deny("missing independent human review attestation")
-    if (not isinstance(trust, dict) or len(trust) < 2 or
-            any(not isinstance(k, str) or not k or
-                not isinstance(v, str) or not v for k, v in trust.items())):
-        deny("trust registry requires string reviewer IDs and public keys")
-    if len(set(trust.values())) != len(trust):
-        deny("trust registry requires distinct signer public keys")
-    # Direct callers must not bypass independent key-possession checks by
-    # supplying low-order Ed25519 public keys instead of an enrolled roster.
+    # Direct callers must not bypass owner-roster uniqueness by using
+    # alternative base64 strings for the SAME bytes. Refuse any malformed or
+    # weak second key before opening an optional signature verification backend.
     from exp053_reviewer_roster import _prime_order_ed25519_public_key
+    decoded={}
+    used_public=set()
+    for identity, encoded in trust.items():
+        if not isinstance(identity,str) or not identity or not isinstance(encoded,str):
+            deny("trust registry identities and keys must be nonempty strings")
+        try:
+            raw=base64.b64decode(encoded,validate=True)
+        except (ValueError,TypeError) as exc:
+            deny("invalid reviewer key encoding: "+type(exc).__name__)
+        if (len(raw)!=32 or base64.b64encode(raw).decode()!=encoded or
+                not _prime_order_ed25519_public_key(raw)):
+            deny("trust registry contains an invalid reviewer public key")
+        if raw in used_public:
+            deny("trust registry contains a reused reviewer public key")
+        used_public.add(raw)
+        decoded[identity]=raw
+    sig=review["signature"]
+    if (not isinstance(sig,str) or len(sig)!=128 or
+            any(c not in "0123456789abcdef" for c in sig)):
+        deny("signed reviewer signature must be canonical lowercase hex")
     try:
-        raw_public=base64.b64decode(trust[rid],validate=True)
-        if not _prime_order_ed25519_public_key(raw_public):
-            deny("signed reviewer public key is not in Ed25519 prime subgroup")
-        # Hosted CI does not require the optional cryptographic backend.
-        # Invalid keys HOLD before import; valid keys still require backend.
+        raw_public=decoded[rid]
+        # Hosted research CI intentionally does not install optional signing
+        # dependencies. Invalid trust must HOLD before importing the backend.
         try:
             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         except ImportError:
             deny("optional Ed25519 signature verification backend unavailable")
         pub=Ed25519PublicKey.from_public_bytes(raw_public)
-        signature=bytes.fromhex(review["signature"])
+        signature=bytes.fromhex(sig)
         unsigned={k:v for k,v in review.items() if k!="signature"}
         pub.verify(signature,canonical(unsigned))
     except Exception as exc:
