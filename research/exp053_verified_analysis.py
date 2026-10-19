@@ -168,8 +168,9 @@ def check_private_archive(rows,approved,packet,scan,weight_ids):
         if not isinstance(human,dict) or set(human)!={"supported","foil"}:
             deny("signed case verdict has unexpected fields")
         good,foil=human["supported"],human["foil"]
-        if (not isinstance(good,str) or good not in "ABCD" or
-                not isinstance(foil,str) or foil not in "ABCD" or good==foil):
+        if (not isinstance(good, str) or not isinstance(foil, str) or
+                len(good) != 1 or len(foil) != 1 or
+                good not in "ABCD" or foil not in "ABCD" or good == foil):
             deny("invalid signed gold and foil option")
         if rot==1:
             good,foil=rotate_label(good),rotate_label(foil)

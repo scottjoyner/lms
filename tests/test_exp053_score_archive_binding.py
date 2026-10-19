@@ -60,6 +60,17 @@ class SyntheticSourceAndLabelBinding(unittest.TestCase):
                 with self.subTest(arm=arm,rotation=rotation):
                     self.assertEqual(self.verify(self.receipt(arm,rotation)),1)
 
+    def test_invalid_signed_label_substrings_denied_before_score_replay(self):
+        for field,value in (("supported", ""), ("foil", ""),
+                            ("supported", "AB"), ("foil", "BC"),
+                            ("supported", None), ("foil", 3)):
+            with self.subTest(field=field,value=value):
+                approved=copy.deepcopy(self.approved)
+                approved[self.case["case_id"]][field]=value
+                with self.assertRaisesRegex(ValueError,"HOLD EXP053: invalid signed gold"):
+                    verification.check_private_archive(
+                        [self.receipt()],approved,self.packet,self.scan,self.checkpoints)
+
     def test_article_identity_mismatch_denied(self):
         r=self.receipt()
         r["article_sha256"]=digest("different fabricated article")

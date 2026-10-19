@@ -117,11 +117,14 @@ function updateProgress(){
     "Case complete":"Case incomplete / awaiting review";
 }
 function complete(d,c){
-  if(d.decision==="reject")return d.reject_reason?.trim().length>=12;
+  if(d.decision==="reject")return typeof d.reject_reason==="string"&&d.reject_reason.trim().length>=12;
   if(d.decision!=="accept")return false;
-  return "ABCD".includes(d.supported_option)&&"ABCD".includes(d.foil_option)&&
-    d.supported_option!==d.foil_option&&(d.support_quote?.trim().length||0)>=20&&
-    c.article.includes(d.support_quote.trim())&&(d.foil_reason?.trim().length||0)>=15;
+  const isChoice=x=>typeof x==="string"&&/^[ABCD]$/.test(x);
+  return isChoice(d.supported_option)&&isChoice(d.foil_option)&&
+    d.supported_option!==d.foil_option&&typeof d.support_quote==="string"&&
+    d.support_quote.trim().length>=20&&typeof c?.article==="string"&&
+    c.article.includes(d.support_quote.trim())&&typeof d.foil_reason==="string"&&
+    d.foil_reason.trim().length>=15;
 }
 function display(){
   const c=packet.cases[index],d=review.decisions[index];

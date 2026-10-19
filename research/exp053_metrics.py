@@ -4,7 +4,10 @@
 No model imports, inference, network, licensed text, or reviewer simulation.
 This pure function is NOT an admission-verification step.
 """
-import hashlib,math,random,statistics
+import hashlib
+import math
+import random
+import statistics
 from pathlib import Path
 from collections import defaultdict
 ANALYSIS_PLAN=Path(__file__).resolve().parent/"EXP053-MEASUREMENT-PLAN-2026-10-16.md"
@@ -61,7 +64,9 @@ def analyze(rows,approved,manifest):
     labels={}
     for cid,ans in approved.items():
         g=ans.get("supported");f=ans.get("foil")
-        if g not in LETTERS or f not in LETTERS or g==f:
+        if (not isinstance(g, str) or not isinstance(f, str) or
+                len(g) != 1 or len(f) != 1 or
+                g not in LETTERS or f not in LETTERS or g == f):
             hold("invalid human-supported option or foil")
         labels[cid]=(g,f)
     next_article={cid:pub[keys[(i+1)%len(keys)]] for i,cid in enumerate(keys)}

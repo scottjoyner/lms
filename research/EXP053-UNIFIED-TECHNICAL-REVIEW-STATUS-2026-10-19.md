@@ -72,3 +72,13 @@ kernel flags and symlinked public protocol paths; all fail closed. They do
 not read licensed RACE passages, reviewer decisions or private keys, and
 cannot grant human authority. The frozen source-only manifest, review count,
 and researcher approval pin remain unchanged.
+
+## Scientific label-validation parity repair (October 19)
+
+Review UI and Python signed-review intake both accepted empty/multi-character
+A/B/C/D **substrings** as plausible labels. Downstream metrics, replay and
+candidate-cohort selection contained the same error. The source-only fix
+requires one exact A/B/C/D label at all five boundaries and adds synthetic
+Node/Python tests, including a pre-signing denial test. No human reviewer was
+enrolled, no exam texts were disclosed, and no score/model admission was run.
+This is a review candidate requiring independent technical scrutiny.

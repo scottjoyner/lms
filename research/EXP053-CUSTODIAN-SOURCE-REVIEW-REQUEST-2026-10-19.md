@@ -28,6 +28,21 @@ This technical source review **does not** automatically constitute any of the
 privilege logs, reviewer identities/consent, passwords, keys or approvals
 should be present in the public review package.
 
+## Additional exact-label scientific intake review (October 19)
+
+The unified review patch also repairs a confirmed Python/JavaScript
+substring-validation defect: a blank string or `"AB"` is considered a
+substring of `"ABCD"`. Before this repair, the offline UI could falsely mark
+a malformed item complete, and Python review/analysis could accept a
+multi-character foil. Independently inspect the strict single-character
+A/B/C/D checks in the offline UI, `exp053_race_review.py` (including candidate
+cohort intake), `exp053_verified_analysis.py` and `exp053_metrics.py`. Review
+the synthetic Node/Python parity and signing-denial tests and ensure no
+change was made to approved reviewer roster pins, sealed corpus, scientific
+preregistration, source-passage content or model execution. See
+`EXP053-OFFLINE-REVIEW-VALIDATION-FINDING-2026-10-19.md` for the confirmed
+failure and exact conditions. This source review is not human adjudication.
+
 ## Reviewer's required decisions, in priority order
 
 1. **Trust and authority claims**: verify that `--inspect`, `--verify`, and

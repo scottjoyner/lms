@@ -110,6 +110,61 @@ class TestEXP053(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"HOLD"):
                 x.check_decision(payload,case)
 
+    def test_review_acceptance_rejects_empty_or_multiletter_answer_and_foil(self):
+        # Synthetic-only regression: Python `"" in "ABCD"` and `"AB" in "ABCD"`
+        # were TRUE. Signed reviewer labels must be exact A/B/C/D, never
+        # accepted as substring matches into the trusted source gate.
+        article = ("In this synthetic paragraph, a sealed rainfall gauge "
+                   "measured rainfall during a controlled experiment.")
+        valid = {"decision":"accept","supported_option":"A","foil_option":"B",
+                 "support_quote":"a sealed rainfall gauge measured rainfall",
+                 "foil_reason":"The other choice is not supported by the synthetic passage."}
+        self.assertEqual(x.check_decision(valid,{"article":article}),"accept")
+        invalid = (("supported_option", ""), ("foil_option", ""),
+                   ("supported_option", "AB"), ("foil_option", "AB"),
+                   ("supported_option", "BCD"), ("foil_option", "BC"),
+                   ("supported_option", 1), ("foil_option", None))
+        for field,value in invalid:
+            with self.subTest(field=field,value=value):
+                bad={**valid,field:value}
+                with self.assertRaisesRegex(ValueError,"HOLD"):
+                    x.check_decision(bad,{"article":article})
+
+        packet={"cases":[{"case_id":"synthetic-case","article":article}]}
+        bad_review={"packet_sha256":x.digest(packet),"role":"independent",
+                    "decisions":[{"case_id":"synthetic-case",**valid,"foil_option":"AB"}]}
+        with self.assertRaisesRegex(ValueError,"HOLD"):
+            x.decisions_for(bad_review,packet)
+
+    def test_invalid_multiletter_review_refused_before_signer_key_access(self):
+        # Signing a review with an invalid foil is blocked before loading any
+        # key; this regression creates no key or identity, only synthetic JSON.
+        from unittest.mock import patch
+        import exp053_sign_review as signer
+        article=("Only this synthetic observation contains a detailed "
+                 "citation for an invented observation.")
+        packet={"schema":"exp053-packet-v1", "cases":[
+            {"case_id":"synthetic-case","article":article}]}
+        review={"schema":"exp053-review-v1","reviewer_id":"synthetic_test_only",
+                "role":"independent","packet_sha256":x.digest(packet),
+                "attestation":ATTEST,"signature":"", "decisions":[
+                    {"case_id":"synthetic-case","decision":"accept",
+                     "supported_option":"A","foil_option":"AB",
+                     "support_quote":"this synthetic observation contains a detailed",
+                     "foil_reason":"This other choice lacks supporting synthetic evidence."}]}
+        with tempfile.TemporaryDirectory(prefix="exp053-invalid-label-signer-test-") as directory:
+            root=Path(directory)
+            packet_path=root/"synthetic_packet.json"
+            draft_path=root/"synthetic_review.json"
+            output=root/"must_not_be_signed.json"
+            packet_path.write_text(json.dumps(packet))
+            draft_path.write_text(json.dumps(review))
+            with patch.object(signer,"get_key",side_effect=AssertionError(
+                    "invalid review must fail before loading a signing key")):
+                with self.assertRaisesRegex(ValueError,"HOLD"):
+                    signer.sign(draft_path,packet_path,root/"no-real-key.pem",output)
+            self.assertFalse(output.exists())
+
     def test_unsupported_decision_type_is_hold(self):
         packet={"cases":[{"case_id":"a",
                            "article":"Source sentence long enough for a quote."}]}
@@ -148,6 +203,20 @@ class TestEXP053(unittest.TestCase):
             x.decisions_for(review,packet,required_ids={"b"})
         with self.assertRaisesRegex(ValueError,"HOLD"):
             x.decisions_for(review,packet)
+    def test_corrupt_multiletter_exam_key_never_enters_frozen_cohort(self):
+        rows=[{"example_id":f"synthetic_unique_case_{i}",
+               "article":(f"Independent synthetic text case {i}; " + "filler "*55),
+               "question":"Which fictional answer is supported by this sentence?",
+               "options":["north","east","south","west"],"answer":"A"}
+              for i in range(64)]
+        self.assertEqual(len(x.cohort(rows)),64)
+        for bad in ("", "AB", "BCD", None, 1):
+            with self.subTest(bad=bad):
+                damaged=copy.deepcopy(rows)
+                damaged[0]["answer"]=bad
+                with self.assertRaisesRegex(ValueError,"HOLD"):
+                    x.cohort(damaged)
+
     def test_same_article_under_64_ids_denied(self):
         repeated=[{"example_id":f"id_{i}","article":"A "*150,
                    "question":f"What happens when condition {i} occurs?",

@@ -53,6 +53,19 @@ class EXP053MetricsContract(unittest.TestCase):
     def test_bootstrap_and_holm_reproducible(self):
         a=m.analyze(self.rows,self.approved,self.manifest)
         self.assertEqual(a,m.analyze(self.rows,self.approved,self.manifest))
+    def test_invalid_human_label_substrings_denied_before_metrics(self):
+        # Python permits "" in "ABCD" and "AB" in "ABCD". Reject before any
+        # rotation or statistical work, with a clean explicit HOLD.
+        first = next(iter(self.approved))
+        for field,value in (("supported", ""), ("foil", ""),
+                            ("supported", "AB"), ("foil", "BC"),
+                            ("supported", None), ("foil", 1)):
+            with self.subTest(field=field,value=value):
+                approved=copy.deepcopy(self.approved)
+                approved[first][field]=value
+                with self.assertRaisesRegex(ValueError,"HOLD EXP053 METRICS: invalid human-supported"):
+                    m.analyze(self.rows,approved,self.manifest)
+
     def test_missing_row_fails_closed(self):
         with self.assertRaisesRegex(ValueError,"HOLD"):
             m.analyze(self.rows[:-1],self.approved,self.manifest)

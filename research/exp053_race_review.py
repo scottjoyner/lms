@@ -49,7 +49,9 @@ def cohort(rows):
         question=r["question"].strip()
         if not (15<=len(question)<=230 and len(opts)==4 and
                 len(set(x.casefold() for x in opts))==4 and
-                all(1<=len(x)<=160 for x in opts) and r["answer"] in LETTERS):
+                all(1<=len(x)<=160 for x in opts) and
+                isinstance(r.get("answer"), str) and len(r["answer"]) == 1 and
+                r["answer"] in LETTERS):
             continue
         grouped[aid].append({"article":article,"question":question,"options":opts,
                              "key":r["answer"],"article_id":aid})
@@ -158,7 +160,12 @@ def check_decision(dec,case):
         return status
     if status!="accept":deny("unreviewed or invalid decision")
     a=dec.get("supported_option");f=dec.get("foil_option")
-    if not isinstance(a,str) or not isinstance(f,str) or a not in LETTERS or f not in LETTERS or a==f:
+    # Python string membership accepts empty strings and multi-letter
+    # substrings, e.g. "" in "ABCD" and "AB" in "ABCD". Validate that both
+    # fields are exactly one permitted answer label before admission.
+    if (not isinstance(a, str) or not isinstance(f, str) or
+            len(a) != 1 or len(f) != 1 or
+            a not in LETTERS or f not in LETTERS or a == f):
         deny("invalid chosen supported/foil options")
     quote=dec.get("support_quote")
     if not isinstance(quote,str) or len(quote.strip())<20 or quote.strip() not in case["article"]:
