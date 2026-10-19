@@ -43,6 +43,23 @@ preregistration, source-passage content or model execution. See
 `EXP053-OFFLINE-REVIEW-VALIDATION-FINDING-2026-10-19.md` for the confirmed
 failure and exact conditions. This source review is not human adjudication.
 
+## Human-operated signer key custody review (October 19)
+
+A separate synthetic key-file test confirmed that the offline human signing
+helper previously followed a symlink into a private Ed25519 PEM and performed
+its permission and data reads through separate paths. The candidate now adds
+an owner-only, single-descriptor non-following key reader to
+`exp053_sign_review.py` and synthetic tests in
+`tests/test_exp053_signing_key_read.py`. The source-only documentation is
+`EXP053-HUMAN-REVIEW-SIGNER-KEY-READ-FINDING-2026-10-19.md`.
+
+An independent technical reviewer should check POSIX flag refusal,
+regular-file ownership/private permissions/nlink, bounded file size,
+stable metadata, safe descriptor closure and no private-key logging. A
+successful synthetic Ed25519 public-key extraction **does not** prove that
+any reviewer is human, properly blinded or owner enrolled. Keys used in
+unit tests are transient synthetic fixtures, not eligibility evidence.
+
 ## Reviewer's required decisions, in priority order
 
 1. **Trust and authority claims**: verify that `--inspect`, `--verify`, and

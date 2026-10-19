@@ -1,19 +1,58 @@
 #!/usr/bin/env python3
 """Human-operated Ed25519 sign/export helper; never creates a review or private key."""
-import argparse,base64,json,os
+import argparse
+import base64
+import json
+import os
+import stat
 from pathlib import Path
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exp053_race_review import canonical,decisions_for,deny
 ATTEST=("I independently reviewed these source passages and responses; "
         "no model predictions or other reviewer labels were provided to me.")
+MAX_KEY_BYTES = 16384
+
+
 def get_key(path):
-    if path.stat().st_mode & 0o077:
-        deny("signing key must be private to its owner (chmod 600)")
-    k=serialization.load_pem_private_key(path.read_bytes(),password=None)
-    if not isinstance(k,Ed25519PrivateKey):
+    """Load a reviewer-operated local PEM without following the key symlink.
+
+    Presence/possession does NOT certify that a real independent human is
+    enrolled. Do not print private bytes or their location on failure.
+    """
+    if not getattr(os, "O_NOFOLLOW", 0) or not getattr(os, "O_NONBLOCK", 0):
+        deny("secure signing-key file access unavailable")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    try:
+        fd = os.open(path, flags)
+    except OSError:
+        deny("signing key unavailable or symlinked")
+    try:
+        before = os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or
+                before.st_uid != os.geteuid() or
+                before.st_mode & 0o077 or before.st_nlink != 1):
+            deny("signing key must be a private owner-controlled regular file")
+        if not 1 <= before.st_size <= MAX_KEY_BYTES:
+            deny("signing key file size invalid")
+        raw = os.read(fd, MAX_KEY_BYTES + 1)
+        after = os.fstat(fd)
+        identity = lambda s: (s.st_dev, s.st_ino, s.st_size,
+                              s.st_mtime_ns, s.st_ctime_ns)
+        if len(raw) != before.st_size or identity(before) != identity(after):
+            deny("signing key file changed while reading")
+    except OSError:
+        deny("signing key could not be inspected securely")
+    finally:
+        os.close(fd)
+    try:
+        key = serialization.load_pem_private_key(raw, password=None)
+    except (ValueError, TypeError, UnsupportedAlgorithm) as exc:
+        deny("invalid unencrypted Ed25519 signing key: " + type(exc).__name__)
+    if not isinstance(key, Ed25519PrivateKey):
         deny("Ed25519 PEM private key required")
-    return k
+    return key
 def public_b64(key):
     return base64.b64encode(key.public_key().public_bytes(
        encoding=serialization.Encoding.Raw,

@@ -82,3 +82,14 @@ requires one exact A/B/C/D label at all five boundaries and adds synthetic
 Node/Python tests, including a pre-signing denial test. No human reviewer was
 enrolled, no exam texts were disclosed, and no score/model admission was run.
 This is a review candidate requiring independent technical scrutiny.
+
+## Offline human signer key-read correction (2026-10-19)
+
+A synthetic Ed25519 private key was previously accepted through a final-
+component symlink because the human-operated signing helper used separate
+path-following `stat()` and `read_bytes()` calls. The corrected helper uses
+one private non-following, nonblocking fd with owner/mode/type/nlink and stable
+metadata checks before parsing a bounded PEM. Negative tests use only
+synthetic keys, and all personal/owner permissions remain unapproved. See
+`EXP053-HUMAN-REVIEW-SIGNER-KEY-READ-FINDING-2026-10-19.md` and the frozen
+`EXP053-HUMAN-SIGNER-KEY-READ-PREFLIGHT-SPEC-2026-10-19.md`.
