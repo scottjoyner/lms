@@ -79,3 +79,14 @@ python3 -m ruff check research/exp053_reviewer_roster.py \
 
 This correction does **not** authorize reviewer enrollment or promote draft
 PR #37; approval remains NO_GO_RESEARCH_ONLY.
+
+## Hosted CI missing optional cryptographic backend (October 19)
+
+The first main GitHub CI run for this PR failed in its Python matrix because
+`cryptography` is intentionally absent from the hosted test environment.
+The source-only weak-key negative test reached the import before refusing a
+malformed public key. `verify_signed` now checks subgroup membership first;
+if a valid point reaches signature verification without the optional backend,
+it returns a sanitized HOLD instead. A test simulates the missing backend,
+covering both invalid and valid public keys without asserting a real human
+signature. Independent human code review and scientific admission remain HOLD.

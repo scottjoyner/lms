@@ -111,6 +111,30 @@ class TestWeakReviewerKeys(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "HOLD EXP053"):
             verify_signed(fake, trust)
 
+    def test_weak_key_refuses_even_without_optional_signature_backend(self):
+        from unittest.mock import patch
+        from exp053_race_review import verify_signed
+        identity = b"\x01" + b"\x00" * 31
+        fake = {"schema": "exp053-review-v1", "reviewer_id": "synthetic_A",
+                "role": "independent", "packet_sha256": "synthetic-only",
+                "attestation": ("I independently reviewed these source passages and responses; "
+                                "no model predictions or other reviewer labels were provided to me."),
+                "decisions": [], "signature": "00" * 64}
+        trust = {"synthetic_A": base64.b64encode(identity).decode(),
+                 "synthetic_B": base64.b64encode(RFC8032[1]).decode()}
+        # Simulate the hosted CI environment even on a workstation where
+        # cryptography is already installed and imported by other tests.
+        with patch.dict(sys.modules, {
+            "cryptography.hazmat.primitives.asymmetric.ed25519": None
+        }):
+            with self.assertRaisesRegex(ValueError, "HOLD EXP053"):
+                verify_signed(fake, trust)
+            # A valid signer key without the optional backend must also
+            # deny. It must not claim a successful human signature.
+            trust["synthetic_A"] = base64.b64encode(RFC8032[0]).decode()
+            with self.assertRaisesRegex(ValueError, "HOLD EXP053"):
+                verify_signed(fake, trust)
+
     def test_synthetic_fresh_cryptography_public_keys_accepted(self):
         try:
             from cryptography.hazmat.primitives import serialization
