@@ -676,7 +676,48 @@ def _verify_success_evidence(root: Path, state: Mapping[str, Any], manifest: Map
             for line in source:
                 if len(samples) >= 100000:
                     raise ValueError("canary soak contains too many samples")
-                samples.append(_mapping(json.loads(line), "canary soak sample"))
+                sample = _mapping(json.loads(line), "canary soak sample")
+                # Success claims must agree with the actual probe execution
+                # receipt; a rehashed summary must not conceal failed probes.
+                required = (
+                    "ok", "returncode", "timed_out", "parse_error",
+                    "duration_seconds", "captured_at_utc",
+                )
+                if any(key not in sample for key in required):
+                    raise ValueError("canary soak sample is missing execution status")
+                if (
+                    type(sample["ok"]) is not bool
+                    or type(sample["returncode"]) is not int
+                    or type(sample["timed_out"]) is not bool
+                    or not (
+                        sample["parse_error"] is None
+                        or isinstance(sample["parse_error"], str)
+                    )
+                ):
+                    raise ValueError("canary soak sample has invalid execution status")
+                duration = sample["duration_seconds"]
+                if (
+                    type(duration) not in (int, float)
+                    or not math.isfinite(duration)
+                    or duration < 0
+                ):
+                    raise ValueError("canary soak sample has invalid duration")
+                timestamp = sample["captured_at_utc"]
+                if not isinstance(timestamp, str):
+                    raise ValueError("canary soak sample has invalid timestamp")
+                try:
+                    captured = dt.datetime.fromisoformat(timestamp)
+                except ValueError as exc:
+                    raise ValueError("canary soak sample has invalid timestamp") from exc
+                if captured.tzinfo is None or captured.utcoffset() != dt.timedelta(0):
+                    raise ValueError("canary soak sample timestamp must be UTC")
+                if sample["ok"] and (
+                    sample["returncode"] != 0
+                    or sample["timed_out"]
+                    or sample["parse_error"] is not None
+                ):
+                    raise ValueError("canary soak sample success contradicts execution")
+                samples.append(sample)
         recomputed = summarize_soak(samples, soak_policy)
     except (json.JSONDecodeError, TypeError) as exc:
         raise ValueError("invalid raw canary soak samples") from exc

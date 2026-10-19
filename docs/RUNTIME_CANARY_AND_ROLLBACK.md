@@ -230,3 +230,12 @@ corresponding resource-growth or throughput-retention gate. At least two
 valid RSS and TPS observations are needed to assess growth and retention.
 This remains local evidence; it does not establish an independently signed
 physical run or stable model identity.
+
+## Probe execution-status consistency
+
+Successful raw soak records must be internally consistent: valid UTC
+timestamps, finite nonnegative durations, integer exit codes, boolean timeout
+flags, and parsed-status fields. A raw sample claiming \`ok=true\` while
+reporting a nonzero exit code, timeout, or parser error is rejected even
+when all unsigned local hashes have been recomputed. These are structural
+checks, not independently witnessed runtime execution.

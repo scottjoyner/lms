@@ -572,3 +572,37 @@ def test_real_canary_soak_missing_required_metric_triggers_rollback(tmp_path, fi
     assert report["success"] is False
     assert report["rollback_succeeded"] is True
     assert report["admission"]["admitted"] is False
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("returncode", 7),
+        ("returncode", False),
+        ("timed_out", True),
+        ("timed_out", 0),
+        ("parse_error", "unexpected parse failure"),
+        ("captured_at_utc", "not-a-timestamp"),
+        ("duration_seconds", -1.0),
+    ],
+)
+def test_rehashed_success_soak_rejects_contradictory_probe_receipt(tmp_path, field, value):
+    # A locally rehashed unsigned manifest must not turn a failed or
+    # malformed probe execution receipt into a successful observation.
+    plan, _ = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "forged-probe-status", False)
+    root = workspace / "forged-probe-status"
+    samples_path = root / "soak-samples.jsonl"
+    rows = [json.loads(line) for line in samples_path.read_text(encoding="utf-8").splitlines()]
+    assert rows and rows[0]["ok"] is True
+    rows[0][field] = value
+    samples_path.write_text(
+        "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    state_path = root / "runtime-canary-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    state["soak"]["samples_sha256"] = canary._operator.file_sha256(samples_path)
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    _reseal_structural_manifest_for_negative_test(root)
+    with pytest.raises(ValueError, match="soak sample"):
+        canary.verify_manifest(root, require_success=True)
