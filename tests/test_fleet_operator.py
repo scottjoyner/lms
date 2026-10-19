@@ -338,3 +338,22 @@ def test_run_manifest_detects_control_file_tampering(tmp_path):
     (root / "operator-state.json").write_text("tampered\n", encoding="utf-8")
     with pytest.raises(ValueError, match="mismatch"):
         fleet_operator.verify_run_manifest(root)
+@pytest.mark.parametrize("alias", ["file_symlink", "directory_symlink", "hard_link"])
+def test_manifest_builder_refuses_unsafe_control_evidence_before_writing(tmp_path, alias):
+    root = tmp_path / "run"
+    root.mkdir()
+    outside = tmp_path / "outside.json"
+    outside.write_bytes(b"outside-run evidence")
+    if alias == "file_symlink":
+        (root / "aliased.json").symlink_to(outside)
+    elif alias == "directory_symlink":
+        (root / "aliased-dir").symlink_to(tmp_path, target_is_directory=True)
+    else:
+        (root / "aliased.json").hardlink_to(outside)
+    with pytest.raises(ValueError, match="operator control file.*(symlink|hard links|unsafe)"):
+        fleet_operator.build_run_manifest(
+            root, {"run_id": "run", "success": True}
+        )
+    assert not (root / "operator-manifest.json").exists(), (
+        "builder emitted a self-inconsistent manifest over unsafe evidence"
+    )

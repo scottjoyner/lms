@@ -649,15 +649,23 @@ def module_command(module: str, *args: str) -> List[str]:
 def _control_files(root: Path) -> List[Dict[str, Any]]:
     files: List[Dict[str, Any]] = []
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name == "operator-manifest.json":
+        relative = path.relative_to(root)
+        # Do not let the manifest builder read external symlink destinations
+        # or silently skip symlinked directories. The verifier rejects both.
+        if path.is_symlink():
+            raise ValueError(f"operator control file contains symlink: {relative}")
+        if path.is_dir():
             continue
-        if path.name.endswith(".tar.gz"):
+        if path.name == "operator-manifest.json" or path.name.endswith(".tar.gz"):
             continue
+        # Hash the same pinned, singly-linked file the verifier accepts.
+        # Manifest construction must not emit an unverifiable evidence set.
+        size, digest = _pinned_control_file_identity(root, relative)
         files.append(
             {
-                "path": path.relative_to(root).as_posix(),
-                "size_bytes": path.stat().st_size,
-                "sha256": file_sha256(path),
+                "path": relative.as_posix(),
+                "size_bytes": size,
+                "sha256": digest,
             }
         )
     return files
