@@ -6,6 +6,7 @@ An SHA256 manifest is not independent trust, and all outcomes remain NO-GO.
 """
 
 import argparse
+import errno
 import hashlib
 import io
 import json
@@ -53,7 +54,9 @@ def _canonical(value):
 
 
 def _local_regular_bytes(path, limit):
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    if not getattr(os, "O_NOFOLLOW", 0) or not getattr(os, "O_NONBLOCK", 0):
+        raise Hold("safe no-follow nonblocking input access unavailable")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
     try:
         fd = os.open(path, flags)
         with os.fdopen(fd, "rb") as handle:
@@ -167,47 +170,99 @@ def _account_home():
     return Path(pwd.getpwuid(os.getuid()).pw_dir)
 
 
-def _safe_output(path):
+def _safe_output_dirfd(path):
+    """Open/validate every user-home subdirectory without following symlinks.
+
+    The returned descriptor, rather than the previously checked PATH, must be
+    used to create, read back and clean up the packet. This closes a race where
+    an attacker substitutes a symlink after a path-based permission check.
+    Caller MUST close the returned fd on every path.
+    """
     target = Path(path)
     home = _account_home()
-    if not target.is_absolute() or ".." in target.parts or not target.is_relative_to(home):
+    if (not target.is_absolute() or not home.is_absolute() or
+            ".." in target.parts or ".." in home.parts or
+            not target.is_relative_to(home)):
         raise Hold("packet output must be an absolute user-local path")
-    parent = target.parent
-    if parent.is_symlink():
-        raise Hold("symlinked packet output parent")
-    if not parent.is_dir() or parent == home:
+    relative = target.relative_to(home)
+    if (len(relative.parts) < 2 or
+            any(part in {"", ".", ".."} for part in relative.parts)):
         raise Hold("packet output requires an existing user-owned subfolder")
-    step = parent
-    while step != home:
-        if step.is_symlink():
-            raise Hold("symlinked packet output parent")
-        step = step.parent
-    if parent.stat().st_uid != os.getuid() or parent.stat().st_mode & 0o022:
-        raise Hold("packet output parent not owner-private")
-    return target
+    if not getattr(os, "O_DIRECTORY", 0) or not getattr(os, "O_NOFOLLOW", 0):
+        raise Hold("secure directory traversal is unavailable")
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = None
+    transferred = False
+    try:
+        fd = os.open(home, flags)
+        for segment in (None, *relative.parts[:-1]):
+            if segment is not None:
+                next_fd = os.open(segment, flags, dir_fd=fd)
+                os.close(fd)
+                fd = next_fd
+            info = os.fstat(fd)
+            if (not stat.S_ISDIR(info.st_mode) or
+                    info.st_uid != os.getuid() or info.st_mode & 0o022):
+                raise Hold("packet output parent not owner-private")
+        transferred = True
+        return fd, relative.parts[-1]
+    except OSError as exc:
+        if exc.errno in (errno.ENOTDIR, errno.ELOOP):
+            raise Hold("symlinked or invalid packet output parent") from exc
+        raise Hold("unsafe or unavailable packet output directory") from exc
+    finally:
+        if fd is not None and not transferred:
+            os.close(fd)
 
 
 def create(path, *, source_dir=ROOT):
-    target = _safe_output(path)
+    target = Path(path)
     raw = render_packet(inventory(source_dir=source_dir))
     report = verify_packet(raw)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    parent_fd, name = _safe_output_dirfd(target)
+    created = False
+    inode = None
     try:
-        fd = os.open(target, flags, 0o600)
-    except OSError as exc:
-        raise Hold("destination exists or cannot be safely created") from exc
-    try:
-        with os.fdopen(fd, "wb") as handle:
+        flags = (os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW |
+                 getattr(os, "O_CLOEXEC", 0))
+        try:
+            fd = os.open(name, flags, 0o600, dir_fd=parent_fd)
+            created = True
+        except OSError as exc:
+            raise Hold("destination exists or cannot be safely created") from exc
+        with os.fdopen(fd, "w+b") as handle:
+            inode = (os.fstat(handle.fileno()).st_dev, os.fstat(handle.fileno()).st_ino)
             handle.write(raw)
             handle.flush()
             os.fsync(handle.fileno())
-        if _local_regular_bytes(target, MAX_PACKET) != raw:
-            raise Hold("newly written packet failed exact-byte verification")
+            handle.seek(0)
+            if handle.read(MAX_PACKET + 1) != raw:
+                raise Hold("newly written packet failed exact-byte verification")
+        # A path swap after validation must not create outside the opened
+        # directory, nor allow reporting success for an unreachable target.
+        fresh_fd, fresh_name = _safe_output_dirfd(target)
+        try:
+            if (fresh_name != name or
+                    (os.fstat(fresh_fd).st_dev, os.fstat(fresh_fd).st_ino) !=
+                    (os.fstat(parent_fd).st_dev, os.fstat(parent_fd).st_ino)):
+                raise Hold("packet output directory changed during creation")
+        finally:
+            os.close(fresh_fd)
+        os.fsync(parent_fd)
     except Exception:
-        target.unlink(missing_ok=True)
+        if created and inode is not None:
+            try:
+                # Avoid deleting a different inode should a same-UID process
+                # replace the directory entry during our verification.
+                current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                if (current.st_dev, current.st_ino) == inode:
+                    os.unlink(name, dir_fd=parent_fd)
+            except OSError:
+                pass
         raise
+    finally:
+        os.close(parent_fd)
     return {**report, "status": "CREATED_USER_LOCAL_ONLY"}
-
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)

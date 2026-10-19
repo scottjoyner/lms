@@ -3,6 +3,7 @@
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
 import zipfile
@@ -100,6 +101,85 @@ class OfflineHandoff(unittest.TestCase):
             with self.assertRaisesRegex(packet.Hold, "symlinked"):
                 packet.create(link / "packet.zip", source_dir=self.src)
         self.assertFalse((self.dest / "packet.zip").exists())
+
+    def test_race_swapping_output_parent_with_symlink_cannot_escape_directory(self):
+        # Regression for an actually reproduced TOCTOU bug: the old implementation
+        # checked the parent path, then used os.open(full_absolute_path).
+        # Replacing that parent with a symlink just before O_CREAT wrote into
+        # the unapproved directory. All state here is disposable synthetic data.
+        outside = self.root / "not-approved"
+        outside.mkdir(mode=0o700)
+        moved = self.root / "owner-private-moved"
+        ordinary_open = os.open
+        swapped = False
+
+        def swap_on_create(path, flags, *args, **kwargs):
+            nonlocal swapped
+            if (not swapped and str(path) == self.output.name and flags & os.O_CREAT):
+                swapped = True
+                self.dest.rename(moved)
+                self.dest.symlink_to(outside, target_is_directory=True)
+            return ordinary_open(path, flags, *args, **kwargs)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "open", side_effect=swap_on_create):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(swapped)
+        self.assertFalse((outside / self.output.name).exists())
+        self.assertFalse((moved / self.output.name).exists())
+
+    def test_race_between_directory_validation_and_creation_is_safe(self):
+        outside = self.root / "not-approved"
+        outside.mkdir(mode=0o700)
+        moved = self.root / "owner-private-moved"
+        actual_open = packet._safe_output_dirfd
+        observed = 0
+
+        def validate_then_swap(path):
+            nonlocal observed
+            observed += 1
+            opened = actual_open(path)
+            if observed == 1:
+                self.dest.rename(moved)
+                self.dest.symlink_to(outside, target_is_directory=True)
+            return opened
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet, "_safe_output_dirfd", side_effect=validate_then_swap):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(observed >= 2)
+        self.assertFalse((outside / self.output.name).exists())
+        self.assertFalse((moved / self.output.name).exists())
+
+    def test_nested_symlinked_output_component_rejected(self):
+        inner = self.dest / "inner"
+        inner.mkdir(mode=0o700)
+        bad = self.dest / "alias"
+        bad.symlink_to(inner, target_is_directory=True)
+        with patch.object(packet, "_account_home", return_value=self.root):
+            with self.assertRaisesRegex(packet.Hold, "symlinked"):
+                packet.create(bad / "subdir" / "packet.zip", source_dir=self.src)
+        self.assertFalse((inner / "subdir" / "packet.zip").exists())
+
+    def test_success_path_is_no_overwrite_and_retains_source_hash(self):
+        with patch.object(packet, "_account_home", return_value=self.root):
+            result = packet.create(self.output, source_dir=self.src)
+        expected = self.prepared()
+        self.assertEqual(packet._sha(expected), result["packet_sha256"])
+        self.assertEqual(self.output.read_bytes(), expected)
+        self.assertFalse(result["scientific_execution_authorized"])
+        self.assertFalse(result["independent_administration_approved"])
+
+    def test_platform_without_nofollow_or_directory_flags_is_rejected(self):
+        # Never silently degrade to a path-following create on unsupported OS.
+        for flag in ("O_NOFOLLOW", "O_DIRECTORY"):
+            with self.subTest(flag=flag), patch.object(packet.os, flag, 0), patch.object(
+                    packet, "_account_home", return_value=self.root):
+                with self.assertRaises(packet.Hold):
+                    packet.create(self.output, source_dir=self.src)
+                self.assertFalse(self.output.exists())
 
     def test_source_changes_are_refused_before_packet_created(self):
         name = next(iter(packet.PINS))
