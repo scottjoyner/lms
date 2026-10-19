@@ -499,3 +499,16 @@ a failure or non-observe manifest; a successful observed run requires its
 rollout results. All invalid evidence stops manifest generation before a new
 manifest is written. This does not independently attest the completeness of
 the reported node list or authorization of the physical rollout.
+
+### Exact successful-node rollout coverage at manifest generation
+
+When the operator records a successful \`observe\` phase, its node roster
+\`operator-state.node_ids\` is now reconciled with \`rollout_results.json\`
+before emitting a manifest. The reported node IDs must match exactly:
+no missing, extra, blank, or duplicated node identities. Each reported node
+must have a zero remote and collection return code, no reported timeouts,
+and a collected artifact subsequently checked by the descriptor-pinned
+archive reader. Failed runs still retain partial rollout evidence for
+diagnostics and continue to generate a **failure** manifest. This local
+cross-check does not substitute for independently observed physical runtime,
+cryptographic custody, or a verified release-gate decision.
