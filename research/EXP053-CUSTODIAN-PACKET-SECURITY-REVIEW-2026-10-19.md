@@ -45,6 +45,37 @@ as previously frozen. Expected SHA256:
 `a0f2458fca44269fa17e27cbec0b34ea78d3a4cb9a8bb35a05807b02156b75b3`.
 The local file has never been transmitted to a custodian by this tool.
 
+## Additional demonstrated final-entry race (follow-up)
+
+A further disposable test exploited a **separate** problem after the directory
+race remediation: the process read back its original file descriptor without
+checking that the final published directory entry still referred to that
+file. Replacing the entry with a symlink to unrelated bytes after the first
+file `fsync` led to a **false `CREATED_USER_LOCAL_ONLY` success**. Replacing
+it with an ordinary forged file likewise produced success in the old code.
+
+The revised code reopens the **final output entry relative to the securely
+retained directory descriptor** with `O_NOFOLLOW|O_NONBLOCK`, checks device and
+inode against the originally created descriptor, verifies `0600` permissions,
+regular-file type, `nlink == 1`, exact expected size and content, and checks
+before/after stable readback metadata. It finally checks that the pathname
+still names the same inode and that no metadata drift was observed. Errors
+remain sanitized HOLD with best-effort, inode-scoped cleanup; it never deletes
+an unrelated substituted file in its cleanup handler.
+
+Adversarial regression now includes (a) replacement with a symlink to decoy
+bytes, (b) replacement with an ordinary fake file, (c) deletion of the final
+entry, (d) creating an unexpected hardlink, and (e) permission weakening to
+world-readable before verification. The original bytes and hash of the
+seven-document ZIP remain unchanged.
+
+**Limit:** This is a bounded, point-in-time consistency check, not an OS-level
+permanent lock on a pathname. A same-UID or privileged process could change
+an entry *after* the final check; a genuinely independent custodian and
+protected immutable publication channel are still necessary for trustworthy
+long-term custody. These local synthetic negative tests do not count toward
+the real 12 physical custody challenges or the 40 blinded RACE reviews.
+
 ## Reproduction
 
 ```

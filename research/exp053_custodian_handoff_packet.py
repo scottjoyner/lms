@@ -238,14 +238,48 @@ def create(path, *, source_dir=ROOT):
             handle.seek(0)
             if handle.read(MAX_PACKET + 1) != raw:
                 raise Hold("newly written packet failed exact-byte verification")
-        # A path swap after validation must not create outside the opened
-        # directory, nor allow reporting success for an unreachable target.
+        # Reopen the *final entry*, not just its directory. The file may be
+        # renamed or substituted after its original descriptor was written;
+        # reading only that original descriptor would incorrectly attest a
+        # now-missing/symlinked/wrong destination file as CREATED.
         fresh_fd, fresh_name = _safe_output_dirfd(target)
         try:
             if (fresh_name != name or
                     (os.fstat(fresh_fd).st_dev, os.fstat(fresh_fd).st_ino) !=
                     (os.fstat(parent_fd).st_dev, os.fstat(parent_fd).st_ino)):
                 raise Hold("packet output directory changed during creation")
+            try:
+                verify_fd = os.open(
+                    name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                    dir_fd=fresh_fd)
+            except OSError as exc:
+                raise Hold("packet output entry changed after creation") from exc
+            with os.fdopen(verify_fd, "rb") as verify_handle:
+                begin = os.fstat(verify_handle.fileno())
+                if (not stat.S_ISREG(begin.st_mode) or
+                        (begin.st_dev, begin.st_ino) != inode or
+                        begin.st_mode & 0o777 != 0o600 or begin.st_nlink != 1 or
+                        begin.st_size != len(raw)):
+                    raise Hold("packet output entry identity or permissions changed")
+                if verify_handle.read(MAX_PACKET + 1) != raw:
+                    raise Hold("packet output entry differs from reviewed bytes")
+                end = os.fstat(verify_handle.fileno())
+                if (begin.st_dev, begin.st_ino, begin.st_size,
+                        begin.st_mtime_ns, begin.st_ctime_ns) != (
+                        end.st_dev, end.st_ino, end.st_size,
+                        end.st_mtime_ns, end.st_ctime_ns):
+                    raise Hold("packet output entry changed during readback")
+            # Detect a replacement between readback and final parent fsync.
+            try:
+                final = os.stat(name, dir_fd=fresh_fd, follow_symlinks=False)
+            except OSError as exc:
+                raise Hold("packet output entry missing after verification") from exc
+            if (not stat.S_ISREG(final.st_mode) or
+                    (final.st_dev, final.st_ino, final.st_size,
+                     final.st_mtime_ns, final.st_ctime_ns) != (
+                        end.st_dev, end.st_ino, end.st_size,
+                        end.st_mtime_ns, end.st_ctime_ns)):
+                raise Hold("packet output entry changed after verification")
         finally:
             os.close(fresh_fd)
         os.fsync(parent_fd)

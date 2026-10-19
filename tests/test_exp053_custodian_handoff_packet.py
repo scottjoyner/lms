@@ -153,6 +153,111 @@ class OfflineHandoff(unittest.TestCase):
         self.assertFalse((outside / self.output.name).exists())
         self.assertFalse((moved / self.output.name).exists())
 
+    def test_final_output_symlink_swap_after_fsync_is_refused(self):
+        # Reproduces the second observed bug: the original code read back
+        # bytes from the original descriptor, but never checked that its
+        # directory entry still pointed at that inode.
+        outside = self.root / "synthetic-decoy.zip"
+        outside.write_bytes(b"NOT AN AUTHORIZED CUSTODIAN PACKET")
+        moved = self.dest / "relocated-original.zip"
+        real_fsync = os.fsync
+        swapped = False
+
+        def swap_after_write(fd):
+            nonlocal swapped
+            real_fsync(fd)
+            if not swapped and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                swapped = True
+                self.output.rename(moved)
+                self.output.symlink_to(outside)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=swap_after_write):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(swapped)
+        self.assertTrue(self.output.is_symlink())
+        self.assertEqual(outside.read_bytes(), b"NOT AN AUTHORIZED CUSTODIAN PACKET")
+        self.assertEqual(moved.read_bytes(), self.prepared())
+
+    def test_final_output_regular_substitution_after_fsync_is_refused(self):
+        moved = self.dest / "original-packet-moved.zip"
+        fake = b"SYNTHETIC DIFFERENT CONTENT"
+        real_fsync = os.fsync
+        substituted = False
+
+        def substitute_after_write(fd):
+            nonlocal substituted
+            real_fsync(fd)
+            if not substituted and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                substituted = True
+                self.output.rename(moved)
+                self.output.write_bytes(fake)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=substitute_after_write):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(substituted)
+        self.assertEqual(self.output.read_bytes(), fake)
+        self.assertEqual(moved.read_bytes(), self.prepared())
+
+    def test_final_output_hardlink_after_fsync_is_refused(self):
+        shadow = self.dest / "unexpected-second-link.zip"
+        real_fsync = os.fsync
+        linked = False
+
+        def hardlink_after_write(fd):
+            nonlocal linked
+            real_fsync(fd)
+            if not linked and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                linked = True
+                os.link(self.output, shadow)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=hardlink_after_write):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(linked)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(shadow.read_bytes(), self.prepared())
+
+    def test_final_output_becomes_world_readable_after_fsync_is_refused(self):
+        real_fsync = os.fsync
+        chmodded = False
+
+        def chmod_after_write(fd):
+            nonlocal chmodded
+            real_fsync(fd)
+            if not chmodded and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                chmodded = True
+                os.chmod(self.output, 0o644)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=chmod_after_write):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(chmodded)
+        self.assertFalse(self.output.exists())
+
+    def test_final_output_deleted_after_fsync_is_refused(self):
+        real_fsync = os.fsync
+        removed = False
+
+        def delete_after_write(fd):
+            nonlocal removed
+            real_fsync(fd)
+            if not removed and os.fstat(fd).st_mode & 0o170000 == 0o100000:
+                removed = True
+                self.output.unlink()
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=delete_after_write):
+            with self.assertRaises(packet.Hold):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(removed)
+        self.assertFalse(self.output.exists())
+
     def test_nested_symlinked_output_component_rejected(self):
         inner = self.dest / "inner"
         inner.mkdir(mode=0o700)
