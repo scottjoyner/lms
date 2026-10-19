@@ -704,9 +704,15 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     return manifest
 
 
-def verify_run_manifest(root: Path, *, require_success: bool = False) -> Dict[str, Any]:
+def verify_run_manifest(
+    root: Path, *, require_success: bool = False, manifest_bytes: Optional[bytes] = None
+) -> Dict[str, Any]:
     path = root / "operator-manifest.json"
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # The attestation verifier supplies the exact bytes authenticated by SSHSIG.
+    manifest = json.loads(
+        path.read_text(encoding="utf-8") if manifest_bytes is None
+        else manifest_bytes.decode("utf-8")
+    )
     if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise ValueError("unsupported operator manifest schema")
     core = {

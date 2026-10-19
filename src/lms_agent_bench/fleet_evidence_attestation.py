@@ -132,7 +132,7 @@ def _verify_pinned_attestation(
     namespace: str,
     *,
     label: str,
-) -> str:
+) -> tuple[str, bytes]:
     """Verify one pinned manifest/signature byte pair, then identify its signer.
 
     Hashing the original files, verifying a *different* read and parsing the
@@ -167,7 +167,7 @@ def _verify_pinned_attestation(
     if process.returncode != 0:
         stderr = process.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError(f"{label} signature verification failed: " + stderr)
-    return _verified_sshsig_key_fingerprint(signature_bytes)
+    return _verified_sshsig_key_fingerprint(signature_bytes), manifest_bytes
 
 
 def sign_run(
@@ -275,7 +275,7 @@ def verify_attestation(
     if bool(attestation.get("run_success")) != bool(manifest_report.get("success")):
         raise ValueError("attestation success state does not match operator manifest")
 
-    verified_fingerprint = _verify_pinned_attestation(
+    verified_fingerprint, signed_manifest_bytes = _verify_pinned_attestation(
         manifest,
         signature,
         attestation.get("manifest_sha256"),
@@ -285,6 +285,13 @@ def verify_attestation(
         namespace,
         label="operator",
     )
+    # A valid signature does NOT validate references inside its manifest.
+    # Re-check the identical bytes OpenSSH authenticated against real files.
+    signed_report = _operator.verify_run_manifest(
+        root, require_success=require_success, manifest_bytes=signed_manifest_bytes
+    )
+    if signed_report != manifest_report:
+        raise ValueError("operator verified manifest differs from signed manifest")
     if attestation.get("signing_key_fingerprint") != verified_fingerprint:
         raise ValueError("operator signing key fingerprint does not match verified signature")
     return {

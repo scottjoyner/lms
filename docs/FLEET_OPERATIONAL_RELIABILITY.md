@@ -416,3 +416,16 @@ of the original on-disk signature between OpenSSH verification and fingerprint
 reporting cannot change the attributed signer. This narrows a same-host
 time-of-check/time-of-use gap; independent custody, trusted clock, immutable
 external witness, and filesystem-level isolation are still separate gates.
+
+### Signed-manifest structural consistency
+
+A locally valid manifest is not necessarily the manifest that was later signed
+and authenticated. After OpenSSH verification, operator and runtime-canary
+attestation verify the **exact authenticated manifest bytes** against the
+referenced control files, archives, canary artifacts and state. Reports from
+before and after cryptographic verification must agree. A pre-signed invalid
+manifest substituted between those operations is rejected even if its SSHSIG
+and unsigned attestation hash are internally consistent. This is local
+structural integrity, not a rollback-resistant or independently witnessed
+authority. Callers must separately control the evidence directory and key
+custody during physical qualification.

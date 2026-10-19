@@ -128,7 +128,7 @@ def verify_attestation(
         raise ValueError("runtime canary attestation success mismatch")
     if bool(attestation.get("rollback_succeeded")) != bool(report.get("rollback_succeeded")):
         raise ValueError("runtime canary attestation rollback mismatch")
-    signed_fingerprint = _ssh._verify_pinned_attestation(  # noqa: SLF001
+    signed_fingerprint, signed_manifest_bytes = _ssh._verify_pinned_attestation(  # noqa: SLF001
         manifest,
         signature,
         attestation.get("manifest_sha256"),
@@ -138,6 +138,12 @@ def verify_attestation(
         namespace,
         label="runtime canary",
     )
+    # Validate the precise signed manifest, not only a prior on-disk read.
+    signed_report = _canary.verify_manifest(
+        root, require_success=require_success, manifest_bytes=signed_manifest_bytes
+    )
+    if signed_report != report:
+        raise ValueError("runtime canary verified manifest differs from signed manifest")
     if attestation.get("signing_key_fingerprint") != signed_fingerprint:
         raise ValueError("runtime canary signing key fingerprint does not match verified signature")
     return {

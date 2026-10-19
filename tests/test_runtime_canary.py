@@ -848,3 +848,66 @@ def test_canary_uses_pinned_signature_when_original_is_swapped_after_verify(
             root, allowed, "runtime-canary-operator", require_success=True
         )
     assert changes
+@pytestmark_attestation
+def test_canary_signed_manifest_is_same_content_as_structurally_validated(
+    tmp_path, monkeypatch,
+):
+    plan, _events = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "canary-manifest-swap", False)
+    root = workspace / "canary-manifest-swap"
+    key = tmp_path / "canary-manifest-swap-key"
+    subprocess.run(
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)],
+        capture_output=True, check=True,
+    )
+    key.chmod(0o600)
+    allowed = tmp_path / "allowed_swap_signers"
+    allowed.write_text(
+        "runtime-canary-operator " + key.with_suffix(".pub").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    attestation.sign_run(root, key, require_success=True)
+    manifest_path = root / "runtime-canary-manifest.json"
+    signature_path = root / "runtime-canary-manifest.json.sig"
+    metadata_path = root / "runtime-canary-attestation.json"
+
+    invalid = json.loads(manifest_path.read_text(encoding="utf-8"))
+    invalid["artifacts"].append({
+        "path": "missing-signed-proof.json", "size_bytes": 9,
+        "sha256": "sha256:" + "0" * 64,
+    })
+    core = {k: v for k, v in invalid.items()
+            if k not in {"created_at_utc", "manifest_fingerprint"}}
+    invalid["manifest_fingerprint"] = canary._operator.canonical_hash(core)
+    alt = tmp_path / "invalid-signed-canary"
+    alt.write_text(json.dumps(invalid), encoding="utf-8")
+    subprocess.run(
+        ["ssh-keygen", "-Y", "sign", "-f", str(key),
+         "-n", attestation.DEFAULT_NAMESPACE, str(alt)],
+        capture_output=True, check=True,
+    )
+    invalid_bytes = alt.read_bytes()
+    invalid_signature = Path(str(alt) + ".sig").read_bytes()
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["manifest_sha256"] = "sha256:" + __import__("hashlib").sha256(invalid_bytes).hexdigest()
+    metadata["signature_sha256"] = "sha256:" + __import__("hashlib").sha256(invalid_signature).hexdigest()
+    attestation_core = {k: v for k, v in metadata.items()
+                       if k not in {"created_at_utc", "attestation_fingerprint"}}
+    metadata["attestation_fingerprint"] = canary._operator.canonical_hash(attestation_core)
+
+    original_check = canary.verify_manifest
+    swapped = []
+
+    def replace_after_validation(*args, **kwargs):
+        result = original_check(*args, **kwargs)
+        manifest_path.write_bytes(invalid_bytes)
+        signature_path.write_bytes(invalid_signature)
+        metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+        swapped.append(True)
+        return result
+
+    monkeypatch.setattr(attestation._canary, "verify_manifest", replace_after_validation)
+    with pytest.raises(ValueError, match="artifact"):
+        attestation.verify_attestation(root, allowed, "runtime-canary-operator", require_success=True)
+    assert swapped

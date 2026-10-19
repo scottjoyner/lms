@@ -149,11 +149,15 @@ def _retry_preflight_node(
 
 
 def _harden_verify_run_manifest(
-    original: Any, root: Path, *, require_success: bool = False
+    original: Any, root: Path, *, require_success: bool = False,
+    manifest_bytes: Optional[bytes] = None,
 ) -> Dict[str, Any]:
     resolved_root = Path(root).expanduser().resolve()
     manifest_path = resolved_root / "operator-manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = json.loads(
+        manifest_path.read_text(encoding="utf-8") if manifest_bytes is None
+        else manifest_bytes.decode("utf-8")
+    )
     seen_control: set[str] = set()
     for entry in manifest.get("control_files", []):
         relative = str(entry.get("path") or "")
@@ -174,7 +178,9 @@ def _harden_verify_run_manifest(
         if key in seen_archives:
             raise ValueError(f"duplicate collected archive entry: {archive}")
         seen_archives.add(key)
-    return original(resolved_root, require_success=require_success)
+    if manifest_bytes is None:
+        return original(resolved_root, require_success=require_success)
+    return original(resolved_root, require_success=require_success, manifest_bytes=manifest_bytes)
 
 
 def apply_patches() -> None:
@@ -194,9 +200,10 @@ def apply_patches() -> None:
     _base.preflight_node = lambda node, update_code, **kwargs: _retry_preflight_node(
         original_node, node, update_code, **kwargs
     )
-    _base.verify_run_manifest = lambda root, require_success=False: (
+    _base.verify_run_manifest = lambda root, require_success=False, manifest_bytes=None: (
         _harden_verify_run_manifest(
-            original_verify, root, require_success=require_success
+            original_verify, root, require_success=require_success,
+            manifest_bytes=manifest_bytes,
         )
     )
     _PATCHED = True
