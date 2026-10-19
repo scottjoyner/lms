@@ -454,3 +454,14 @@ apply to direct manifest and signed-attestation verification. They do not
 protect against every concurrent in-place mutation, malicious local kernel,
 or privileged access to this process. Off-host independently held evidence
 and signer custody remain mandatory for release authorization.
+
+### Collected archive descriptor containment
+
+Operator-collected archives use absolute paths inside their run root, emitted
+by the collector. Those references now follow the same descriptor-anchored,
+\`O_NOFOLLOW\`, single-link, single-read size/digest checks as control files.
+Absolute paths outside the run, dot-dot traversals, direct or parent symlinks,
+hard-linked aliases, and file replacement between path validation and digest
+verification fail closed. Ordinary local archive collection still works.
+This protects ordinary local filesystem evidence, not an adversarial kernel,
+root-controlled evidence mutation, or independent checkpoint custody.
