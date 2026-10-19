@@ -7,6 +7,7 @@ import json
 import math
 import os
 import re
+import selectors
 import signal
 import socket
 import statistics
@@ -366,15 +367,51 @@ def _captured_probe(spec: Mapping[str, Any], cwd: Path, env: Mapping[str, str]) 
         stderr=subprocess.PIPE,
         start_new_session=True,
     ) as process:
+        deadline = started + float(spec["timeout_seconds"])
+        captured: Dict[str, bytearray] = {"stdout": bytearray(), "stderr": bytearray()}
         timed_out = False
         try:
-            stdout, stderr = process.communicate(timeout=float(spec["timeout_seconds"]))
-        except subprocess.TimeoutExpired:
-            timed_out = True
+            # communicate() buffers unlimited subprocess output before we can
+            # check its length. Drain both Unix pipes incrementally, allowing
+            # at most one MiB per stream plus a single overflow sentinel byte.
+            with selectors.DefaultSelector() as selector:
+                assert process.stdout is not None and process.stderr is not None
+                selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+                selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+                while selector.get_map():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        timed_out = True
+                        break
+                    ready = selector.select(timeout=remaining)
+                    if not ready:
+                        timed_out = True
+                        break
+                    for key, _mask in ready:
+                        output = captured[key.data]
+                        available = min(65536, _MAX_CAPTURE_BYTES + 1 - len(output))
+                        chunk = os.read(key.fd, available)
+                        if not chunk:
+                            selector.unregister(key.fileobj)
+                            continue
+                        output.extend(chunk)
+                        if len(output) > _MAX_CAPTURE_BYTES:
+                            raise RuntimeError("soak probe output exceeded one MiB")
+            if not timed_out:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                else:
+                    try:
+                        process.wait(timeout=remaining)
+                    except subprocess.TimeoutExpired:
+                        timed_out = True
+        except BaseException:
             _terminate(process)
-            stdout, stderr = process.communicate(timeout=2)
-    if len(stdout) > _MAX_CAPTURE_BYTES or len(stderr) > _MAX_CAPTURE_BYTES:
-        raise RuntimeError("soak probe output exceeded one MiB")
+            raise
+        if timed_out:
+            _terminate(process)
+        stdout, stderr = bytes(captured["stdout"]), bytes(captured["stderr"])
     payload: Dict[str, Any] = {}
     parse_error: Optional[str] = None
     lines = [line for line in stdout.decode("utf-8", errors="replace").splitlines() if line.strip()]
