@@ -286,3 +286,42 @@ def test_signed_fleet_control_files_must_reside_inside_run(tmp_path, symlink_kin
     # Even direct manifest verification must reject the external reference.
     with pytest.raises(ValueError, match="control file.*(symlink|escapes)"):
         fleet_operator.verify_run_manifest(root, require_success=True)
+@pytest.mark.parametrize("attack", ["outside_hardlink", "swap_after_path_check"])
+def test_signed_control_evidence_cannot_alias_external_file(tmp_path, monkeypatch, attack):
+    # The external file is never authorized as run-owned evidence.
+    root = make_run(tmp_path)
+    external = tmp_path / "outside-control-evidence.json"
+    external.write_bytes(b"EXTERNAL")
+    claimed = root / "claimed-control-evidence.json"
+    if attack == "outside_hardlink":
+        claimed.hardlink_to(external)
+    else:
+        claimed.write_bytes(b"INTERNAL")
+    manifest_path = root / "operator-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["control_files"] = [{
+        "path": claimed.name,
+        "size_bytes": external.stat().st_size,
+        "sha256": fleet_operator.file_sha256(external),
+    }]
+    core = {k: v for k, v in manifest.items()
+            if k not in {"created_at_utc", "operator_manifest_fingerprint"}}
+    manifest["operator_manifest_fingerprint"] = fleet_operator.canonical_hash(core)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    key, _allowed = make_key(tmp_path)
+    if attack == "swap_after_path_check":
+        original_sha = fleet_operator.file_sha256
+        switched = []
+
+        def replace_during_hash(path):
+            if Path(path) == claimed:
+                claimed.unlink()
+                claimed.symlink_to(external)
+                switched.append(True)
+            return original_sha(path)
+
+        monkeypatch.setattr(fleet_operator, "file_sha256", replace_during_hash)
+    with pytest.raises(ValueError, match="operator control file .*"):
+        attestation.sign_run(root, key, require_success=True)
+    with pytest.raises(ValueError, match="operator control file .*"):
+        fleet_operator.verify_run_manifest(root, require_success=True)

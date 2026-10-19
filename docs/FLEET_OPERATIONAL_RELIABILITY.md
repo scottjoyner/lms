@@ -440,3 +440,17 @@ the recorded file size and digest. Both direct manifest verification and
 signed operator attestation use this fail-closed check. This is a local path
 containment check, not a filesystem snapshot, a defense against hard links or
 all concurrent file substitutions, or independent witness authority.
+
+### Descriptor-pinned run control evidence
+
+The control-file verifier opens the resolved run directory, each relative
+parent directory, and the final regular file through directory descriptors
+using \`O_NOFOLLOW\`. It calculates the declared size and SHA-256 from that
+single pinned descriptor, refusing hard-linked files (\`st_nlink != 1\`) and
+checking inode, size, modification time, and change time after reading.
+This prevents simple hard-link escape aliases and path replacement between
+a separate symlink check and a later path-based hash open. The restrictions
+apply to direct manifest and signed-attestation verification. They do not
+protect against every concurrent in-place mutation, malicious local kernel,
+or privileged access to this process. Off-host independently held evidence
+and signer custody remain mandatory for release authorization.
