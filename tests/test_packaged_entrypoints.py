@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
@@ -40,3 +41,17 @@ def test_importable_version_matches_project_metadata():
     match = re.search(r'(?m)^version = "([^"]+)"$', pyproject)
     assert match is not None
     assert lms_agent_bench.__version__ == match.group(1)
+
+
+def test_packaged_cli_uses_package_local_legacy_modules():
+    """Do not silently rely on top-level checkout-only compatibility shims."""
+    package_root = Path(lms_agent_bench.__file__).parent
+    for filename in ("lms_cli_v2.py", "lms_history_decide.py"):
+        module = ast.parse((package_root / filename).read_text(encoding="utf-8"))
+        imports = [
+            node
+            for node in ast.walk(module)
+            if isinstance(node, ast.Import)
+            and any(alias.name.startswith("lms_") for alias in node.names)
+        ]
+        assert imports == [], f"{filename} has checkout-only absolute LMS imports"
