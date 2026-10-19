@@ -420,3 +420,51 @@ def test_manifest_builder_accepts_verified_run_local_archive(tmp_path):
     assert manifest["archives"][0]["path"] == str(archive)
     report = fleet_operator.verify_run_manifest(root, require_success=True)
     assert report["valid"] and report["archive_count"] == 1
+@pytest.mark.parametrize("failure", [
+    "invalid_json", "wrong_schema", "missing_results", "results_null",
+    "results_object", "nonmapping_entry", "run_id_mismatch",
+])
+def test_manifest_builder_rejects_malformed_present_rollout_results(tmp_path, failure):
+    root = tmp_path / "run"
+    observe = root / "observe"
+    observe.mkdir(parents=True)
+    path = observe / "rollout_results.json"
+    value = {"schema_version": "fleet_rollout.v1", "run_id": "run", "results": []}
+    if failure == "invalid_json":
+        path.write_text("{truncated", encoding="utf-8")
+    else:
+        if failure == "wrong_schema":
+            value["schema_version"] = "not-a-rollout"
+        elif failure == "missing_results":
+            del value["results"]
+        elif failure == "results_null":
+            value["results"] = None
+        elif failure == "results_object":
+            value["results"] = {"node-a": {}}
+        elif failure == "nonmapping_entry":
+            value["results"] = ["malformed-node-entry"]
+        elif failure == "run_id_mismatch":
+            value["run_id"] = "other-run"
+        fleet_operator.write_json(path, value)
+    with pytest.raises(ValueError, match="rollout results"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": False})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_requires_results_for_successful_observe(tmp_path):
+    root = tmp_path / "run"
+    (root / "observe").mkdir(parents=True)
+    with pytest.raises(ValueError, match="rollout results.*missing"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": True})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_preserves_failure_manifest_without_rollout_results(tmp_path):
+    root = tmp_path / "run"
+    (root / "observe").mkdir(parents=True)
+    manifest = fleet_operator.build_run_manifest(
+        root, {"run_id": "run", "success": False}
+    )
+    assert manifest["success"] is False
+    assert manifest["archives"] == []
+    assert fleet_operator.verify_run_manifest(root)["valid"] is True

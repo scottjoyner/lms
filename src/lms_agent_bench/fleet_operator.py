@@ -671,18 +671,35 @@ def _control_files(root: Path) -> List[Dict[str, Any]]:
     return files
 
 
-def _archive_references(root: Path) -> List[Dict[str, Any]]:
+def _archive_references(
+    root: Path, *, require_results: bool = False
+) -> List[Dict[str, Any]]:
     results_path = root / "observe" / "rollout_results.json"
-    if not results_path.is_file():
+    if not results_path.exists():
+        if require_results:
+            raise ValueError("rollout results file is missing for successful observe")
         return []
+    if not results_path.is_file():
+        raise ValueError("rollout results path is not a regular file")
     try:
         payload = json.loads(results_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("rollout results JSON is unreadable or malformed") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("rollout results must be a JSON object")
+    if payload.get("schema_version") != "fleet_rollout.v1":
+        raise ValueError("rollout results schema version is invalid")
+    if payload.get("run_id") != root.name:
+        raise ValueError("rollout results run ID does not match run directory")
+    entries = payload.get("results")
+    if not isinstance(entries, list) or any(
+        not isinstance(item, Mapping) for item in entries
+    ):
+        raise ValueError("rollout results must contain a list of node objects")
     references: List[Dict[str, Any]] = []
     normalized_root = Path(root).expanduser().resolve()
-    for item in payload.get("results", []):
-        if not isinstance(item, Mapping) or not item.get("collected_artifact"):
+    for item in entries:
+        if not item.get("collected_artifact"):
             continue
         archive_path = Path(str(item["collected_artifact"]))
         if not archive_path.is_absolute():
@@ -727,7 +744,11 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
         "config_sha256": state.get("config_sha256"),
         "env_file_sha256": state.get("env_file_sha256"),
         "control_files": _control_files(root),
-        "archives": _archive_references(root),
+        "archives": _archive_references(
+            root,
+            require_results=state.get("success") is True
+            and (state.get("rollout") is not None or (root / "observe").is_dir()),
+        ),
         "admission": {"admitted": False},
     }
     manifest = {
