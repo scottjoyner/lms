@@ -465,3 +465,14 @@ hard-linked aliases, and file replacement between path validation and digest
 verification fail closed. Ordinary local archive collection still works.
 This protects ordinary local filesystem evidence, not an adversarial kernel,
 root-controlled evidence mutation, or independent checkpoint custody.
+
+### Manifest builder / verifier evidence parity
+
+Building an operator manifest uses the same descriptor-pinned, no-follow,
+single-hard-link control-file reader used by its verifier. Symlinks to
+files or directories under the run root fail before a manifest is written,
+instead of letting manifest generation read external bytes or silently omit
+an aliased directory. Normal self-contained run evidence is unaffected.
+A privileged attacker able to mutate inodes concurrently or alter the
+operator process is outside this local evidence-custody guarantee. Preserve
+NO-GO until independent review and off-host rollback witness authority.
