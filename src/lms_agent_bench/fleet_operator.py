@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -704,6 +706,65 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     return manifest
 
 
+def _pinned_control_file_identity(root: Path, relative: Path) -> Tuple[int, str]:
+    """Hash run-local regular evidence through one descriptor-anchored read.
+
+    O_NOFOLLOW applies to both parent directories and the final file. A
+    single-inode hard-link outside the run cannot be distinguished from a
+    run-owned hard link by path, so reject every multiply linked file.
+    """
+    directory = Path(root).expanduser().resolve()
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    opened: List[int] = []
+    try:
+        base_fd = os.open(directory, flags | os.O_DIRECTORY)
+        opened.append(base_fd)
+        current_fd = base_fd
+        for component in relative.parts[:-1]:
+            current_fd = os.open(
+                component, flags | os.O_DIRECTORY, dir_fd=current_fd
+            )
+            opened.append(current_fd)
+        file_fd = os.open(
+            relative.parts[-1], flags | os.O_NONBLOCK, dir_fd=current_fd
+        )
+        opened.append(file_fd)
+        before = os.fstat(file_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"operator control file is not regular: {relative}")
+        if before.st_nlink != 1:
+            raise ValueError(f"operator control file has multiple hard links: {relative}")
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            chunk = os.read(file_fd, 8 * 1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            digest.update(chunk)
+        after = os.fstat(file_fd)
+        if (
+            before.st_dev != after.st_dev
+            or before.st_ino != after.st_ino
+            or before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+            or before.st_ctime_ns != after.st_ctime_ns
+            or after.st_nlink != 1
+            or size != after.st_size
+        ):
+            raise ValueError(f"operator control file changed during read: {relative}")
+        return size, "sha256:" + digest.hexdigest()
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            raise ValueError(f"operator control file is missing: {relative}") from exc
+        raise ValueError(
+            f"operator control file contains symlink or unsafe path: {relative}"
+        ) from exc
+    finally:
+        for fd in reversed(opened):
+            os.close(fd)
+
+
 def verify_run_manifest(
     root: Path, *, require_success: bool = False, manifest_bytes: Optional[bytes] = None
 ) -> Dict[str, Any]:
@@ -726,24 +787,10 @@ def verify_run_manifest(
         relative = Path(str(entry.get("path") or ""))
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError("unsafe control-file path in operator manifest")
-        # A relative lexical path is not proof of run-local evidence:
-        # symlinked files or parent directories can redirect outside the run.
-        normalized_root = Path(root).expanduser().resolve()
-        file_path = normalized_root / relative
-        if any(
-            (normalized_root.joinpath(*relative.parts[:position])).is_symlink()
-            for position in range(1, len(relative.parts) + 1)
-        ):
-            raise ValueError(f"operator control file contains symlink: {relative}")
-        if not file_path.is_file():
-            raise ValueError(f"operator control file is missing: {relative}")
-        try:
-            file_path.resolve(strict=True).relative_to(normalized_root)
-        except ValueError as exc:
-            raise ValueError(f"operator control file escapes run directory: {relative}") from exc
-        if file_path.stat().st_size != int(entry.get("size_bytes")):
+        size, digest = _pinned_control_file_identity(root, relative)
+        if size != int(entry.get("size_bytes")):
             raise ValueError(f"operator control file size mismatch: {relative}")
-        if file_sha256(file_path) != entry.get("sha256"):
+        if digest != entry.get("sha256"):
             raise ValueError(f"operator control file hash mismatch: {relative}")
     for archive in manifest.get("archives", []):
         archive_path = Path(str(archive.get("path") or ""))
