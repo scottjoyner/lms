@@ -405,3 +405,14 @@ injections on a noncritical node:
 
 Results should be retained as negative evidence before any runtime admission is
 considered.
+
+### Pinned attestation verification bytes
+
+Both operator and runtime-canary verifiers now snapshot the manifest and
+detached SSH signature bytes exactly once. Hash comparisons, the OpenSSH
+signature check (through a private temporary signature file), and embedded
+signer fingerprint extraction all refer to that same byte pair. A mutation
+of the original on-disk signature between OpenSSH verification and fingerprint
+reporting cannot change the attributed signer. This narrows a same-host
+time-of-check/time-of-use gap; independent custody, trusted clock, immutable
+external witness, and filesystem-level isolation are still separate gates.

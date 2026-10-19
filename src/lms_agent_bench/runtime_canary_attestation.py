@@ -116,10 +116,6 @@ def verify_attestation(
     if Path(signature_name).name != signature_name:
         raise ValueError("runtime canary signature path is unsafe")
     signature = _ssh._require_regular(root / signature_name, "runtime canary signature")  # noqa: SLF001
-    if _ssh.file_sha256(manifest) != attestation.get("manifest_sha256"):
-        raise ValueError("attested runtime canary manifest SHA-256 mismatch")
-    if _ssh.file_sha256(signature) != attestation.get("signature_sha256"):
-        raise ValueError("attested runtime canary signature SHA-256 mismatch")
     for key, report_key in (
         ("run_id", "run_id"),
         ("canary_id", "canary_id"),
@@ -132,29 +128,16 @@ def verify_attestation(
         raise ValueError("runtime canary attestation success mismatch")
     if bool(attestation.get("rollback_succeeded")) != bool(report.get("rollback_succeeded")):
         raise ValueError("runtime canary attestation rollback mismatch")
-    process = subprocess.run(
-        [
-            _ssh._ssh_keygen(),  # noqa: SLF001
-            "-Y",
-            "verify",
-            "-f",
-            str(signers),
-            "-I",
-            identity,
-            "-n",
-            namespace,
-            "-s",
-            str(signature),
-        ],
-        input=manifest.read_bytes(),
-        capture_output=True,
-        timeout=30,
-        check=False,
+    signed_fingerprint = _ssh._verify_pinned_attestation(  # noqa: SLF001
+        manifest,
+        signature,
+        attestation.get("manifest_sha256"),
+        attestation.get("signature_sha256"),
+        signers,
+        identity,
+        namespace,
+        label="runtime canary",
     )
-    if process.returncode != 0:
-        stderr = process.stderr.decode("utf-8", errors="replace").strip()
-        raise ValueError("runtime canary signature verification failed: " + stderr)
-    signed_fingerprint = _ssh._verified_sshsig_key_fingerprint(signature)  # noqa: SLF001
     if attestation.get("signing_key_fingerprint") != signed_fingerprint:
         raise ValueError("runtime canary signing key fingerprint does not match verified signature")
     return {

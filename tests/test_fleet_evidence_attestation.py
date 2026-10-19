@@ -146,3 +146,53 @@ def test_verified_fleet_signer_fingerprint_cannot_be_rewritten_to_other_allowed_
 
     with pytest.raises(ValueError, match="signing key fingerprint"):
         attestation.verify_attestation(root, allowed, "operator", require_success=True)
+
+def test_fleet_attestation_uses_same_signature_bytes_for_verify_and_attribution(
+    tmp_path, monkeypatch
+):
+    root = make_run(tmp_path)
+    primary, allowed = make_key(tmp_path)
+    other = tmp_path / "race-other-key"
+    subprocess.run(
+        ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(other)],
+        capture_output=True, check=True,
+    )
+    other.chmod(0o600)
+    with allowed.open("a", encoding="utf-8") as output:
+        output.write("operator " + other.with_suffix(".pub").read_text(encoding="utf-8"))
+
+    attestation.sign_run(root, primary, require_success=True)
+    signed_manifest = root / "operator-manifest.json"
+    signature = root / "operator-manifest.json.sig"
+    alternate_input = tmp_path / "alternate-input"
+    alternate_input.write_bytes(signed_manifest.read_bytes())
+    subprocess.run(
+        ["ssh-keygen", "-Y", "sign", "-f", str(other),
+         "-n", attestation.DEFAULT_NAMESPACE, str(alternate_input)],
+        capture_output=True, check=True,
+    )
+    alternate_signature = Path(str(alternate_input) + ".sig").read_bytes()
+    assert alternate_signature != signature.read_bytes()
+
+    evidence_path = root / "operator-attestation.json"
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    evidence["signing_key_fingerprint"] = attestation._key_fingerprint(other)
+    core = {k: v for k, v in evidence.items()
+            if k not in {"created_at_utc", "attestation_fingerprint"}}
+    evidence["attestation_fingerprint"] = fleet_operator.canonical_hash(core)
+    evidence_path.write_text(json.dumps(evidence), encoding="utf-8")
+
+    real_run = subprocess.run
+    swapped = []
+
+    def swap_original_signature_after_verification(args, **kwargs):
+        result = real_run(args, **kwargs)
+        if "-Y" in args and "verify" in args and result.returncode == 0:
+            signature.write_bytes(alternate_signature)
+            swapped.append(True)
+        return result
+
+    monkeypatch.setattr(attestation.subprocess, "run", swap_original_signature_after_verification)
+    with pytest.raises(ValueError, match="signing key fingerprint"):
+        attestation.verify_attestation(root, allowed, "operator", require_success=True)
+    assert swapped, "OpenSSH verification was not exercised"

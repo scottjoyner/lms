@@ -11,6 +11,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
@@ -95,7 +96,7 @@ def _verified_sshsig_key_fingerprint(signature: Path) -> str:
     exactly the fingerprint ssh-keygen -lf -E sha256 reports for that key.
     Call only after ssh-keygen -Y verify succeeds under allowed-signers policy.
     """
-    armored = signature.read_bytes()
+    armored = signature if isinstance(signature, bytes) else signature.read_bytes()
     if len(armored) > 256 * 1024:
         raise ValueError("OpenSSH signature is too large")
     lines = armored.splitlines()
@@ -119,6 +120,54 @@ def _verified_sshsig_key_fingerprint(signature: Path) -> str:
     pub = encoded[14:14 + size]
     digest = base64.b64encode(hashlib.sha256(pub).digest()).decode("ascii")
     return "SHA256:" + digest.rstrip("=")
+
+
+def _verify_pinned_attestation(
+    manifest: Path,
+    signature: Path,
+    recorded_manifest_sha256: str,
+    recorded_signature_sha256: str,
+    allowed_signers: Path,
+    identity: str,
+    namespace: str,
+    *,
+    label: str,
+) -> str:
+    """Verify one pinned manifest/signature byte pair, then identify its signer.
+
+    Hashing the original files, verifying a *different* read and parsing the
+    original signature again permits a same-owner file-replacement race.
+    The OpenSSH subprocess sees a private snapshot of the captured signature,
+    and the public-key fingerprint comes from those same captured bytes.
+    """
+    if signature.stat().st_size > 256 * 1024:
+        raise ValueError(f"{label} signature exceeds size limit")
+    manifest_bytes = manifest.read_bytes()
+    signature_bytes = signature.read_bytes()
+    if len(signature_bytes) > 256 * 1024:
+        raise ValueError(f"{label} signature exceeds size limit")
+    if "sha256:" + hashlib.sha256(manifest_bytes).hexdigest() != recorded_manifest_sha256:
+        raise ValueError(f"attested {label} manifest SHA-256 mismatch")
+    if "sha256:" + hashlib.sha256(signature_bytes).hexdigest() != recorded_signature_sha256:
+        raise ValueError(f"attested {label} signature SHA-256 mismatch")
+
+    with tempfile.TemporaryDirectory(prefix="lms-attest-verify-") as directory:
+        pinned_signature = Path(directory) / "signature"
+        pinned_signature.write_bytes(signature_bytes)
+        process = subprocess.run(
+            [
+                _ssh_keygen(), "-Y", "verify", "-f", str(allowed_signers),
+                "-I", identity, "-n", namespace, "-s", str(pinned_signature),
+            ],
+            input=manifest_bytes,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    if process.returncode != 0:
+        stderr = process.stderr.decode("utf-8", errors="replace").strip()
+        raise ValueError(f"{label} signature verification failed: " + stderr)
+    return _verified_sshsig_key_fingerprint(signature_bytes)
 
 
 def sign_run(
@@ -221,38 +270,21 @@ def verify_attestation(
     if Path(signature_name).name != signature_name:
         raise ValueError("attestation signature path is unsafe")
     signature = _require_regular(root / signature_name, "operator signature")
-    if file_sha256(manifest) != attestation.get("manifest_sha256"):
-        raise ValueError("attested manifest SHA-256 mismatch")
-    if file_sha256(signature) != attestation.get("signature_sha256"):
-        raise ValueError("attested signature SHA-256 mismatch")
     if attestation.get("run_id") != manifest_report.get("run_id"):
         raise ValueError("attestation run ID does not match operator manifest")
     if bool(attestation.get("run_success")) != bool(manifest_report.get("success")):
         raise ValueError("attestation success state does not match operator manifest")
 
-    process = subprocess.run(
-        [
-            _ssh_keygen(),
-            "-Y",
-            "verify",
-            "-f",
-            str(signers),
-            "-I",
-            identity,
-            "-n",
-            namespace,
-            "-s",
-            str(signature),
-        ],
-        input=manifest.read_bytes(),
-        capture_output=True,
-        timeout=30,
-        check=False,
+    verified_fingerprint = _verify_pinned_attestation(
+        manifest,
+        signature,
+        attestation.get("manifest_sha256"),
+        attestation.get("signature_sha256"),
+        signers,
+        identity,
+        namespace,
+        label="operator",
     )
-    if process.returncode != 0:
-        stderr = process.stderr.decode("utf-8", errors="replace").strip()
-        raise ValueError("operator signature verification failed: " + stderr)
-    verified_fingerprint = _verified_sshsig_key_fingerprint(signature)
     if attestation.get("signing_key_fingerprint") != verified_fingerprint:
         raise ValueError("operator signing key fingerprint does not match verified signature")
     return {
