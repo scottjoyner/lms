@@ -429,3 +429,14 @@ and unsigned attestation hash are internally consistent. This is local
 structural integrity, not a rollback-resistant or independently witnessed
 authority. Callers must separately control the evidence directory and key
 custody during physical qualification.
+
+### Signed control-file path containment
+
+An operator manifest may use only run-local control evidence. The verifier
+rejects any symbolic-link component in a control-file path, including parent
+directory symlinks, even when the lexical path is relative. It also checks
+that the real target remains below the resolved run directory before checking
+the recorded file size and digest. Both direct manifest verification and
+signed operator attestation use this fail-closed check. This is a local path
+containment check, not a filesystem snapshot, a defense against hard links or
+all concurrent file substitutions, or independent witness authority.

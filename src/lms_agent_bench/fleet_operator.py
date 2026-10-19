@@ -726,9 +726,21 @@ def verify_run_manifest(
         relative = Path(str(entry.get("path") or ""))
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError("unsafe control-file path in operator manifest")
-        file_path = root / relative
+        # A relative lexical path is not proof of run-local evidence:
+        # symlinked files or parent directories can redirect outside the run.
+        normalized_root = Path(root).expanduser().resolve()
+        file_path = normalized_root / relative
+        if any(
+            (normalized_root.joinpath(*relative.parts[:position])).is_symlink()
+            for position in range(1, len(relative.parts) + 1)
+        ):
+            raise ValueError(f"operator control file contains symlink: {relative}")
         if not file_path.is_file():
             raise ValueError(f"operator control file is missing: {relative}")
+        try:
+            file_path.resolve(strict=True).relative_to(normalized_root)
+        except ValueError as exc:
+            raise ValueError(f"operator control file escapes run directory: {relative}") from exc
         if file_path.stat().st_size != int(entry.get("size_bytes")):
             raise ValueError(f"operator control file size mismatch: {relative}")
         if file_sha256(file_path) != entry.get("sha256"):
