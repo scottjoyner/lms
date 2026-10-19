@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
+import hashlib
 import json
 import os
 import subprocess
@@ -16,6 +19,39 @@ from lms_agent_bench import runtime_canary as _canary
 
 SCHEMA_VERSION = "runtime_canary_attestation.v1"
 DEFAULT_NAMESPACE = "lms-runtime-canary"
+
+
+def _verified_sshsig_key_fingerprint(signature: Path) -> str:
+    """Derive signer identity from the verified SSHSIG, not mutable JSON.
+
+    The embedded public-key blob uses OpenSSH wire encoding; its SHA-256 digest
+    is the fingerprint printed by ssh-keygen -lf -E sha256. Always invoke this
+    only AFTER ssh-keygen -Y verify succeeds against the allowed signers file.
+    """
+    armored = signature.read_bytes()
+    if len(armored) > 256 * 1024:
+        raise ValueError("runtime canary signature is too large")
+    lines = armored.splitlines()
+    if (
+        len(lines) < 3
+        or lines[0] != b"-----BEGIN SSH SIGNATURE-----"
+        or lines[-1] != b"-----END SSH SIGNATURE-----"
+    ):
+        raise ValueError("invalid runtime canary SSH signature armor")
+    try:
+        encoded = base64.b64decode(b"".join(lines[1:-1]), validate=True)
+    except binascii.Error as exc:
+        raise ValueError("invalid runtime canary SSH signature encoding") from exc
+    if not encoded.startswith(b"SSHSIG") or len(encoded) < 14:
+        raise ValueError("invalid runtime canary SSH signature envelope")
+    if int.from_bytes(encoded[6:10], "big") != 1:
+        raise ValueError("unsupported runtime canary SSH signature version")
+    size = int.from_bytes(encoded[10:14], "big")
+    if not 0 < size <= 65536 or len(encoded) < 14 + size:
+        raise ValueError("invalid runtime canary signature public key")
+    public_key_blob = encoded[14 : 14 + size]
+    fingerprint = base64.b64encode(hashlib.sha256(public_key_blob).digest())
+    return "SHA256:" + fingerprint.decode("ascii").rstrip("=")
 
 
 def sign_run(
@@ -154,12 +190,15 @@ def verify_attestation(
     if process.returncode != 0:
         stderr = process.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError("runtime canary signature verification failed: " + stderr)
+    signed_fingerprint = _verified_sshsig_key_fingerprint(signature)
+    if attestation.get("signing_key_fingerprint") != signed_fingerprint:
+        raise ValueError("runtime canary signing key fingerprint does not match verified signature")
     return {
         "valid": True,
         **report,
         "identity": identity,
         "namespace": namespace,
-        "signing_key_fingerprint": attestation.get("signing_key_fingerprint"),
+        "signing_key_fingerprint": signed_fingerprint,
         "attestation_fingerprint": attestation.get("attestation_fingerprint"),
         "admission": {"admitted": False},
     }

@@ -287,3 +287,14 @@ Budget exhaustion fails the soak and enters the existing rollback sequence,
 rather than allowing a successful canary or an unbounded evidence collection.
 Independent signer custody, off-host monotonic checkpoints and physical
 recovery approval are still separate requirements.
+
+## Verified signer fingerprint provenance
+
+The attestation's signing-key fingerprint is informational metadata and its
+ordinary JSON hash is **not** a signature. After an OpenSSH \`-Y verify\` succeeds
+using the supplied allowed-signers policy, the verifier extracts the embedded
+public key from the SSHSIG envelope, computes its actual SHA-256 fingerprint,
+and requires it to match the attestation field. Rehashing local metadata to
+substitute another authorized key's fingerprint is rejected. This prevents
+false **key attribution**, but it does not establish independent custody of
+either key, allow-list freshness, physical execution, or anti-rollback.
