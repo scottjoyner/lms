@@ -26,33 +26,106 @@ def lower_sha(value):
             all(c in "0123456789abcdef" for c in value))
 
 
+def _open_no_symlink_ancestors(path):
+    """Resolve each lexical path component via non-following dir-fds.
+
+    Opening the final leaf with O_NOFOLLOW does NOT protect ancestor symlink
+    substitutions. Every directory component is therefore independently
+    checked by the kernel, including components under the public repo.
+    """
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    parts = absolute.parts
+    if len(parts) < 2 or parts[0] != "/":
+        deny("invalid private reviewer roster pathname")
+    dflags = os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW
+    parent = os.open("/", dflags)
+    leaf = None
+    try:
+        for component in parts[1:-1]:
+            next_dir = os.open(component, dflags, dir_fd=parent)
+            try:
+                os.close(parent)
+            except BaseException:
+                # Ownership of next_dir has not been transferred. If the old
+                # parent cannot be released, never strand the newly opened fd.
+                os.close(next_dir)
+                raise
+            parent = next_dir
+        leaf = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+                       dir_fd=parent)
+        return leaf
+    finally:
+        # Close(2) failures are ambiguous: on Linux EINTR may have already
+        # released the descriptor. A blind retry could close a reused fd.
+        try:
+            parent_identity = os.fstat(parent)
+        except OSError:
+            parent_identity = None
+        try:
+            os.close(parent)
+        except BaseException:
+            # The caller did not receive the leaf on this error path.
+            if leaf is not None:
+                try:
+                    os.close(leaf)
+                except OSError:
+                    pass
+            if parent_identity is not None:
+                try:
+                    current = os.fstat(parent)
+                    if (current.st_dev, current.st_ino) == (
+                            parent_identity.st_dev, parent_identity.st_ino):
+                        os.close(parent)  # Only retry if same opened inode.
+                except OSError:
+                    pass
+            raise
+
+
 def load_roster(path, packet_sha256, pinned_sha256, repo_root):
     """Validate exact owner-pinned private bytes and A/B/adjudicator slots."""
     if not lower_sha(pinned_sha256):
         deny("the owner has not independently approved any reviewer roster")
+    if not all(getattr(os, name, 0) for name in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("secure nonfollowing roster file access unavailable")
     path = Path(path)
-    # Read through a single non-following file descriptor to prevent a path
-    # substitution between the permission check and the fingerprinted bytes.
+    absolute = Path(os.path.abspath(os.fspath(path)))
     try:
-        resolved = path.resolve(strict=True)
-        if resolved.is_relative_to(Path(repo_root).resolve()):
+        public_root = Path(repo_root).resolve(strict=True)
+        intended = absolute.resolve(strict=True)
+        if intended.is_relative_to(public_root):
             deny("private reviewer roster must not reside in the public repository")
-        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
-        fd = os.open(path, flags)
+        fd = _open_no_symlink_ancestors(absolute)
         try:
             before = os.fstat(fd)
-            if not stat.S_ISREG(before.st_mode) or before.st_mode & 0o077:
-                deny("roster must be a private regular file (mode 0600)")
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid() or
+                    before.st_nlink != 1 or before.st_mode & 0o077):
+                deny("roster must be an owner-private, single-link regular file")
             if not 1 <= before.st_size <= MAX_ROSTER_BYTES:
                 deny("private reviewer roster size outside allowed limit")
-            with os.fdopen(fd, "rb", closefd=False) as handle:
-                data = handle.read(MAX_ROSTER_BYTES + 1)
+            data = bytearray()
+            while len(data) < MAX_ROSTER_BYTES + 1:
+                block = os.read(fd, min(65536, MAX_ROSTER_BYTES + 1 - len(data)))
+                if not block:
+                    break
+                data.extend(block)
             after = os.fstat(fd)
             def identity(st):
                 return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
                         st.st_ctime_ns)
             if identity(before) != identity(after) or len(data) != before.st_size:
                 deny("private roster changed during admission")
+            # A parent swapped to a symlink, or a different same-byte roster,
+            # must not be silently treated as the approved local file.
+            if absolute.resolve(strict=True) != intended or intended.is_relative_to(public_root):
+                deny("private roster pathname changed during admission")
+            final_fd = _open_no_symlink_ancestors(absolute)
+            try:
+                final = os.fstat(final_fd)
+                if (final.st_dev, final.st_ino) != (before.st_dev, before.st_ino):
+                    deny("private roster inode changed during admission")
+            finally:
+                os.close(final_fd)
         finally:
             os.close(fd)
     except (OSError, RuntimeError) as exc:
