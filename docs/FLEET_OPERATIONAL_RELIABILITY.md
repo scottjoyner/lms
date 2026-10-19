@@ -476,3 +476,15 @@ an aliased directory. Normal self-contained run evidence is unaffected.
 A privileged attacker able to mutate inodes concurrently or alter the
 operator process is outside this local evidence-custody guarantee. Preserve
 NO-GO until independent review and off-host rollback witness authority.
+
+### Archive reference generation matches verification
+
+When building a manifest, archive references copied from
+\`observe/rollout_results.json\` are validated **before a manifest is written**.
+Each collected artifact must be an absolute path contained in the run root;
+it must pass the descriptor-anchored no-symlink/single-hard-link reader, and
+the collector's size and SHA-256 claims must match the bytes just hashed.
+Valid collector metadata is retained, while outside-run paths, hard-linked
+aliases and stale metadata fail closed. This prevents creating a manifest
+that signed verification will necessarily reject, but does not establish
+independent evidence custody or tamper-resistant replay protection.

@@ -357,3 +357,66 @@ def test_manifest_builder_refuses_unsafe_control_evidence_before_writing(tmp_pat
     assert not (root / "operator-manifest.json").exists(), (
         "builder emitted a self-inconsistent manifest over unsafe evidence"
     )
+@pytest.mark.parametrize(
+    "attack", ["outside", "hardlink", "symlink", "wrong_size", "wrong_hash"]
+)
+def test_manifest_builder_rejects_unsafe_rollout_archive_references(tmp_path, attack):
+    root = tmp_path / "run"
+    root.mkdir()
+    observe = root / "observe"
+    observe.mkdir()
+    archive_dir = root / "archives"
+    archive_dir.mkdir()
+    outside = tmp_path / "outside.tar.gz"
+    outside.write_bytes(b"outside bytes")
+    claimed = archive_dir / "collected.tar.gz"
+    if attack == "hardlink":
+        claimed.hardlink_to(outside)
+    elif attack == "symlink":
+        claimed.symlink_to(outside)
+    else:
+        claimed.write_bytes(b"inside bytes")
+    candidate = outside if attack == "outside" else claimed
+    reported_size = candidate.stat().st_size
+    reported_hash = fleet_operator.file_sha256(candidate)
+    if attack == "wrong_size":
+        reported_size += 1
+    if attack == "wrong_hash":
+        reported_hash = "sha256:" + "0" * 64
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run",
+         "results": [{
+             "node_id": "synthetic-node", "collected_artifact": str(candidate),
+             "collected_artifact_size_bytes": reported_size,
+             "collected_artifact_sha256": reported_hash,
+         }]},
+    )
+    with pytest.raises(ValueError, match="archive"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": True})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_accepts_verified_run_local_archive(tmp_path):
+    root = tmp_path / "run"
+    root.mkdir()
+    observe = root / "observe"
+    observe.mkdir()
+    archive = root / "archives" / "collected.tar.gz"
+    archive.parent.mkdir()
+    archive.write_bytes(b"ordinary collected archive")
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run",
+         "results": [{
+             "node_id": "synthetic-node", "collected_artifact": str(archive),
+             "collected_artifact_size_bytes": archive.stat().st_size,
+             "collected_artifact_sha256": fleet_operator.file_sha256(archive),
+         }]},
+    )
+    manifest = fleet_operator.build_run_manifest(
+        root, {"run_id": "run", "success": True}
+    )
+    assert manifest["archives"][0]["path"] == str(archive)
+    report = fleet_operator.verify_run_manifest(root, require_success=True)
+    assert report["valid"] and report["archive_count"] == 1

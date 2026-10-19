@@ -680,15 +680,40 @@ def _archive_references(root: Path) -> List[Dict[str, Any]]:
     except (OSError, json.JSONDecodeError):
         return []
     references: List[Dict[str, Any]] = []
+    normalized_root = Path(root).expanduser().resolve()
     for item in payload.get("results", []):
         if not isinstance(item, Mapping) or not item.get("collected_artifact"):
             continue
+        archive_path = Path(str(item["collected_artifact"]))
+        if not archive_path.is_absolute():
+            raise ValueError(f"operator archive path must be absolute: {archive_path}")
+        try:
+            relative = archive_path.relative_to(normalized_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"operator archive escapes run directory: {archive_path}"
+            ) from exc
+        if not relative.parts or ".." in relative.parts:
+            raise ValueError(f"operator archive path is unsafe: {archive_path}")
+        size, digest = _pinned_control_file_identity(
+            normalized_root, relative, label="archive"
+        )
+        try:
+            claimed_size = int(item.get("collected_artifact_size_bytes"))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"operator archive has invalid recorded size: {archive_path}"
+            ) from exc
+        if size != claimed_size:
+            raise ValueError(f"operator archive size mismatch: {archive_path}")
+        if digest != item.get("collected_artifact_sha256"):
+            raise ValueError(f"operator archive hash mismatch: {archive_path}")
         references.append(
             {
                 "node_id": item.get("node_id"),
-                "path": str(item.get("collected_artifact")),
-                "size_bytes": item.get("collected_artifact_size_bytes"),
-                "sha256": item.get("collected_artifact_sha256"),
+                "path": str(archive_path),
+                "size_bytes": size,
+                "sha256": digest,
             }
         )
     return references
