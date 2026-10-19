@@ -16,6 +16,71 @@ SCHEMA = "exp053-owner-reviewed-roster-v1"
 MAX_ROSTER_BYTES = 16384  # Private human-key metadata, never corpus source text.
 ROLES = {"A": "independent", "B": "independent", "ADJ": "adjudicator"}
 
+# Ed25519 compressed public keys are NOT validated by a 32-byte length check.
+# In some OpenSSL versions a low-order/identity public key verifies a
+# signature without proving any independent private-key possession. These
+# operations use only public coordinates; never process secret signing keys.
+_FIELD = 2**255 - 19
+_ORDER = 2**252 + 27742317777372353535851937790883648493
+_D = (-121665 * pow(121666, _FIELD - 2, _FIELD)) % _FIELD
+_SQRT_MINUS_ONE = pow(2, (_FIELD - 1) // 4, _FIELD)
+_IDENTITY = (0, 1, 1, 0)
+
+
+def _edwards_add(a, b):
+    """Complete extended Edwards addition with a = -1, public inputs only."""
+    x1, y1, z1, t1 = a
+    x2, y2, z2, t2 = b
+    left = ((y1 - x1) * (y2 - x2)) % _FIELD
+    right = ((y1 + x1) * (y2 + x2)) % _FIELD
+    cross = (2 * _D * t1 * t2) % _FIELD
+    depth = (2 * z1 * z2) % _FIELD
+    e = (right - left) % _FIELD
+    f = (depth - cross) % _FIELD
+    g = (depth + cross) % _FIELD
+    h = (right + left) % _FIELD
+    return ((e * f) % _FIELD, (g * h) % _FIELD,
+            (f * g) % _FIELD, (e * h) % _FIELD)
+
+
+def _prime_order_ed25519_public_key(raw):
+    """True iff this canonical compressed point is nonzero and L-torsion-free.
+
+    No external library's from_public_bytes() routine is assumed to enforce
+    curve/subgroup constraints. This performs public-input group arithmetic.
+    """
+    if not isinstance(raw, bytes) or len(raw) != 32:
+        return False
+    packed = int.from_bytes(raw, "little")
+    sign = packed >> 255
+    y = packed & ((1 << 255) - 1)
+    if y >= _FIELD:
+        return False
+    y2 = (y * y) % _FIELD
+    denominator = (_D * y2 + 1) % _FIELD
+    if denominator == 0:
+        return False
+    x2 = ((y2 - 1) * pow(denominator, _FIELD - 2, _FIELD)) % _FIELD
+    x = pow(x2, (_FIELD + 3) // 8, _FIELD)
+    if x * x % _FIELD != x2:
+        x = (x * _SQRT_MINUS_ONE) % _FIELD
+    if x * x % _FIELD != x2:
+        return False
+    if x & 1 != sign:
+        x = (_FIELD - x) % _FIELD
+    if not x and sign:
+        return False  # Noncanonical encoding of a point with x=0.
+    point = (x, y, 1, (x * y) % _FIELD)
+    if point == _IDENTITY:
+        return False
+    acc = _IDENTITY
+    for bit in bin(_ORDER)[2:]:
+        acc = _edwards_add(acc, acc)
+        if bit == "1":
+            acc = _edwards_add(acc, point)
+    # Projective identity: X == 0, Y == Z, modulo field prime.
+    return acc[0] % _FIELD == 0 and (acc[1] - acc[2]) % _FIELD == 0
+
 
 def deny(message):
     raise ValueError("HOLD EXP053 ROSTER: " + message)
@@ -174,8 +239,9 @@ def load_roster(path, packet_sha256, pinned_sha256, repo_root):
         except (TypeError, ValueError) as exc:
             deny("bad reviewer key encoding: " + type(exc).__name__)
         if (len(pub) != 32 or
-                base64.b64encode(pub).decode() != info["public_key_b64"]):
-            deny("invalid Ed25519 public key")
+                base64.b64encode(pub).decode() != info["public_key_b64"] or
+                not _prime_order_ed25519_public_key(pub)):
+            deny("invalid or low-order Ed25519 public key")
         if reviewer_id in used_ids or pub in used_keys:
             deny("reviewer identities and signing keys must be distinct")
         used_ids.add(reviewer_id)

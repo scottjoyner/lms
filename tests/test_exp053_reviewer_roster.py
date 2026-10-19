@@ -28,8 +28,8 @@ class Enrollment(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.path=Path(self.tmp.name)/"owner-enrollment-TEST-ONLY.json"
         self.packet="c"*64
-        self.a=base64.b64encode(b"a"*32).decode()
-        self.b=base64.b64encode(b"b"*32).decode()
+        self.a=base64.b64encode(bytes.fromhex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a")).decode()
+        self.b=base64.b64encode(bytes.fromhex("3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c")).decode()
         self.value={"schema":roster.SCHEMA,"packet_sha256":self.packet,
                     "owner_custody_reference_sha256":"d"*64,
                     "blind_assignments_confirmed":True,
@@ -69,7 +69,7 @@ class Enrollment(unittest.TestCase):
     def test_adjudicator_role_enforced(self):
         r=copy.deepcopy(self.value)
         r["slots"]["ADJ"]={"reviewer_id":"test_adjudicator","role":"adjudicator",
-                            "public_key_b64":base64.b64encode(b"c"*32).decode()}
+                            "public_key_b64":base64.b64encode(bytes.fromhex("fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025")).decode()}
         self.assertEqual(set(self.check(r)["slots"]),{"A","B","ADJ"})
         r["slots"]["ADJ"]["role"]="independent"
         with self.assertRaisesRegex(ValueError,"HOLD"):self.check(r)

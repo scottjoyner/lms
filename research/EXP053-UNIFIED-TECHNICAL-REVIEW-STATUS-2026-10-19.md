@@ -179,3 +179,18 @@ identity-checked best-effort retry for an ambiguously failed last parent
 close. No real roster or RACE text was read. See the frozen
 `EXP053-ROSTER-DIRFD-CLEANUP-SPEC-2026-10-19.md`,
 `EXP053-ROSTER-DIRFD-CLEANUP-FINDING-2026-10-19.md`, and synthetic tests.
+
+## Weak Ed25519 reviewer key enrollment and direct verifier refusal
+
+A synthetic identity-point reviewer key previously passed private roster
+parsing and allowed a publicly constructible signature to verify for two
+different messages with the installed OpenSSL provider. Direct
+`verify_signed` calls could also accept this invented review without proof of
+private-key possession. The unified research candidate now requires
+canonical, non-identity, prime-order subgroup public keys in both paths.
+RFC 8032 vectors, synthetic weak/mixed-order cases, and ephemeral keys pass
+negative/positive tests; 228 classifications matched independent libsodium.
+The public source-only draft PR #37 has the same fix; see the new
+`EXP053-ED25519-KEY-SUBGROUP-SPEC-2026-10-19.md` and findings document.
+No actual reviewer key or source text was accessed. Owner roster pin remains
+unset; EXP-053 inference still NO_GO_RESEARCH_ONLY.

@@ -189,3 +189,13 @@ synthetic error/KeyboardInterrupt tests in
 opened but not-yet-owned directory fds on an old-parent close error and closes
 the leaf on a final parent close failure. Linux close-error ambiguity remains
 a documented limitation; this is not independent scientific approval.
+
+## Critical Ed25519 weak-key validation (October 19)
+
+Inspect `exp053_reviewer_roster._prime_order_ed25519_public_key`, the separate
+`exp053_race_review.verify_signed` check, and the synthetic weak-key
+regression suite. Length-32 and canonical-base64 public keys can still encode
+weak/identity points; unit-tested signature acceptance did not prove any
+private-key holder. The corrected source rejects those keys. Independently
+review the pure-Python subgroup math before granting ANY human source review
+approval. Published draft PR #37 carries the source-only review request.
