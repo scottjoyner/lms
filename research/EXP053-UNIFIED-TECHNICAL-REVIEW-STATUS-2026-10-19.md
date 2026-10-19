@@ -136,3 +136,14 @@ mandatory if an exact hex pin is configured. Negative tests instrument
 public-safe synthetic paths to prove no sensitive-file access without
 approval. See `EXP053-EARLY-OWNER-PIN-FAIL-CLOSED-SPEC-2026-10-19.md` and
 `EXP053-EARLY-OWNER-PIN-FAIL-CLOSED-FINDING-2026-10-19.md`.
+
+## Authenticate exact owner roster before licensed source reads (October 19)
+
+A syntactically plausible but incorrect owner roster SHA previously allowed
+`verified_admission` to hash licensed source before roster byte validation.
+The local research branch now uses only the preregistered source-free manifest
+packet digest to verify the exact private owner roster first. Malformed,
+mismatched or unsafe synthetic rosters refuse before any source access; a
+valid synthetic roster still cannot bypass the source hash. See
+`EXP053-ROSTER-BEFORE-SOURCE-CUSTODY-SPEC-2026-10-19.md` and
+`EXP053-ROSTER-BEFORE-SOURCE-CUSTODY-FINDING-2026-10-19.md`.

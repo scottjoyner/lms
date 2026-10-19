@@ -305,11 +305,27 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if (not isinstance(pin, str) or len(pin) != 64 or
             any(c not in "0123456789abcdef" for c in pin)):
         deny("owner has not approved any independent human reviewer roster")
-    if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
-    if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
+    # The source-free public manifest is itself pinned by the preregistered
+    # SHA. Its packet digest is the trust anchor for checking the separately
+    # owner-pinned private A/B roster BEFORE reading licensed source bytes.
     if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:
         deny("immutable public manifest is absent or modified")
-    manifest=json.loads(MANIFEST.read_text())
+    try:
+        manifest=json.loads(MANIFEST.read_text())
+    except (ValueError, UnicodeError, OSError, RecursionError):
+        deny("immutable public manifest cannot be parsed safely")
+    packet_pin=manifest.get("packet_sha256") if isinstance(manifest,dict) else None
+    if (not isinstance(packet_pin,str) or len(packet_pin)!=64 or
+            any(c not in "0123456789abcdef" for c in packet_pin)):
+        deny("immutable public manifest has invalid packet identity")
+    from exp053_reviewer_roster import load_roster
+    roster=load_roster(keys_path,packet_pin,pin,
+                       Path(__file__).resolve().parents[1])
+    # A syntactically valid roster pin alone is not proof of human enrollment.
+    # Only exact, owner-pinned bytes with matching packet identity allow the
+    # existing SOURCE/protocol/private packet/sealed-answer checks to start.
+    if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
+    if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
     packet=json.loads((private_dir/"packet.json").read_text())
     seal=json.loads((private_dir/"sealed_exam_key.json").read_text())
     if packet.get("source_sha256")!=SOURCE_SHA or packet.get("protocol_sha256")!=PROTOCOL_SHA:
@@ -318,9 +334,6 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if (seal["packet_sha256"]!=digest(packet) or
         digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
         deny("answer key differs from committed manifest")
-    from exp053_reviewer_roster import load_roster
-    roster=load_roster(keys_path,digest(packet),APPROVED_REVIEWER_ROSTER_SHA256,
-                       Path(__file__).resolve().parents[1])
     trust=roster["keys"]
     observations=[];signer_ids=[]
     for slot in ("A","B"):

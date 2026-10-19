@@ -51,19 +51,22 @@ class UnapprovedRosterCannotReadSource(unittest.TestCase):
             lambda: review.gate(self.private, self.roster, self.result), pin="")
         self.assertFalse(self.result.exists())
 
-    def test_approved_shape_does_not_bypass_source_hash_gate(self):
+    def test_valid_pin_shape_without_roster_never_reaches_source_hash(self):
+        real_hash = review.filehash
         seen = []
-        def mismatch(path):
-            seen.append(str(path))
-            return "0" * 64
+
+        def protected_hash(path):
+            seen.append(path)
+            if Path(path) == review.MANIFEST:
+                return real_hash(path)  # Immutable public, source-free manifest.
+            raise AssertionError("roster is absent: no source hashing allowed")
+
         with patch.object(review, "APPROVED_REVIEWER_ROSTER_SHA256", "a" * 64), \
              patch.object(review, "SOURCE", self.source), \
-             patch.object(review, "filehash", side_effect=mismatch), \
-             patch.object(Path, "read_text", side_effect=AssertionError(
-                 "source mismatch must not read private files")):
-            with self.assertRaisesRegex(ValueError, "^HOLD EXP053: source authority changed"):
+             patch.object(review, "filehash", side_effect=protected_hash):
+            with self.assertRaisesRegex(ValueError, "HOLD EXP053 ROSTER"):
                 review.verified_admission(self.private, self.roster)
-        self.assertEqual(seen, [str(self.source)])
+        self.assertEqual(seen, [review.MANIFEST])
         self.assertFalse(self.result.exists())
 
     def test_live_unapproved_pin_remains_empty_without_opening_live_corpus(self):

@@ -150,3 +150,13 @@ manifest, private packet, review form or answer-key read. A valid-format
 fake pin does not bypass downstream checks. Synthetic tests and the status
 report do NOT attest independently enrolled humans, 40 approved articles,
 or external witness custody.
+
+## Exact roster first, licensed source second (October 19)
+
+Review the new `verified_admission` order and synthetic tests in
+`tests/test_exp053_roster_before_source.py`. The code now checks the pinned
+source-free public manifest, then the exact privately owner-pinned roster
+before probing/hashing the licensed RACE corpus, private packet or sealed
+answers. Confirm that wrong owner/packet pins and unsafe rosters HOLD and that
+real source SHA, human signatures and 40-item thresholds remain mandatory.
+Passing unit tests cannot independently enroll humans or approve model runs.
