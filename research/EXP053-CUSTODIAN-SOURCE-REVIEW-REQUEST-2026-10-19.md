@@ -131,3 +131,12 @@ review creation. An independent reviewer should inspect `save_private()` in
 no-follow parent binding, readback, cleanup and no-overwrite. This is a
 local source-only safety improvement; it does not constitute signed human
 review evidence or proof of independent custody.
+
+## Human signer offline draft input review (October 19)
+
+Review `exp053_sign_review.py` and `tests/test_exp053_signer_input_boundary.py`
+for bounded no-follow packet/draft reads, duplicate JSON keys, invalid
+adjudicator case IDs, and denial **before** private signer key access. This
+is a source-only integrity hardening patch, not evidence that a real reviewer
+has been enrolled, agreed or signed. See the frozen specification and
+reproducible finding named `EXP053-SIGNER-INPUT-BOUNDARY-*.md`.

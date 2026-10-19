@@ -114,3 +114,14 @@ export reuses this private writer. Unit tests use synthetic JSON and ephemeral
 keys only. See `EXP053-PRIVATE-REVIEW-WRITER-SPEC-2026-10-19.md` and
 `EXP053-PRIVATE-REVIEW-WRITER-FINDING-2026-10-19.md`. This does not amend
 human or scientific authorization.
+
+## Offline reviewer packet/draft read hardening (October 19)
+
+The human-operated signer previously used path-following unbounded JSON
+reads, permitted duplicate JSON fields, and raised raw exceptions for
+malformed adjudicator subsets. The local input path now performs a stable,
+bounded one-descriptor read and strict JSON/decision validation before
+opening a signing key. Synthetic adversarial tests cover the refusal
+boundary and a valid synthetic signature; owner enrollment and model
+admission remain unapproved. See `EXP053-SIGNER-INPUT-BOUNDARY-SPEC-2026-10-19.md`
+and `EXP053-SIGNER-INPUT-BOUNDARY-FINDING-2026-10-19.md`.
