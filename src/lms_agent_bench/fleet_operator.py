@@ -768,6 +768,16 @@ def _archive_references(
 
 
 def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
+    # A local phase label is not authority to skip successful rollout checks.
+    # A phase marker, node roster, rollout status or observe directory indicates
+    # observed-run context; missing/edited labels must not bypass coverage.
+    observed_context = (
+        state.get("phase") == "observe"
+        or "node_ids" in state
+        or state.get("rollout") is not None
+        or (root / "observe").exists()
+    )
+    require_rollout_coverage = state.get("success") is True and observed_context
     core = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "run_id": state.get("run_id"),
@@ -777,12 +787,10 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
         "control_files": _control_files(root),
         "archives": _archive_references(
             root,
-            require_results=state.get("success") is True
-            and (state.get("rollout") is not None or (root / "observe").is_dir()),
+            require_results=require_rollout_coverage,
             expected_success_nodes=(
                 list(state.get("node_ids") or [])
-                if state.get("success") is True and state.get("phase") == "observe"
-                else None
+                if require_rollout_coverage else None
             ),
         ),
         "admission": {"admitted": False},
