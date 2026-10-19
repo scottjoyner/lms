@@ -231,3 +231,13 @@ read stability and rejects ambiguous duplicate JSON object fields. Review
 `EXP053-PRIVATE-ADMISSION-JSON-BOUNDARY-SPEC-2026-10-19.md`. The patch is
 research-only; source passages, real human signing keys or approvals are
 not part of this review request. Scientific inference remains blocked.
+
+## Public manifest same-bytes SHA and JSON binding (October 19)
+
+The old admission path checked `filehash(MANIFEST)` then separately parsed
+`MANIFEST.read_text()`. A synthetic timed replacement caused the roster
+loader to receive a packet SHA from a different file. The unified candidate
+now checks hash and strict JSON against one bounded no-follow fd buffer,
+with stability/inode recheck and negative synthetic tests. Public draft PR
+#38 contains the same source-only fix; no genuine private review material,
+human enrollment, scoring or inference was authorized. NO_GO_RESEARCH_ONLY.

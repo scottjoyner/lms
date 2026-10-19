@@ -227,3 +227,13 @@ contain no licensed source data. See
 `EXP053-PRIVATE-ADMISSION-JSON-BOUNDARY-SPEC-2026-10-19.md`, its finding and
 `tests/test_exp053_private_admission_json.py`. Independent human custody and
 model authorization remain NO_GO_RESEARCH_ONLY.
+
+## Public manifest same-bytes SHA and JSON binding (October 19)
+
+The old admission path checked `filehash(MANIFEST)` then separately parsed
+`MANIFEST.read_text()`. A synthetic timed replacement caused the roster
+loader to receive a packet SHA from a different file. The unified candidate
+now checks hash and strict JSON against one bounded no-follow fd buffer,
+with stability/inode recheck and negative synthetic tests. Public draft PR
+#38 contains the same source-only fix; no genuine private review material,
+human enrollment, scoring or inference was authorized. NO_GO_RESEARCH_ONLY.
