@@ -4,7 +4,9 @@ import argparse
 import base64
 import hashlib
 import json
+import math
 import os
+import stat
 from pathlib import Path
 from collections import defaultdict
 SOURCE=Path("/media/scott/SSD_4TB/hf-cache/huggingface/hub/datasets--ehovy--race/snapshots/2fec9fd81f1dc971569a9b729c43f2f0e6436637/high/test-00000-of-00001.parquet")
@@ -30,6 +32,91 @@ def filehash(p):
         for b in iter(lambda:f.read(1<<20),b""):h.update(b)
     return h.hexdigest()
 def deny(msg):raise ValueError("HOLD EXP053: "+msg)
+
+PRIVATE_JSON_LIMIT = 8_000_000
+
+
+def _unique_private_fields(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            deny("ambiguous duplicate field in private admission JSON")
+        value[key] = item
+    return value
+
+
+def _invalid_private_constant(_value):
+    deny("invalid numeric constant in private admission JSON")
+
+
+def _finite_private_float(value):
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        deny("non-finite number in private admission JSON")
+    return parsed
+
+
+def _read_private_admission_json(path):
+    """Read stable, source-protected owner-private JSON without symlink walks.
+
+    No actual human record or RACE source is accessed by unit tests. The
+    independently pinned roster must already pass before admission uses this.
+    """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not all(getattr(os, name, 0) for name in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("secure private admission file access unavailable")
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    try:
+        root = Path(__file__).resolve().parents[1]
+        intended = absolute.resolve(strict=True)
+        if intended.is_relative_to(root):
+            deny("private admission input inside public source checkout")
+        fd = _open_no_symlink_ancestors(absolute)
+        try:
+            before = os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid() or
+                    before.st_nlink != 1 or before.st_mode & 0o077 or
+                    not 1 <= before.st_size <= PRIVATE_JSON_LIMIT):
+                deny("private admission input is not an owner-private bounded file")
+            data = bytearray()
+            while len(data) < PRIVATE_JSON_LIMIT + 1:
+                part = os.read(fd, min(65536, PRIVATE_JSON_LIMIT + 1 - len(data)))
+                if not part:
+                    break
+                data.extend(part)
+            after = os.fstat(fd)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if len(data) != before.st_size or identity(after) != identity(before):
+                deny("private admission input changed during descriptor read")
+            if (absolute.resolve(strict=True) != intended or
+                    intended.is_relative_to(root)):
+                deny("private admission pathname changed during read")
+            final_fd = _open_no_symlink_ancestors(absolute)
+            try:
+                last = os.fstat(final_fd)
+                if (last.st_dev, last.st_ino) != (before.st_dev, before.st_ino):
+                    deny("private admission inode changed during read")
+            finally:
+                os.close(final_fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        deny("private admission file unavailable or unsafe")
+    try:
+        result = json.loads(data.decode("utf-8"),
+                            object_pairs_hook=_unique_private_fields,
+                            parse_constant=_invalid_private_constant,
+                            parse_float=_finite_private_float)
+    except (ValueError, UnicodeError, RecursionError, OverflowError):
+        deny("private admission JSON malformed or ambiguous")
+    if not isinstance(result, dict):
+        deny("private admission JSON must be an object")
+    return result
+
+
 def corpus():
     if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority mismatch")
     if filehash(PROTOCOL)!=PROTOCOL_SHA:deny("preregistered protocol drift")
@@ -212,26 +299,46 @@ def decisions_for(review,packet,required_ids=None):
     if set(out)!=expected:deny("unexpected decision scope")
     return out
 def verified_admission(private_dir,keys_path,adjudicator_file=None):
-    if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
-    if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
+    # There is no scientific authorization without an independently approved
+    # owner roster. Refuse BEFORE hashing licensed source bytes or opening
+    # private reviewer/answer-key files when the pin is still unset.
+    pin = APPROVED_REVIEWER_ROSTER_SHA256
+    if (not isinstance(pin, str) or len(pin) != 64 or
+            any(c not in "0123456789abcdef" for c in pin)):
+        deny("owner has not approved any independent human reviewer roster")
+    # The source-free public manifest is itself pinned by the preregistered
+    # SHA. Its packet digest is the trust anchor for checking the separately
+    # owner-pinned private A/B roster BEFORE reading licensed source bytes.
     if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:
         deny("immutable public manifest is absent or modified")
-    manifest=json.loads(MANIFEST.read_text())
-    packet=json.loads((private_dir/"packet.json").read_text())
-    seal=json.loads((private_dir/"sealed_exam_key.json").read_text())
+    try:
+        manifest=json.loads(MANIFEST.read_text())
+    except (ValueError, UnicodeError, OSError, RecursionError):
+        deny("immutable public manifest cannot be parsed safely")
+    packet_pin=manifest.get("packet_sha256") if isinstance(manifest,dict) else None
+    if (not isinstance(packet_pin,str) or len(packet_pin)!=64 or
+            any(c not in "0123456789abcdef" for c in packet_pin)):
+        deny("immutable public manifest has invalid packet identity")
+    from exp053_reviewer_roster import load_roster
+    roster=load_roster(keys_path,packet_pin,pin,
+                       Path(__file__).resolve().parents[1])
+    # A syntactically valid roster pin alone is not proof of human enrollment.
+    # Only exact, owner-pinned bytes with matching packet identity allow the
+    # existing SOURCE/protocol/private packet/sealed-answer checks to start.
+    if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority changed")
+    if not PROTOCOL.is_file() or filehash(PROTOCOL)!=PROTOCOL_SHA:deny("protocol drift")
+    packet=_read_private_admission_json(private_dir/"packet.json")
+    seal=_read_private_admission_json(private_dir/"sealed_exam_key.json")
     if packet.get("source_sha256")!=SOURCE_SHA or packet.get("protocol_sha256")!=PROTOCOL_SHA:
         deny("packet custody mismatch")
     if digest(packet)!=manifest["packet_sha256"]:deny("packet differs from manifest")
     if (seal["packet_sha256"]!=digest(packet) or
         digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
         deny("answer key differs from committed manifest")
-    from exp053_reviewer_roster import load_roster
-    roster=load_roster(keys_path,digest(packet),APPROVED_REVIEWER_ROSTER_SHA256,
-                       Path(__file__).resolve().parents[1])
     trust=roster["keys"]
     observations=[];signer_ids=[]
     for slot in ("A","B"):
-        review=json.loads((private_dir/("reviewer_"+slot+".json")).read_text())
+        review=_read_private_admission_json(private_dir/("reviewer_"+slot+".json"))
         rid=require_owner_assigned_signer(review,trust,roster["slots"],slot)
         signer_ids.append(rid)
         observations.append(decisions_for(review,packet))
@@ -252,7 +359,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
             deny(str(len(unresolved))+" disputed items require independent third review")
         if "ADJ" not in roster["slots"]:
             deny("third independent adjudicator has not been owner-enrolled")
-        third=json.loads(adjudicator_file.read_text())
+        third=_read_private_admission_json(adjudicator_file)
         third_id=require_owner_assigned_signer(third,trust,roster["slots"],"ADJ")
         if third_id in signer_ids:
             deny("adjudicator must be independent of both reviewers")
