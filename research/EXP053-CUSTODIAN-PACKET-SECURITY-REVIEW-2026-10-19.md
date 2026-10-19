@@ -127,3 +127,31 @@ The broader PR #32 stacked branch and its model/adjudication gates remain
 unapproved. Zero human article reviews and no native EXP-053 model forwards
 were authorized or executed by this change. No external witness setup,
 software deployment, NAS/Neo4j write, model loading, GitHub push or merge.
+
+## Python KeyboardInterrupt during packet creation (follow-up)
+
+A disposable signal simulation exposed another interrupted-write issue:
+`KeyboardInterrupt` inherits from `BaseException`, not `Exception`. The
+source-only packager's prior `except Exception` cleanup blocks did not run on
+Ctrl-C-like interruption, leaving a fully or partially written but unapproved
+named packet on disk. In a synthetic post-write, pre-fsync interruption,
+the old code raised KeyboardInterrupt and left 28,769 bytes at the destination.
+The bytes happen to be the deterministic research handoff in that particular
+fixture, but an interrupted file must never be described as published or
+verified.
+
+The fix runs inode-guarded cleanup for `BaseException` at the descriptor
+adoption, initial metadata and outer creation scopes, while **re-raising**
+KeyboardInterrupt for direct `create()` callers. The CLI catches
+KeyboardInterrupt and returns a sanitized NO-GO JSON error with exit 2,
+without exposing private filesystem paths or Python tracebacks. Regression
+covers interruption during file `fsync`, during initial `fstat` before
+recording the inode, and during `fdopen` ownership transfer. It also checks
+that the raw file descriptor closes and that the named file is cleaned up
+unless its identity is not safely known. An interrupted CLI invocation
+returns no approval.
+
+These safeguards cannot clean up after SIGKILL, process crash, OS panic,
+power loss, or an attacker who can keep replacing the directory entry with
+same-user privileges. They do not upgrade local disk publication into a
+separately administered witness or change any model inference gate.

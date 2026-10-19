@@ -154,6 +154,73 @@ class OfflineHandoff(unittest.TestCase):
         self.assertFalse((outside / self.output.name).exists())
         self.assertFalse((moved / self.output.name).exists())
 
+    def test_keyboard_interrupt_during_write_cleans_named_packet(self):
+        original_fsync = os.fsync
+        interrupted = False
+
+        def signal_during_file_fsync(fd):
+            nonlocal interrupted
+            if not interrupted and stat.S_ISREG(os.fstat(fd).st_mode):
+                interrupted = True
+                raise KeyboardInterrupt("synthetic SIGINT")
+            return original_fsync(fd)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=signal_during_file_fsync):
+            with self.assertRaises(KeyboardInterrupt):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(interrupted)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(list(self.dest.iterdir()), [])
+
+    def test_keyboard_interrupt_before_initial_file_fstat_retries_cleanup(self):
+        real_fstat = os.fstat
+        interrupted = False
+
+        def signal_on_initial_fstat(fd):
+            nonlocal interrupted
+            info = real_fstat(fd)
+            if not interrupted and stat.S_ISREG(info.st_mode) and info.st_size == 0:
+                interrupted = True
+                raise KeyboardInterrupt("synthetic SIGINT before identity saved")
+            return info
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fstat", side_effect=signal_on_initial_fstat):
+            with self.assertRaises(KeyboardInterrupt):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(interrupted)
+        self.assertFalse(self.output.exists())
+
+    def test_keyboard_interrupt_during_fdopen_closes_raw_fd(self):
+        real_fdopen = os.fdopen
+        interrupted_fd = []
+
+        def signal_during_fdopen(fd, mode="r", *args, **kwargs):
+            if mode == "w+b":
+                interrupted_fd.append(fd)
+                raise KeyboardInterrupt("synthetic SIGINT before descriptor adoption")
+            return real_fdopen(fd, mode, *args, **kwargs)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fdopen", side_effect=signal_during_fdopen):
+            with self.assertRaises(KeyboardInterrupt):
+                packet.create(self.output, source_dir=self.src)
+        self.assertEqual(len(interrupted_fd), 1)
+        with self.assertRaises(OSError):
+            os.fstat(interrupted_fd[0])
+        self.assertFalse(self.output.exists())
+
+    def test_cli_keyboard_interrupt_is_sanitized_no_go(self):
+        out = io.StringIO()
+        with patch.object(packet, "inventory", side_effect=KeyboardInterrupt), contextlib.redirect_stdout(out):
+            rc = packet.main(["--inspect"])
+        self.assertEqual(rc, 2)
+        result = json.loads(out.getvalue())
+        self.assertEqual(result["status"], "INVALID_OR_UNVERIFIABLE_PACKET")
+        self.assertFalse(result["scientific_execution_authorized"])
+        self.assertFalse(result["independent_administration_approved"])
+
     def test_created_empty_packet_is_cleaned_after_initial_fstat_error(self):
         # Confirmed failure in the prior version: successful O_EXCL followed
         # by a one-time metadata read failure left a zero-byte output behind.

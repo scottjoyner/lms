@@ -235,7 +235,7 @@ def create(path, *, source_dir=ROOT):
         # capture its identity if possible for inode-guarded cleanup.
         try:
             handle = os.fdopen(fd, "w+b")
-        except Exception:
+        except BaseException:
             try:
                 info = os.fstat(fd)
                 inode = (info.st_dev, info.st_ino)
@@ -254,7 +254,7 @@ def create(path, *, source_dir=ROOT):
                 handle.seek(0)
                 if handle.read(MAX_PACKET + 1) != raw:
                     raise Hold("newly written packet failed exact-byte verification")
-            except Exception:
+            except BaseException:
                 if inode is None:
                     # Metadata failure immediately after O_EXCL must not leave
                     # an empty named artifact when a retry safely identifies
@@ -310,7 +310,7 @@ def create(path, *, source_dir=ROOT):
         finally:
             os.close(fresh_fd)
         os.fsync(parent_fd)
-    except Exception:
+    except BaseException:
         if created and inode is not None:
             try:
                 # Avoid deleting a different inode should a same-UID process
@@ -344,7 +344,7 @@ def main(argv=None):
         else:
             report = {**verify_packet(_local_regular_bytes(args.verify, MAX_PACKET)),
                       "status": "LOCAL_PACKET_BYTES_VERIFIED_ONLY"}
-    except (Hold, OSError, ValueError):
+    except (Hold, OSError, ValueError, KeyboardInterrupt):
         print('{"decision":"NO_GO_RESEARCH_ONLY","scientific_execution_authorized":false,'
               '"independent_administration_approved":false,'
               '"witness_durability_approved":false,"status":"INVALID_OR_UNVERIFIABLE_PACKET"}')
