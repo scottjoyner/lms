@@ -748,3 +748,44 @@ def test_soak_evidence_budget_exhaustion_triggers_verified_rollback(tmp_path, mo
     assert report["admission"] == {"admitted": False}
     with pytest.raises(ValueError, match="did not complete successfully"):
         canary.verify_manifest(workspace / "soak-budget-rollback", require_success=True)
+@pytestmark_attestation
+def test_rehashed_attestation_cannot_misattribute_signature_to_another_allowed_key(tmp_path):
+    plan, _events = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "key-attribution", False)
+    root = workspace / "key-attribution"
+    primary = tmp_path / "primary-key"
+    unrelated = tmp_path / "other-key"
+    for key in (primary, unrelated):
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)],
+            check=True, capture_output=True,
+        )
+        key.chmod(0o600)
+    allowed = tmp_path / "allowed_signers"
+    allowed.write_text(
+        "".join(
+            "runtime-canary-operator " + key.with_suffix(".pub").read_text(encoding="utf-8")
+            for key in (primary, unrelated)
+        ), encoding="utf-8",
+    )
+    attestation.sign_run(root, primary, require_success=True)
+    verified = attestation.verify_attestation(root, allowed, "runtime-canary-operator", require_success=True)
+    primary_fingerprint = attestation._ssh._key_fingerprint(primary)
+    other_fingerprint = attestation._ssh._key_fingerprint(unrelated)
+    assert verified["signing_key_fingerprint"] == primary_fingerprint
+    assert other_fingerprint != primary_fingerprint
+
+    # Forge only unsigned JSON and its ordinary recomputable hash. SSHSIG
+    # remains signed by the primary key, even though both keys are authorized.
+    attestation_path = root / "runtime-canary-attestation.json"
+    payload = json.loads(attestation_path.read_text(encoding="utf-8"))
+    payload["signing_key_fingerprint"] = other_fingerprint
+    core = {
+        key: val for key, val in payload.items()
+        if key not in {"created_at_utc", "attestation_fingerprint"}
+    }
+    payload["attestation_fingerprint"] = canary._operator.canonical_hash(core)
+    attestation_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="signing key fingerprint"):
+        attestation.verify_attestation(root, allowed, "runtime-canary-operator", require_success=True)
