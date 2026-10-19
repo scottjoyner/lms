@@ -103,3 +103,14 @@ set/dictionary membership and preserves strict third-party disputed subset
 validation. Synthetic tests ensure deterministic HOLD and prohibit signing-
 key access for invalid drafts. See the frozen
 `EXP053-MALFORMED-REVIEW-REFUSAL-SPEC-2026-10-19.md` and findings report.
+
+## Private artifact creation window closed (October 19)
+
+An injected `fchmod` failure demonstrated that the old `open("xb")` then
+`fchmod(0600)` private writer could leave a mode-0644 file. It has been
+replaced with parent-dirfd-anchored `O_EXCL` creation in mode 0600 before any
+bytes are written, full readback and inode-scoped cleanup; the human signer
+export reuses this private writer. Unit tests use synthetic JSON and ephemeral
+keys only. See `EXP053-PRIVATE-REVIEW-WRITER-SPEC-2026-10-19.md` and
+`EXP053-PRIVATE-REVIEW-WRITER-FINDING-2026-10-19.md`. This does not amend
+human or scientific authorization.

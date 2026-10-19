@@ -9,7 +9,7 @@ from pathlib import Path
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from exp053_race_review import canonical,decisions_for,deny
+from exp053_race_review import canonical,decisions_for,deny,save_private
 ATTEST=("I independently reviewed these source passages and responses; "
         "no model predictions or other reviewer labels were provided to me.")
 MAX_KEY_BYTES = 16384
@@ -74,9 +74,7 @@ def sign(input_path,packet_path,key_path,out):
     key=get_key(key_path)
     unsigned={k:v for k,v in review.items() if k!="signature"}
     unsigned["signature"]=key.sign(canonical(unsigned)).hex()
-    with out.open("xb") as f:
-        os.fchmod(f.fileno(),0o600)
-        f.write(canonical(unsigned)+b"\n")
+    save_private(out, unsigned)
     print("SIGNED_REVIEW",unsigned["reviewer_id"],"PUBLIC_KEY_B64",public_b64(key))
 def main():
     p=argparse.ArgumentParser()

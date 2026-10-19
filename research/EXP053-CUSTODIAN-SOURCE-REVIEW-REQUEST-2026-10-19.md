@@ -121,3 +121,13 @@ source and negative tests in `exp053_race_review.py` and
 `tests/test_exp053_malformed_review_refusal.py` before approval. This is an
 error-handling fix, **not** evidence of an independently enrolled signer or
 signed RACE decisions. See `EXP053-MALFORMED-REVIEW-REFUSAL-FINDING-2026-10-19.md`.
+
+## Private output mode and interruption review (October 19)
+
+The candidate fixes the initial mode-0644 window in private JSON and signed
+review creation. An independent reviewer should inspect `save_private()` in
+`exp053_race_review.py`, its use by `exp053_sign_review.py`, and tests in
+`tests/test_exp053_private_writer.py` for exact-mode `O_EXCL` creation,
+no-follow parent binding, readback, cleanup and no-overwrite. This is a
+local source-only safety improvement; it does not constitute signed human
+review evidence or proof of independent custody.
