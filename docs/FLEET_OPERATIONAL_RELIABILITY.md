@@ -488,3 +488,14 @@ Valid collector metadata is retained, while outside-run paths, hard-linked
 aliases and stale metadata fail closed. This prevents creating a manifest
 that signed verification will necessarily reject, but does not establish
 independent evidence custody or tamper-resistant replay protection.
+
+### Malformed and missing rollout results
+
+Manifest generation never silently treats a **present but malformed** rollout
+results file as having no collected archives. The builder requires valid JSON,
+the expected \`fleet_rollout.v1\` schema, the current run identifier, and a
+list of node-result objects. Missing results are tolerated only when producing
+a failure or non-observe manifest; a successful observed run requires its
+rollout results. All invalid evidence stops manifest generation before a new
+manifest is written. This does not independently attest the completeness of
+the reported node list or authorization of the physical rollout.
