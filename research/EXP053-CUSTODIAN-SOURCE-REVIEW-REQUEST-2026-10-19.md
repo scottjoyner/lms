@@ -169,3 +169,14 @@ technical reviewer should inspect the synthetic tests in
 `tests/test_exp053_roster_nofollow_failclosed.py` and verify that no OS fallback
 can silently follow a substituted private roster symlink. An exact valid
 roster SHA alone still cannot establish a human signer's independence.
+
+## Owner roster ancestor symlink swap (October 19)
+
+Review `exp053_reviewer_roster.py` and synthetic
+`tests/test_exp053_roster_ancestor_race.py`: the previous `path.resolve`
+precheck plus final-file `O_NOFOLLOW` did not block substituting an ancestor
+directory symlink into the public repo. A synthetic identical-byte substitute
+roster was accepted. The candidate uses an `O_PATH` nonfollowing component
+walk plus path/inode stability checks. Inspect the explicit limitations in
+`EXP053-ROSTER-ANCESTOR-RACE-FINDING-2026-10-19.md`; tests do not supply an
+independently approved real reviewer identity or model authorization.

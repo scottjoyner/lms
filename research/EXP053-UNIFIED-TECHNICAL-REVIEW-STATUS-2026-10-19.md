@@ -159,3 +159,13 @@ repository placement. The actual owner approval pin is still EMPTY; this
 is NOT independent human enrollment. See
 `EXP053-ROSTER-NOFOLLOW-FAILCLOSED-SPEC-2026-10-19.md` and
 `EXP053-ROSTER-NOFOLLOW-FAILCLOSED-FINDING-2026-10-19.md`.
+
+## Reviewer roster ancestor race correction (October 19)
+
+A synthetic identical-byte roster in a public repo was accepted by the old
+loader after the private roster's parent path was replaced with a symlink
+between preflight `resolve()` and final `os.open(... O_NOFOLLOW)`. All path
+components are now walked through nonfollowing `O_PATH` directory descriptors,
+and the opened file is rechecked against the original named inode after
+reading. This is a source-only custody-path fix, NOT a real human approval.
+See `EXP053-ROSTER-ANCESTOR-RACE-SPEC-2026-10-19.md` and its finding.
