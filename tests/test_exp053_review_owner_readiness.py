@@ -170,7 +170,8 @@ class ReviewOwnerPreflight(unittest.TestCase):
         real_open = os.open
         unexpected = []
         def guarded_open(path, flags, *args, **kwargs):
-            if str(path).startswith(str(self.private)) or str(path) == str(self.source):
+            if ((str(path).startswith(str(self.private)) and str(path) != str(self.private)) or
+                    str(path) == str(self.source)):
                 unexpected.append(str(path))
                 raise AssertionError("private content must not be opened")
             return real_open(path, flags, *args, **kwargs)
@@ -178,6 +179,42 @@ class ReviewOwnerPreflight(unittest.TestCase):
             report = self.inspect()
         self.assertEqual(unexpected, [])
         self.assertFalse(report["private_content_accessed"])
+
+    def test_symlink_swap_during_directory_relative_stat_is_blocked(self):
+        # The previous path-based lstat check could observe the destination
+        # directory before a rename and different files after a symlink swap.
+        original_stat = os.stat
+        moved = self.root / "private-moved"
+        substitute = self.root / "synthetic-untrusted-files"
+        substitute.mkdir(mode=0o700)
+        for name in ready.PRIVATE_FILES:
+            (substitute / name).write_bytes(b"untrusted placeholder")
+            (substitute / name).chmod(0o600)
+        swapped = False
+
+        def swap_on_first_private_stat(path, *args, **kwargs):
+            nonlocal swapped
+            if (not swapped and path in ready.PRIVATE_FILES and
+                    kwargs.get("dir_fd") is not None):
+                swapped = True
+                self.private.rename(moved)
+                self.private.symlink_to(substitute, target_is_directory=True)
+            return original_stat(path, *args, **kwargs)
+
+        with patch.object(ready.os, "stat", side_effect=swap_on_first_private_stat):
+            result = self.inspect()
+        self.assertTrue(swapped)
+        self.assertTrue(all(value == "BLOCKED_UNVERIFIED"
+                            for value in result["private_assets_metadata_only"].values()))
+        self.assertFalse(result["scientific_execution_authorized"])
+
+    def test_missing_secure_directory_flags_refuses_private_presence(self):
+        for name in ("O_DIRECTORY", "O_NOFOLLOW"):
+            with self.subTest(name=name), patch.object(ready.os, name, 0):
+                result = self.inspect()
+                self.assertTrue(all(x == "BLOCKED_UNVERIFIED"
+                                    for x in result["private_assets_metadata_only"].values()))
+                self.assertFalse(result["independent_human_review_authorized"])
 
     def test_nested_json_parser_ambiguous_fields_rejected(self):
         raw = self.manifest.read_bytes()

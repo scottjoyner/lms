@@ -15,7 +15,7 @@ import exp053_race_review as review
 
 SCHEMA = "exp053-review-owner-readiness-v1"
 SPEC = Path(__file__).resolve().parent / "EXP053-REVIEW-OWNER-READINESS-SPEC-2026-10-19.md"
-SPEC_SHA = "286aec273a33f8749c25db0eb021783f44f06c6916128f579cc5befb6c4526c7"
+SPEC_SHA = "f07806c897e035f6c9c73413c4334c14a98e488d4acac68fb548c1cadbee46a8"
 PRIVATE_DIR = Path("/media/scott/SSD_4TB/exp053-private-20261016")
 PRIVATE_FILES = ("packet.json", "sealed_exam_key.json", "reviewer_A.json", "reviewer_B.json")
 REQUIRED_KEYS = {"schema", "source", "source_sha256", "protocol_sha256", "packet_sha256",
@@ -105,24 +105,51 @@ def _validate_public(manifest):
 
 
 def _private_status(folder, names):
-    """Do not open private assets. lstat metadata only; redact all paths."""
-    result = {name: "BLOCKED_UNVERIFIED" for name in names}
+    """Report private filenames using directory-relative METADATA only.
+
+    Open *only the containing directory*, never the private data files. A
+    switched parent path or symlink cannot be mistaken for verified current
+    contents. Anything uncertain fails closed to BLOCKED_UNVERIFIED.
+    """
+    blocked = {name: "BLOCKED_UNVERIFIED" for name in names}
+    if not getattr(os, "O_DIRECTORY", 0) or not getattr(os, "O_NOFOLLOW", 0):
+        return blocked
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     try:
-        d = os.lstat(folder)
+        parent_fd = os.open(folder, flags)
+    except OSError:
+        return blocked
+    try:
+        d = os.fstat(parent_fd)
         if (not stat.S_ISDIR(d.st_mode) or d.st_uid != os.geteuid() or
                 d.st_mode & 0o077):
-            return result
+            return blocked
+        found = dict(blocked)
         for name in names:
             try:
-                info = os.lstat(Path(folder) / name)
+                info = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
                 if (stat.S_ISREG(info.st_mode) and info.st_uid == os.geteuid() and
                         info.st_size > 0 and info.st_mode & 0o077 == 0):
-                    result[name] = "PRESENT_METADATA_ONLY_UNVERIFIED"
+                    found[name] = "PRESENT_METADATA_ONLY_UNVERIFIED"
             except OSError:
                 pass
+        try:
+            refreshed_fd = os.open(folder, flags)
+        except OSError:
+            return blocked
+        try:
+            refreshed = os.fstat(refreshed_fd)
+            current = os.fstat(parent_fd)
+            if ((refreshed.st_dev, refreshed.st_ino) != (d.st_dev, d.st_ino) or
+                    (current.st_dev, current.st_ino) != (d.st_dev, d.st_ino)):
+                return blocked
+            return found
+        finally:
+            os.close(refreshed_fd)
     except OSError:
-        pass
-    return result
+        return blocked
+    finally:
+        os.close(parent_fd)
 
 
 def inspect(*, manifest_path=review.MANIFEST, protocol_path=review.PROTOCOL,

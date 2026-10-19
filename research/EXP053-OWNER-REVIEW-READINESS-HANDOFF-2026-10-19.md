@@ -22,9 +22,14 @@ was opened, copied, displayed, included in the output or committed.
 | Scientific execution authorization | FALSE | No model inference, promotion or deployment |
 
 All four private review artifacts were observed as owner-owned private regular
-files under an owner-private directory, using `lstat` only. This does not
-establish RACE text integrity, whether any forms have been filled, reviewer
-identity, native human reading, provenance, consent or review quality.
+files under an owner-private directory, using read-only **directory-descriptor-
+relative metadata checks**, without opening private file contents. The
+metadata checker refuses symlink substitution of the entire private directory:
+if its path changes during inspection, all four files are marked BLOCKED,
+not PRESENT. This is a point-in-time diagnostic, not external publication
+or file-custody authority. It does not establish RACE text integrity, whether
+any forms have been filled, reviewer identity, native human reading,
+provenance, consent or review quality.
 
 ## The smallest real human handoff
 

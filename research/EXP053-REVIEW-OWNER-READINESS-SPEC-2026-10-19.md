@@ -21,8 +21,13 @@ enrollment, independent witness, or permission to start scientific inference.
 - Require private directory to be a non-symlink directory owned by the local
   euid and mode without any group/other bits, and each named private asset
   to be non-symlink regular file, matching the account's euid and mode with
-  no group/other bits. Missing/unreadable/unsafe means BLOCKED. Do not
-  inspect inode contents even for the presence check.
+  no group/other bits. The checker must use a non-following directory
+  descriptor and `stat(..., dir_fd=..., follow_symlinks=False)` so directory
+  substitution between listing and inspection does not attest unrelated files.
+  After the check it must verify that a freshly opened directory descriptor
+  still identifies the same private directory inode, otherwise report all
+  private files BLOCKED. Missing/unreadable/unsafe means BLOCKED. Do not
+  open or inspect inode contents even for the presence check.
 - Separate status of private asset availability from owner approval: the
   reviewer roster digest `APPROVED_REVIEWER_ROSTER_SHA256` remains empty, so
   enrollment is UNAPPROVED even if all four private assets exist. A helper
