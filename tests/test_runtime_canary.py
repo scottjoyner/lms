@@ -681,3 +681,70 @@ def test_lifecycle_log_flood_is_stopped_before_command_finishes(tmp_path, stream
     assert not finished.exists(), "lifecycle command completed after exceeding output budget"
     assert (tmp_path / "snapshot.stdout.log").stat().st_size <= canary._MAX_COMMAND_LOG_BYTES
     assert (tmp_path / "snapshot.stderr.log").stat().st_size <= canary._MAX_COMMAND_LOG_BYTES
+@pytest.mark.parametrize("scenario", ["sample_count", "evidence_bytes"])
+def test_soak_producer_limits_apply_before_unbounded_collection(tmp_path, monkeypatch, scenario):
+    plan, _events = make_plan(tmp_path)
+    normalized = canary.load_plan(plan)
+    policy = dict(normalized["soak"])
+    policy["duration_seconds"] = 30.0
+    policy["minimum_samples"] = 1
+    policy["interval_seconds"] = 0.0
+    output = tmp_path / f"bounded-{scenario}.jsonl"
+    calls = []
+
+    def synthetic_probe(_spec, _cwd, _env):
+        calls.append(1)
+        if len(calls) > (3 if scenario == "sample_count" else 1):
+            raise AssertionError("probe called after evidence budget should have failed")
+        sample = {
+            "ok": True, "returncode": 0, "timed_out": False,
+            "parse_error": None, "duration_seconds": 0.001,
+            "captured_at_utc": canary.utc_now(),
+            "latency_seconds": 0.01, "rss_bytes": 1024,
+            "tps": 20.0, "temperature_c": 50.0,
+            "stderr_tail": "",
+        }
+        if scenario == "evidence_bytes":
+            sample["stderr_tail"] = "x" * 600
+        return sample
+
+    monkeypatch.setattr(canary, "_captured_probe", synthetic_probe)
+    if scenario == "sample_count":
+        monkeypatch.setattr(canary, "_MAX_SOAK_SAMPLES", 3)
+        with pytest.raises(RuntimeError, match="soak sample count limit"):
+            canary.run_soak(normalized["commands"]["soak_probe"], policy,
+                           cwd=tmp_path, env={}, output=output)
+        assert len(calls) == 3
+        assert len(output.read_text().splitlines()) == 3
+    else:
+        monkeypatch.setattr(canary, "_MAX_SOAK_BYTES", 500)
+        with pytest.raises(RuntimeError, match="soak evidence size limit"):
+            canary.run_soak(normalized["commands"]["soak_probe"], policy,
+                           cwd=tmp_path, env={}, output=output)
+        assert len(calls) == 1
+        assert not output.exists() or output.stat().st_size <= 500
+
+
+def test_plan_rejects_impossible_soak_minimum_samples(tmp_path, monkeypatch):
+    plan, _events = make_plan(tmp_path)
+    payload = json.loads(plan.read_text())
+    payload["soak"]["minimum_samples"] = 4
+    plan.write_text(json.dumps(payload))
+    monkeypatch.setattr(canary, "_MAX_SOAK_SAMPLES", 3)
+    with pytest.raises(ValueError, match="minimum_samples.*limit"):
+        canary.load_plan(plan)
+def test_soak_evidence_budget_exhaustion_triggers_verified_rollback(tmp_path, monkeypatch):
+    plan, events = make_plan(tmp_path)
+    monkeypatch.setattr(canary, "_MAX_SOAK_BYTES", 1)
+    workspace = tmp_path / "runs"
+    with pytest.raises(RuntimeError, match="soak evidence size limit.*rollback_succeeded=True"):
+        canary.execute(plan, workspace, "soak-budget-rollback", False)
+    assert events.read_text().splitlines()[-3:] == [
+        "stop", "rollback", "rollback-health",
+    ]
+    report = canary.verify_manifest(workspace / "soak-budget-rollback")
+    assert report["success"] is False
+    assert report["rollback_succeeded"] is True
+    assert report["admission"] == {"admitted": False}
+    with pytest.raises(ValueError, match="did not complete successfully"):
+        canary.verify_manifest(workspace / "soak-budget-rollback", require_success=True)
