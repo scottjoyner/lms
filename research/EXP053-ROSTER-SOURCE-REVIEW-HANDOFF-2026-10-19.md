@@ -90,3 +90,17 @@ if a valid point reaches signature verification without the optional backend,
 it returns a sanitized HOLD instead. A test simulates the missing backend,
 covering both invalid and valid public keys without asserting a real human
 signature. Independent human code review and scientific admission remain HOLD.
+
+## Canonical direct reviewer trust registry and signature receipts
+
+A synthetic Ed25519 signer demonstrated that distinct base64 strings with
+unused nonzero padding bits can decode to the *same* signer key. The old
+`verify_signed` tested distinct encoded strings and accepted that fake
+second identity; it also failed to validate other roster entries and raised
+`TypeError` on an unhashable key. The direct verifier now validates 2–3
+canonical and distinct prime-order public keys, rejecting alternate base64
+encodings, weak other signers and malformed trust maps before importing its
+optional backend. Signature receipt bytes must have one lowercase-hex text
+encoding. See `EXP053-TRUST-REGISTRY-CANONICAL-*.md` and the synthetic tests in
+`tests/test_exp053_trust_registry_canonical.py`. Independent source review
+still required, **NO_GO_RESEARCH_ONLY**.
