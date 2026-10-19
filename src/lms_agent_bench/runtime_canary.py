@@ -428,16 +428,45 @@ def summarize_soak(samples: Sequence[Mapping[str, Any]], policy: Mapping[str, An
         else:
             current += 1
             max_consecutive = max(max_consecutive, current)
-    latencies = [float(sample["latency_seconds"]) for sample in successes if "latency_seconds" in sample]
-    rss = [float(sample["rss_bytes"]) for sample in successes if "rss_bytes" in sample]
-    temperatures = [float(sample["temperature_c"]) for sample in successes if "temperature_c" in sample]
-    tps = [float(sample["tps"]) for sample in successes if "tps" in sample and float(sample["tps"]) > 0]
+    # Missing or invalid measurements may not silently disable RSS growth or
+    # throughput retention checks. All successful probes must report usable
+    # latency, RSS, and positive TPS; temperature is required when gated.
+    def usable(sample: Mapping[str, Any], key: str, *, positive: bool = False) -> bool:
+        value = sample.get(key)
+        return type(value) in (int, float) and math.isfinite(value) and (
+            value > 0 if positive else value >= 0
+        )
+
+    latencies = [
+        float(s["latency_seconds"]) for s in successes if usable(s, "latency_seconds")
+    ]
+    rss = [float(s["rss_bytes"]) for s in successes if usable(s, "rss_bytes", positive=True)]
+    tps = [float(s["tps"]) for s in successes if usable(s, "tps", positive=True)]
+    temperatures = [
+        float(s["temperature_c"]) for s in successes if usable(s, "temperature_c")
+    ]
     p95 = _percentile(latencies, 0.95)
     rss_growth = max(0.0, rss[-1] - rss[0]) if len(rss) >= 2 else 0.0
     baseline_tps = _median_window(tps, first=True)
     terminal_tps = _median_window(tps, first=False)
     terminal_ratio = terminal_tps / baseline_tps if baseline_tps and terminal_tps is not None else None
     failures: List[str] = []
+    for key in ("latency_seconds", "rss_bytes", "tps"):
+        positive = key in {"rss_bytes", "tps"}
+        if any(not usable(s, key, positive=positive) for s in successes):
+            failures.append(f"invalid_{key}")
+    if any(
+        "temperature_c" in s and not usable(s, "temperature_c")
+        for s in successes
+    ) or (
+        policy.get("max_temperature_c") is not None
+        and any(not usable(s, "temperature_c") for s in successes)
+    ):
+        failures.append("invalid_temperature_c")
+    if len(rss) < 2:
+        failures.append("insufficient_rss_samples")
+    if len(tps) < 2:
+        failures.append("insufficient_tps_samples")
     if len(samples) < int(policy["minimum_samples"]):
         failures.append("insufficient_samples")
     if success_rate < float(policy["minimum_success_rate"]):
