@@ -199,3 +199,12 @@ weak/identity points; unit-tested signature acceptance did not prove any
 private-key holder. The corrected source rejects those keys. Independently
 review the pure-Python subgroup math before granting ANY human source review
 approval. Published draft PR #37 carries the source-only review request.
+
+## Optional signature backend fail-closed (2026-10-19)
+
+The first hosted PR #37 CI run failed because its source-only environment
+does not install the optional cryptography package. The verifier now rejects
+malformed/weak Ed25519 public keys BEFORE attempting that import; a valid
+key with an unavailable signing backend still returns HOLD. The synthetic
+negative test mocks the unavailable module. No approval pin or model gate
+was changed. This local backport matches the draft review branch fix.

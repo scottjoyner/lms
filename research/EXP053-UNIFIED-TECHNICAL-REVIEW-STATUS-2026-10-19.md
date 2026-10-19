@@ -194,3 +194,12 @@ The public source-only draft PR #37 has the same fix; see the new
 `EXP053-ED25519-KEY-SUBGROUP-SPEC-2026-10-19.md` and findings document.
 No actual reviewer key or source text was accessed. Owner roster pin remains
 unset; EXP-053 inference still NO_GO_RESEARCH_ONLY.
+
+## Optional signature backend fail-closed (2026-10-19)
+
+The first hosted PR #37 CI run failed because its source-only environment
+does not install the optional cryptography package. The verifier now rejects
+malformed/weak Ed25519 public keys BEFORE attempting that import; a valid
+key with an unavailable signing backend still returns HOLD. The synthetic
+negative test mocks the unavailable module. No approval pin or model gate
+was changed. This local backport matches the draft review branch fix.
