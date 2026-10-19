@@ -230,14 +230,41 @@ def create(path, *, source_dir=ROOT):
             created = True
         except OSError as exc:
             raise Hold("destination exists or cannot be safely created") from exc
-        with os.fdopen(fd, "w+b") as handle:
-            inode = (os.fstat(handle.fileno()).st_dev, os.fstat(handle.fileno()).st_ino)
-            handle.write(raw)
-            handle.flush()
-            os.fsync(handle.fileno())
-            handle.seek(0)
-            if handle.read(MAX_PACKET + 1) != raw:
-                raise Hold("newly written packet failed exact-byte verification")
+        # Once O_EXCL succeeds the entry belongs to this attempt. If fdopen
+        # fails, the raw descriptor has no owner; close it explicitly, and
+        # capture its identity if possible for inode-guarded cleanup.
+        try:
+            handle = os.fdopen(fd, "w+b")
+        except Exception:
+            try:
+                info = os.fstat(fd)
+                inode = (info.st_dev, info.st_ino)
+            except OSError:
+                pass
+            finally:
+                os.close(fd)
+            raise
+        with handle:
+            try:
+                info = os.fstat(handle.fileno())
+                inode = (info.st_dev, info.st_ino)
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+                handle.seek(0)
+                if handle.read(MAX_PACKET + 1) != raw:
+                    raise Hold("newly written packet failed exact-byte verification")
+            except Exception:
+                if inode is None:
+                    # Metadata failure immediately after O_EXCL must not leave
+                    # an empty named artifact when a retry safely identifies
+                    # the still-open inode. Never unlink an unknown identity.
+                    try:
+                        info = os.fstat(handle.fileno())
+                        inode = (info.st_dev, info.st_ino)
+                    except OSError:
+                        pass
+                raise
         # Reopen the *final entry*, not just its directory. The file may be
         # renamed or substituted after its original descriptor was written;
         # reading only that original descriptor would incorrectly attest a

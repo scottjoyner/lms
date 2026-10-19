@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import stat
 import tempfile
 import unittest
 import zipfile
@@ -152,6 +153,88 @@ class OfflineHandoff(unittest.TestCase):
         self.assertTrue(observed >= 2)
         self.assertFalse((outside / self.output.name).exists())
         self.assertFalse((moved / self.output.name).exists())
+
+    def test_created_empty_packet_is_cleaned_after_initial_fstat_error(self):
+        # Confirmed failure in the prior version: successful O_EXCL followed
+        # by a one-time metadata read failure left a zero-byte output behind.
+        real_fstat = os.fstat
+        failed = False
+
+        def initial_file_info_error(fd):
+            nonlocal failed
+            info = real_fstat(fd)
+            if not failed and stat.S_ISREG(info.st_mode) and info.st_size == 0:
+                failed = True
+                raise OSError("synthetic first regular-file fstat error")
+            return info
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fstat", side_effect=initial_file_info_error):
+            with self.assertRaises(OSError):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(failed)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(set(self.dest.iterdir()), set())
+
+    def test_fdopen_failure_closes_fd_and_removes_exclusive_entry(self):
+        fdopen = os.fdopen
+        opened = []
+
+        def reject_write_wrapper(fd, mode="r", *args, **kwargs):
+            if mode == "w+b":
+                opened.append(fd)
+                raise OSError("synthetic binary descriptor wrapping failure")
+            return fdopen(fd, mode, *args, **kwargs)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fdopen", side_effect=reject_write_wrapper):
+            with self.assertRaises(OSError):
+                packet.create(self.output, source_dir=self.src)
+        self.assertEqual(len(opened), 1)
+        with self.assertRaises(OSError):
+            os.fstat(opened[0])  # original descriptor MUST NOT remain open
+        self.assertFalse(self.output.exists())
+
+    def test_interrupted_flush_after_packet_write_cleans_partial_file(self):
+        fsync = os.fsync
+        interrupted = False
+
+        def fail_first_file_flush(fd):
+            nonlocal interrupted
+            if not interrupted and stat.S_ISREG(os.fstat(fd).st_mode):
+                interrupted = True
+                raise OSError("synthetic persistence failure")
+            return fsync(fd)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=fail_first_file_flush):
+            with self.assertRaises(OSError):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(interrupted)
+        self.assertFalse(self.output.exists())
+
+    def test_failure_cleanup_never_unlinks_substituted_file(self):
+        fsync = os.fsync
+        moved = self.dest / "original-incomplete.zip"
+        fake = b"synthetic substitute that must survive cleanup"
+        substituted = False
+
+        def replace_during_fsync(fd):
+            nonlocal substituted
+            if not substituted and stat.S_ISREG(os.fstat(fd).st_mode):
+                substituted = True
+                self.output.rename(moved)
+                self.output.write_bytes(fake)
+                raise OSError("synthetic failure after third-party substitution")
+            return fsync(fd)
+
+        with patch.object(packet, "_account_home", return_value=self.root), patch.object(
+                packet.os, "fsync", side_effect=replace_during_fsync):
+            with self.assertRaises(OSError):
+                packet.create(self.output, source_dir=self.src)
+        self.assertTrue(substituted)
+        self.assertEqual(self.output.read_bytes(), fake)
+        self.assertEqual(moved.read_bytes(), self.prepared())
 
     def test_final_output_symlink_swap_after_fsync_is_refused(self):
         # Reproduces the second observed bug: the original code read back

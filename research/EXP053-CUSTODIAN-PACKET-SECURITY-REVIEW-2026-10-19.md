@@ -76,6 +76,39 @@ protected immutable publication channel are still necessary for trustworthy
 long-term custody. These local synthetic negative tests do not count toward
 the real 12 physical custody challenges or the 40 blinded RACE reviews.
 
+## Interrupted creation and partial-file cleanup (follow-up)
+
+A third source-only adversarial test demonstrated a separate failure: after
+`O_CREAT|O_EXCL` successfully created the named output, a transient `fstat`
+failure occurred **before the code saved its inode identity**. `create()`
+correctly raised an error but left a **zero-byte named packet** in the
+intended output directory, potentially blocking a subsequent no-overwrite
+retry and confusing operators about an incomplete handoff.
+
+The code now retains explicit ownership of the just-opened descriptor until
+`os.fdopen` successfully adopts it; if descriptor wrapping itself fails,
+the raw descriptor is closed. An exception during the first identity check
+retries `fstat` **while the created descriptor is still open**, so cleanup
+can verify the file identity and safely remove the failed new entry. Once
+identity is recorded, persistence or readback failures use the existing
+inode-scoped, directory-fd-relative cleanup. No cleanup ever unlinks a
+substitute file whose device/inode differ from the created entry.
+
+Disposable negative tests cover: an initial one-shot file `fstat` error,
+`fdopen` failing after creation (including checking that its file descriptor
+was closed), an interrupted file `fsync` after writing, and replacement with
+a different file immediately before persistence fails. All are local
+synthetic injections; none generate witness evidence or use private data.
+
+**Bounded guarantee:** Recovery from an unrecoverable kernel error that
+prevents *all* identity reads cannot safely unlink a path without risking
+removal of a third-party replacement; in that unusual case a failed named
+file may remain, and `O_EXCL` prevents treating it as an approved retry.
+The tool does not promise cleanup after `SIGKILL`, hard crashes or malicious
+same-user mutation following its final check. The caller must verify its
+output independently. All approval and scientific-execution gates remain
+unconditionally NO-GO.
+
 ## Reproduction
 
 ```
