@@ -38,6 +38,7 @@ _REQUIRED_COMMANDS = (
 _SECRET_FLAGS = ("--api-key", "--token", "--password", "--secret")
 _SAFE_BASE_ENV = ("HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL", "TMPDIR")
 _MAX_CAPTURE_BYTES = 1024 * 1024
+_MAX_COMMAND_LOG_BYTES = 4 * _MAX_CAPTURE_BYTES
 
 
 def utc_now() -> str:
@@ -317,22 +318,67 @@ def run_command(
     stdout_path = logs / f"{name}.stdout.log"
     stderr_path = logs / f"{name}.stderr.log"
     started = time.monotonic()
-    with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-        process = subprocess.Popen(
+    # Pipe the wrappers rather than sending unbounded output straight to disk.
+    # The upper bound applies while the command is still running, not after it.
+    deadline = started + float(spec["timeout_seconds"])
+    with (
+        stdout_path.open("wb") as stdout,
+        stderr_path.open("wb") as stderr,
+        subprocess.Popen(
             argv,
             cwd=str(cwd),
             env=dict(env),
-            stdout=stdout,
-            stderr=stderr,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             start_new_session=True,
-        )
+        ) as process,
+    ):
         timed_out = False
+        written = {"stdout": 0, "stderr": 0}
+        sinks = {"stdout": stdout, "stderr": stderr}
         try:
-            returncode = process.wait(timeout=float(spec["timeout_seconds"]))
-        except subprocess.TimeoutExpired:
-            timed_out = True
+            with selectors.DefaultSelector() as selector:
+                assert process.stdout is not None and process.stderr is not None
+                selector.register(process.stdout, selectors.EVENT_READ, "stdout")
+                selector.register(process.stderr, selectors.EVENT_READ, "stderr")
+                while selector.get_map():
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        timed_out = True
+                        break
+                    ready = selector.select(timeout=remaining)
+                    if not ready:
+                        timed_out = True
+                        break
+                    for key, _mask in ready:
+                        stream = key.data
+                        budget = _MAX_COMMAND_LOG_BYTES + 1 - written[stream]
+                        chunk = os.read(key.fd, min(65536, budget))
+                        if not chunk:
+                            selector.unregister(key.fileobj)
+                            continue
+                        remaining_bytes = _MAX_COMMAND_LOG_BYTES - written[stream]
+                        sinks[stream].write(chunk[:remaining_bytes])
+                        written[stream] += min(len(chunk), remaining_bytes)
+                        if len(chunk) > remaining_bytes:
+                            raise RuntimeError(
+                                f"lifecycle command {name} output exceeded four MiB"
+                            )
+            if not timed_out:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    timed_out = True
+                else:
+                    try:
+                        process.wait(timeout=remaining)
+                    except subprocess.TimeoutExpired:
+                        timed_out = True
+        except BaseException:
             _terminate(process)
-            returncode = process.returncode if process.returncode is not None else -signal.SIGKILL
+            raise
+        if timed_out:
+            _terminate(process)
+        returncode = process.returncode if process.returncode is not None else -signal.SIGKILL
     report = {
         "name": name,
         "argv": list(spec["argv"]),

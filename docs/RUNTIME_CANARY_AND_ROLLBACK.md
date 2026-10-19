@@ -262,3 +262,16 @@ kills the probe's process group even if the parent exited while a child
 retained its pipe. Independently daemonized descendants remain outside this
 process-group safety boundary. This is an offline controller test, not a
 physical runtime qualification or production admission.
+
+
+## Bounded lifecycle-command logs
+
+Lifecycle wrapper commands (including stop, rollback, and rollback-health) are
+captured incrementally into on-disk stdout/stderr files with a **four-MiB
+per-stream maximum**. Oversized output aborts the command and terminates its
+process group before it fills the controller filesystem. The truncated log
+remains available for investigation; a failed command cannot be reported as a
+successful lifecycle stage. The monotonic deadline and descendant cleanup
+continue to apply to both log pipes. This does not prevent all disk exhaustion
+outside these controller-owned log files, or descendants that explicitly
+escape the process group.

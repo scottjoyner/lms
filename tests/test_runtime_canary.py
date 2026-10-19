@@ -665,3 +665,19 @@ def test_oversize_soak_probe_output_is_stopped_before_completion(tmp_path, strea
     with pytest.raises(RuntimeError, match="soak probe output exceeded one MiB"):
         canary._captured_probe(spec, cwd=tmp_path, env={})
     assert not finished.exists(), "oversized probe was allowed to finish flooding output"
+
+@pytest.mark.parametrize("stream", ["stdout", "stderr"])
+def test_lifecycle_log_flood_is_stopped_before_command_finishes(tmp_path, stream):
+    finished = tmp_path / "flood-completed"
+    code = (
+        "import sys; from pathlib import Path;"
+        "stream=getattr(sys,sys.argv[1]).buffer;"
+        "stream.write(b'x'*(16*1024*1024));stream.flush();"
+        "Path(sys.argv[2]).write_text('finished')"
+    )
+    spec = canary._command(command(code, stream, str(finished), timeout=3), "snapshot")
+    with pytest.raises(RuntimeError, match="lifecycle command .* output exceeded"):
+        canary.run_command("snapshot", spec, cwd=tmp_path, env={}, logs=tmp_path)
+    assert not finished.exists(), "lifecycle command completed after exceeding output budget"
+    assert (tmp_path / "snapshot.stdout.log").stat().st_size <= canary._MAX_COMMAND_LOG_BYTES
+    assert (tmp_path / "snapshot.stderr.log").stat().st_size <= canary._MAX_COMMAND_LOG_BYTES
