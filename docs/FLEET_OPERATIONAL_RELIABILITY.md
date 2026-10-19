@@ -512,3 +512,15 @@ archive reader. Failed runs still retain partial rollout evidence for
 diagnostics and continue to generate a **failure** manifest. This local
 cross-check does not substitute for independently observed physical runtime,
 cryptographic custody, or a verified release-gate decision.
+
+### Successful-run coverage cannot depend on the phase label alone
+
+A successful operator run requires complete rollout evidence when *any* observe
+context exists: an observe phase marker, a node roster, rollout command status
+or the observe directory itself. The requirement does not disappear if an
+untrusted local state writer deletes or changes \`phase\`. Missing rollout
+results or an absent node roster in that context fail closed before emitting
+a success manifest. Standalone artifacts that have no rollout context may
+still emit manifests; they are not evidence of a physical fleet rollout.
+This prevents a local state-label bypass but does not grant authority to
+declare a genuine physical run successful or replace independent custody.
