@@ -805,7 +805,11 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def _pinned_control_file_identity(
-    root: Path, relative: Path, *, label: str = "control file"
+    root: Path,
+    relative: Path,
+    *,
+    label: str = "control file",
+    capture: Optional[bytearray] = None,
 ) -> Tuple[int, str]:
     """Hash run-local regular evidence through one descriptor-anchored read.
 
@@ -842,6 +846,10 @@ def _pinned_control_file_identity(
                 break
             size += len(chunk)
             digest.update(chunk)
+            if capture is not None:
+                if len(capture) + len(chunk) > 1024 * 1024:
+                    raise ValueError(f"operator {label} exceeds state-size limit: {relative}")
+                capture.extend(chunk)
         after = os.fstat(file_fd)
         if (
             before.st_dev != after.st_dev
@@ -883,15 +891,43 @@ def verify_run_manifest(
     }
     if manifest.get("operator_manifest_fingerprint") != canonical_hash(core):
         raise ValueError("operator manifest fingerprint mismatch")
+    captured_state: Optional[bytearray] = None
     for entry in manifest.get("control_files", []):
         relative = Path(str(entry.get("path") or ""))
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError("unsafe control-file path in operator manifest")
-        size, digest = _pinned_control_file_identity(root, relative)
+        capture = bytearray() if relative == Path("operator-state.json") else None
+        size, digest = _pinned_control_file_identity(
+            root, relative, capture=capture
+        )
         if size != int(entry.get("size_bytes")):
             raise ValueError(f"operator control file size mismatch: {relative}")
         if digest != entry.get("sha256"):
             raise ValueError(f"operator control file hash mismatch: {relative}")
+        if capture is not None:
+            captured_state = capture
+    state_path = Path(root) / "operator-state.json"
+    if (state_path.exists() or state_path.is_symlink()) and captured_state is None:
+        raise ValueError("operator-state evidence is omitted from the manifest")
+    if captured_state is not None:
+        try:
+            persisted = json.loads(captured_state.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError("operator state evidence is not valid JSON") from exc
+        if not isinstance(persisted, Mapping):
+            raise ValueError("operator state evidence must be a JSON object")
+        if persisted.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError("operator state schema is invalid")
+        if persisted.get("run_id") != manifest.get("run_id"):
+            raise ValueError("operator state run ID differs from signed manifest")
+        if (
+            not isinstance(persisted.get("success"), bool)
+            or persisted["success"] is not manifest.get("success")
+        ):
+            raise ValueError("operator state success differs from signed manifest")
+        admission = persisted.get("admission")
+        if not isinstance(admission, Mapping) or admission.get("admitted") is not False:
+            raise ValueError("operator state admission must remain denied")
     normalized_root = Path(root).expanduser().resolve()
     for archive in manifest.get("archives", []):
         archive_path = Path(str(archive.get("path") or ""))

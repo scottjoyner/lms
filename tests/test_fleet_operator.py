@@ -334,7 +334,12 @@ def test_postflight_failure_blocks_success_even_after_rollout(tmp_path, monkeypa
 def test_run_manifest_detects_control_file_tampering(tmp_path):
     root = tmp_path / "run"
     root.mkdir()
-    fleet_operator.write_json(root / "operator-state.json", {"success": True})
+    fleet_operator.write_json(
+        root / "operator-state.json",
+        {"schema_version": fleet_operator.SCHEMA_VERSION,
+         "run_id": "run", "success": True,
+         "admission": {"admitted": False}},
+    )
     fleet_operator.build_run_manifest(
         root,
         {
