@@ -789,3 +789,62 @@ def test_rehashed_attestation_cannot_misattribute_signature_to_another_allowed_k
     attestation_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="signing key fingerprint"):
         attestation.verify_attestation(root, allowed, "runtime-canary-operator", require_success=True)
+@pytestmark_attestation
+def test_canary_uses_pinned_signature_when_original_is_swapped_after_verify(
+    tmp_path, monkeypatch
+):
+    plan, _events = make_plan(tmp_path)
+    workspace = tmp_path / "runs"
+    canary.execute(plan, workspace, "canary-pinned-race", False)
+    root = workspace / "canary-pinned-race"
+    primary = tmp_path / "primary-pinned-key"
+    alternate = tmp_path / "alternate-pinned-key"
+    for key in (primary, alternate):
+        subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)],
+            capture_output=True, check=True,
+        )
+        key.chmod(0o600)
+    allowed = tmp_path / "allowed_pinned_signers"
+    allowed.write_text(
+        "".join(
+            "runtime-canary-operator "
+            + key.with_suffix(".pub").read_text(encoding="utf-8")
+            for key in (primary, alternate)
+        ), encoding="utf-8",
+    )
+    attestation.sign_run(root, primary, require_success=True)
+    manifest = root / "runtime-canary-manifest.json"
+    signature = root / "runtime-canary-manifest.json.sig"
+    other_input = tmp_path / "other-manifest-input"
+    other_input.write_bytes(manifest.read_bytes())
+    subprocess.run(
+        ["ssh-keygen", "-Y", "sign", "-f", str(alternate),
+         "-n", attestation.DEFAULT_NAMESPACE, str(other_input)],
+        capture_output=True, check=True,
+    )
+    other_sig = Path(str(other_input) + ".sig").read_bytes()
+    metadata_path = root / "runtime-canary-attestation.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["signing_key_fingerprint"] = attestation._ssh._key_fingerprint(alternate)
+    core = {k: v for k, v in metadata.items()
+            if k not in {"created_at_utc", "attestation_fingerprint"}}
+    metadata["attestation_fingerprint"] = canary._operator.canonical_hash(core)
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    real_run = subprocess.run
+    changes = []
+
+    def switch_signature_after_openssh_verify(args, **kwargs):
+        result = real_run(args, **kwargs)
+        if "-Y" in args and "verify" in args and result.returncode == 0:
+            signature.write_bytes(other_sig)
+            changes.append(True)
+        return result
+
+    monkeypatch.setattr(attestation.subprocess, "run", switch_signature_after_openssh_verify)
+    with pytest.raises(ValueError, match="signing key fingerprint"):
+        attestation.verify_attestation(
+            root, allowed, "runtime-canary-operator", require_success=True
+        )
+    assert changes
