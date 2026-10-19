@@ -130,9 +130,16 @@ def verify_signed(review,trust):
         deny("missing independent human review attestation")
     if not isinstance(trust,dict) or len(trust)<2 or len(set(trust.values()))!=len(trust):
         deny("trust registry requires distinct signer public keys")
+    # A 32-byte or from_public_bytes()-accepted Ed25519 key need not be a
+    # prime-subgroup point. Reject degenerate keys even for direct callers
+    # that bypass the separately owner-pinned private roster loader.
+    from exp053_reviewer_roster import _prime_order_ed25519_public_key
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     try:
-        pub=Ed25519PublicKey.from_public_bytes(base64.b64decode(trust[rid],validate=True))
+        raw_public=base64.b64decode(trust[rid],validate=True)
+        if not _prime_order_ed25519_public_key(raw_public):
+            deny("signed reviewer public key is not in Ed25519 prime subgroup")
+        pub=Ed25519PublicKey.from_public_bytes(raw_public)
         signature=bytes.fromhex(review["signature"])
         unsigned={k:v for k,v in review.items() if k!="signature"}
         pub.verify(signature,canonical(unsigned))

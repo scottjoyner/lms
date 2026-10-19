@@ -49,3 +49,33 @@ independent custody/rollback evidence and separate model-weight approval.
 Draft PR #32 and the original research worktrees remain unchanged.
 
 **Decision: NO_GO_RESEARCH_ONLY; zero independently admitted human reviews.**
+
+## Critical follow-up: Ed25519 public-key subgroup (October 19)
+
+Before approval, independently review the **weak public-key signature issue**
+documented in `EXP053-ED25519-KEY-SUBGROUP-FINDING-2026-10-19.md` and the
+preregistered source-only test specification in
+`EXP053-ED25519-KEY-SUBGROUP-SPEC-2026-10-19.md`.
+
+`load_roster()` now refuses noncanonical, low-order and mixed-torsion Ed25519
+public keys, and direct `exp053_race_review.verify_signed()` callers enforce
+that same prime-order subgroup check. The installed OpenSSL provider accepted
+an identity-point synthetic signature for two unrelated messages; this could
+otherwise defeat private-key-possession evidence. An independent check against
+libsodium matched all 228 synthetic key classifications. It remains essential
+to review the point-decoding and group-arithmetic implementation carefully.
+
+Focused reproduction:
+
+```
+python3 -m pytest -q tests/test_exp053_roster_weak_keys.py \
+  tests/test_exp053_reviewer_roster.py \
+  tests/test_exp053_roster_ancestor_race.py \
+  tests/test_exp053_roster_nofollow_failclosed.py \
+  tests/test_exp053_human_review_gate.py
+python3 -m ruff check research/exp053_reviewer_roster.py \
+  research/exp053_race_review.py tests/test_exp053_roster_weak_keys.py
+```
+
+This correction does **not** authorize reviewer enrollment or promote draft
+PR #37; approval remains NO_GO_RESEARCH_ONLY.
