@@ -112,3 +112,12 @@ review. Do not manufacture a review identity or a signature to satisfy this
 handoff. The local source-only change may be prepared for independent review,
 but do not force-update PR #32, merge the stacked research history or run
 EXP-053 model forwards on this basis.
+
+## Malformed-review refusal follow-up (October 19)
+
+The current unified source review also includes a narrow denial repair for
+unhashable JSON case IDs and malformed reviewer trust mappings. Review exact
+source and negative tests in `exp053_race_review.py` and
+`tests/test_exp053_malformed_review_refusal.py` before approval. This is an
+error-handling fix, **not** evidence of an independently enrolled signer or
+signed RACE decisions. See `EXP053-MALFORMED-REVIEW-REFUSAL-FINDING-2026-10-19.md`.

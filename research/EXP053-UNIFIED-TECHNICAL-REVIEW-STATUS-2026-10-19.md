@@ -93,3 +93,13 @@ metadata checks before parsing a bounded PEM. Negative tests use only
 synthetic keys, and all personal/owner permissions remain unapproved. See
 `EXP053-HUMAN-REVIEW-SIGNER-KEY-READ-FINDING-2026-10-19.md` and the frozen
 `EXP053-HUMAN-SIGNER-KEY-READ-PREFLIGHT-SPEC-2026-10-19.md`.
+
+## Invalid reviewer case/trust object refusal (October 19)
+
+Offline signed-review parsing previously surfaced uncaught `TypeError` on
+JSON object/list case IDs and malformed reviewer trust-store values. Source-
+only validation now checks case IDs and public-key string types before
+set/dictionary membership and preserves strict third-party disputed subset
+validation. Synthetic tests ensure deterministic HOLD and prohibit signing-
+key access for invalid drafts. See the frozen
+`EXP053-MALFORMED-REVIEW-REFUSAL-SPEC-2026-10-19.md` and findings report.

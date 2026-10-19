@@ -130,7 +130,11 @@ def verify_signed(review,trust):
         deny("invalid signed review role")
     if review.get("attestation")!="I independently reviewed these source passages and responses; no model predictions or other reviewer labels were provided to me.":
         deny("missing independent human review attestation")
-    if not isinstance(trust,dict) or len(trust)<2 or len(set(trust.values()))!=len(trust):
+    if (not isinstance(trust, dict) or len(trust) < 2 or
+            any(not isinstance(k, str) or not k or
+                not isinstance(v, str) or not v for k, v in trust.items())):
+        deny("trust registry requires string reviewer IDs and public keys")
+    if len(set(trust.values())) != len(trust):
         deny("trust registry requires distinct signer public keys")
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     try:
@@ -178,16 +182,38 @@ def decisions_for(review,packet,required_ids=None):
     if not isinstance(review,dict):deny("malformed review payload")
     if review.get("packet_sha256")!=digest(packet):deny("packet mismatch")
     if review.get("role") not in ("independent","adjudicator"):deny("invalid signer role")
-    lookup={c["case_id"]:c for c in packet["cases"]}
-    ds=review.get("decisions",[])
-    expected=set(lookup) if required_ids is None else set(required_ids)
-    if not isinstance(ds,list) or len(ds)!=len(expected):deny("incomplete review form")
-    out={}
+    if not isinstance(packet, dict) or not isinstance(packet.get("cases"), list):
+        deny("malformed reviewer source packet")
+    lookup = {}
+    for case in packet["cases"]:
+        if not isinstance(case, dict):
+            deny("malformed reviewer source case")
+        cid = case.get("case_id")
+        if (not isinstance(cid, str) or not cid or cid in lookup or
+                not isinstance(case.get("article"), str)):
+            deny("invalid or repeated reviewer source case identity")
+        lookup[cid] = case
+    ds = review.get("decisions", [])
+    if required_ids is None:
+        expected = set(lookup)
+    else:
+        if (not isinstance(required_ids, (set, list, tuple)) or
+                any(not isinstance(cid, str) or not cid for cid in required_ids)):
+            deny("malformed adjudicator case scope")
+        expected = set(required_ids)
+        if len(expected) != len(required_ids):
+            deny("duplicate adjudicator case scope")
+    if not isinstance(ds, list) or len(ds) != len(expected):
+        deny("incomplete review form")
+    out = {}
     for d in ds:
-        if not isinstance(d,dict):deny("malformed reviewer decision payload")
-        cid=d.get("case_id")
-        if cid in out or cid not in lookup:deny("duplicate/foreign case")
-        check_decision(d,lookup[cid]);out[cid]=d
+        if not isinstance(d, dict):
+            deny("malformed reviewer decision payload")
+        cid = d.get("case_id")
+        if not isinstance(cid, str) or not cid or cid in out or cid not in lookup:
+            deny("invalid duplicate/foreign reviewer case identity")
+        check_decision(d, lookup[cid])
+        out[cid] = d
     if set(out)!=expected:deny("unexpected decision scope")
     return out
 def verified_admission(private_dir,keys_path,adjudicator_file=None):
