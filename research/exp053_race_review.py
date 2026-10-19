@@ -134,11 +134,17 @@ def verify_signed(review,trust):
     # prime-subgroup point. Reject degenerate keys even for direct callers
     # that bypass the separately owner-pinned private roster loader.
     from exp053_reviewer_roster import _prime_order_ed25519_public_key
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
     try:
         raw_public=base64.b64decode(trust[rid],validate=True)
         if not _prime_order_ed25519_public_key(raw_public):
             deny("signed reviewer public key is not in Ed25519 prime subgroup")
+        # Hosted research CI intentionally does not install optional signing
+        # dependencies. An invalid public key must HOLD *before* import, and
+        # a missing backend must HOLD rather than traceback or sign.
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        except ImportError:
+            deny("optional Ed25519 signature verification backend unavailable")
         pub=Ed25519PublicKey.from_public_bytes(raw_public)
         signature=bytes.fromhex(review["signature"])
         unsigned={k:v for k,v in review.items() if k!="signature"}
