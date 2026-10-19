@@ -309,6 +309,13 @@ lms-fleet-attest verify \
 The allowed-signers file should be controlled separately from the run evidence.
 Verification recomputes the operator manifest, attestation, manifest SHA,
 signature SHA, run identity, and OpenSSH signature before returning success.
+After OpenSSH verifies the signature under allowed-signers policy, the verifier
+derives the signer SHA-256 fingerprint from the embedded SSHSIG public key.
+The independently editable attestation JSON fingerprint must match that
+verified key; rehashing unsigned JSON to impersonate a different authorized
+signer fails closed. The same shared SSHSIG identity parser now backs runtime
+canary attestation. This is signer attribution **not** independent key custody,
+fresh allowed-signers policy, external anti-rollback proof or runtime admission.
 Signing and verification never grant runtime admission.
 
 ## No automatic resume

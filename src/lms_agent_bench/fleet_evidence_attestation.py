@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import os
@@ -84,6 +86,39 @@ def _key_fingerprint(key: Path) -> str:
     if not fingerprint:
         raise ValueError("ssh-keygen did not return a SHA-256 key fingerprint")
     return fingerprint
+
+
+def _verified_sshsig_key_fingerprint(signature: Path) -> str:
+    """Identify the public key carried by an already VERIFIED SSHSIG.
+
+    The embedded public-key blob is OpenSSH wire encoding. Its SHA-256 is
+    exactly the fingerprint ssh-keygen -lf -E sha256 reports for that key.
+    Call only after ssh-keygen -Y verify succeeds under allowed-signers policy.
+    """
+    armored = signature.read_bytes()
+    if len(armored) > 256 * 1024:
+        raise ValueError("OpenSSH signature is too large")
+    lines = armored.splitlines()
+    if (
+        len(lines) < 3
+        or lines[0] != b"-----BEGIN SSH SIGNATURE-----"
+        or lines[-1] != b"-----END SSH SIGNATURE-----"
+    ):
+        raise ValueError("invalid OpenSSH signature armor")
+    try:
+        encoded = base64.b64decode(b"".join(lines[1:-1]), validate=True)
+    except binascii.Error as exc:
+        raise ValueError("invalid OpenSSH signature encoding") from exc
+    if not encoded.startswith(b"SSHSIG") or len(encoded) < 14:
+        raise ValueError("invalid OpenSSH signature envelope")
+    if int.from_bytes(encoded[6:10], "big") != 1:
+        raise ValueError("unsupported OpenSSH signature version")
+    size = int.from_bytes(encoded[10:14], "big")
+    if not 0 < size <= 65536 or len(encoded) < 14 + size:
+        raise ValueError("invalid OpenSSH signature public key")
+    pub = encoded[14:14 + size]
+    digest = base64.b64encode(hashlib.sha256(pub).digest()).decode("ascii")
+    return "SHA256:" + digest.rstrip("=")
 
 
 def sign_run(
@@ -217,13 +252,16 @@ def verify_attestation(
     if process.returncode != 0:
         stderr = process.stderr.decode("utf-8", errors="replace").strip()
         raise ValueError("operator signature verification failed: " + stderr)
+    verified_fingerprint = _verified_sshsig_key_fingerprint(signature)
+    if attestation.get("signing_key_fingerprint") != verified_fingerprint:
+        raise ValueError("operator signing key fingerprint does not match verified signature")
     return {
         "valid": True,
         "run_id": manifest_report.get("run_id"),
         "run_success": manifest_report.get("success") is True,
         "identity": identity,
         "namespace": namespace,
-        "signing_key_fingerprint": attestation.get("signing_key_fingerprint"),
+        "signing_key_fingerprint": verified_fingerprint,
         "manifest_sha256": attestation.get("manifest_sha256"),
         "signature_sha256": attestation.get("signature_sha256"),
         "attestation_fingerprint": attestation.get("attestation_fingerprint"),
