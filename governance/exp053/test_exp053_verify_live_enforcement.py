@@ -26,6 +26,9 @@ class FakeServer:
         self.wrong_effective_id=False
         self.mutate_policy_after=False
         self.policy_reads=0
+        self.branch_listings=0
+        self.add_branch_on_refresh=False
+        self.drop_branch_on_refresh=False
 
     def __call__(self,path):
         path=path.split('?')[0]
@@ -46,7 +49,13 @@ class FakeServer:
                 del data['bypass_actors']
             return data
         if path=='/branches':
-            return [{'name':x} for x in self.names]
+            self.branch_listings += 1
+            snapshot = list(self.names)
+            if self.branch_listings >= 2 and self.add_branch_on_refresh:
+                snapshot.append('research/exp053-new-unscanned-target')
+            if self.branch_listings >= 2 and self.drop_branch_on_refresh:
+                snapshot.pop()
+            return [{'name':x} for x in snapshot]
         if path.startswith('/branches/'):
             name=unquote(path[len('/branches/'):])
             return {'name':name,'protected':self.active}
@@ -155,6 +164,24 @@ class EnforcementTests(unittest.TestCase):
         report=Audit(server).run()
         self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
         self.assertFalse(next(e for e in report['events'] if e['code']=='policy_stable_across_snapshot')['ok'])
+
+    def test_new_branch_mid_scan_holds_instead_of_certifying_partial_inventory(self):
+        server=FakeServer()
+        server.add_branch_on_refresh=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertEqual(len(report['branches']),len(BRANCHES))
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='branch_inventory_stable')['ok'])
+        self.assertEqual(server.branch_listings,2)
+
+    def test_deleted_branch_mid_scan_holds(self):
+        server=FakeServer()
+        server.drop_branch_on_refresh=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='branch_inventory_stable')['ok'])
 
     def test_api_errors_are_not_silenced(self):
         def fails(path): raise ApiError('simulated denied request')
