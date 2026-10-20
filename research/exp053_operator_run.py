@@ -86,6 +86,36 @@ def _signed_authorization(path, private_dir, provenance, packet_sha256,
     return record, digest, data
 
 
+def _pinned_operator_parent(parent_path):
+    """Open every lexical directory component without following symlinks."""
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not all(getattr(os, flag, 0) for flag in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        _deny_invalid("secure operator journal pathname traversal unavailable")
+    fd = _open_no_symlink_ancestors(parent_path)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISDIR(info.st_mode) or
+                info.st_uid != os.geteuid() or info.st_mode & 0o022):
+            _deny_invalid("operator journal parent owner, mode, or type invalid")
+    except BaseException:
+        os.close(fd)
+        raise
+    return fd
+
+
+def _require_operator_parent_stable(parent_path, pinned_fd):
+    """Refuse a parent path redirect before or after remote claim CAS."""
+    fresh = _pinned_operator_parent(parent_path)
+    try:
+        actual = os.fstat(fresh)
+        approved = os.fstat(pinned_fd)
+        if (actual.st_dev, actual.st_ino) != (approved.st_dev, approved.st_ino):
+            _deny_invalid("operator journal parent pathname changed")
+    finally:
+        os.close(fresh)
+
+
 def _consume_claim(path, private_dir, authorization, authorization_sha256,
                    *, operator_public_key_sha256, scorer_public_key_sha256,
                    operator_authorization_bytes):
@@ -104,96 +134,102 @@ def _consume_claim(path, private_dir, authorization, authorization_sha256,
         if (resolved.is_relative_to(root_dir) or
                 resolved.is_relative_to(scorer_dir)):
             _deny_invalid("operator journal is not separated from scorer and source")
-        parent = path.parent.stat()
-        if not stat.S_ISDIR(parent.st_mode) or parent.st_mode & 0o022:
-            _deny_invalid("operator journal parent writable by other users")
-        fd = os.open(path, os.O_RDWR | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+        parent_fd = _pinned_operator_parent(path.parent)
         try:
-            with os.fdopen(fd, "r+b", closefd=False) as stream:
-                fcntl.flock(fd, fcntl.LOCK_EX)
-                before = os.fstat(fd)
-                linked = os.stat(path, follow_symlinks=False)
-                if (not stat.S_ISREG(before.st_mode) or
-                        before.st_mode & 0o077 or before.st_nlink != 1 or
-                        before.st_uid != os.getuid() or
-                        (before.st_dev, before.st_ino) !=
-                        (linked.st_dev, linked.st_ino) or
-                        not 1 <= before.st_size <= MAX_STATE_BYTES):
-                    _deny_invalid("operator journal ownership, mode, or inode invalid")
-                raw = stream.read(MAX_STATE_BYTES + 1)
-                after = os.fstat(fd)
-                if (len(raw) != before.st_size or len(raw) > MAX_STATE_BYTES or
-                        (before.st_ino, before.st_dev, before.st_size,
-                         before.st_mtime_ns, before.st_ctime_ns) !=
-                        (after.st_ino, after.st_dev, after.st_size,
-                         after.st_mtime_ns, after.st_ctime_ns)):
-                    _deny_invalid("operator journal changed during locked read")
-                state = unambiguous_json(raw)
-                if (not isinstance(state, dict) or set(state) != STATE_FIELDS or
-                        state["schema"] != STATE_SCHEMA or
-                        type(state["last_sequence"]) is not int or
-                        state["last_sequence"] < 0 or
-                        not hex_digest(state["last_claim_sha256"]) or
-                        (state["last_sequence"] == 0 and
-                         state["last_claim_sha256"] != "0" * 64)):
-                    _deny_invalid("operator state missing, corrupted, or manually reset")
-                if (authorization["sequence"] != state["last_sequence"] + 1 or
-                        authorization["previous_claim_sha256"] !=
-                        state["last_claim_sha256"]):
-                    _deny_invalid("authorization already used, stale, or wrong chained sequence")
-                # A separately administered CAS must commit first: a restored
-                # local journal cannot present a fresh high-water response.
-                # If remote commit succeeds and local update fails, HOLD.
-                witness_evidence = commit_independent_highwater(
-                    sequence=authorization["sequence"],
-                    previous_claim_sha256=authorization["previous_claim_sha256"],
-                    claim_sha256=authorization_sha256,
-                    execution_id_sha256=authorization["runner_execution_id_sha256"],
-                    operator_public_key_sha256=operator_public_key_sha256,
-                    scorer_public_key_sha256=scorer_public_key_sha256,
-                    operator_authorization_bytes=operator_authorization_bytes)
-                new_state = {
-                    "schema": STATE_SCHEMA,
-                    "last_sequence": authorization["sequence"],
-                    "last_claim_sha256": authorization_sha256,
-                }
-                data = json.dumps(new_state, sort_keys=True,
-                                  separators=(",", ":")).encode() + b"\n"
-                # Recheck same path/inode before creating a durable claim.
-                linked = os.stat(path, follow_symlinks=False)
-                if (linked.st_ino, linked.st_dev) != (before.st_ino, before.st_dev):
-                    _deny_invalid("operator claim journal replaced while locked")
-                marker_id = authorization["runner_execution_id_sha256"]
-                marker_path = path.with_name(path.name + ".used-" + marker_id)
-                try:
-                    marker_fd = os.open(
-                        marker_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL |
-                        getattr(os, "O_NOFOLLOW", 0), 0o600)
-                except FileExistsError:
-                    _deny_invalid("scorer execution ID was already claimed, even with a new sequence")
-                try:
-                    os.write(marker_fd, (authorization_sha256 + "\n").encode())
-                    os.fsync(marker_fd)
-                finally:
-                    os.close(marker_fd)
-                dir_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
-                try:
-                    os.fsync(dir_fd)
-                finally:
-                    os.close(dir_fd)
-                # If interrupted after marker creation, refuse later reuse.
-                stream.seek(0)
-                stream.write(data)
-                stream.truncate()
-                stream.flush()
-                os.fsync(fd)
-                return {
-                    "operator_sequence": authorization["sequence"],
-                    "operator_authorization_sha256": authorization_sha256,
-                    **witness_evidence,
-                }
+            parent = os.fstat(parent_fd)
+            if (not stat.S_ISDIR(parent.st_mode) or
+                    parent.st_uid != os.geteuid() or parent.st_mode & 0o022):
+                _deny_invalid("operator journal parent not securely owner-controlled")
+            fd = os.open(path.name, os.O_RDWR | os.O_NONBLOCK | os.O_NOFOLLOW,
+                         dir_fd=parent_fd)
+            try:
+                with os.fdopen(fd, "r+b", closefd=False) as stream:
+                    fcntl.flock(fd, fcntl.LOCK_EX)
+                    before = os.fstat(fd)
+                    linked = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+                    if (not stat.S_ISREG(before.st_mode) or
+                            before.st_mode & 0o077 or before.st_nlink != 1 or
+                            before.st_uid != os.getuid() or
+                            (before.st_dev, before.st_ino) !=
+                            (linked.st_dev, linked.st_ino) or
+                            not 1 <= before.st_size <= MAX_STATE_BYTES):
+                        _deny_invalid("operator journal ownership, mode, or inode invalid")
+                    raw = stream.read(MAX_STATE_BYTES + 1)
+                    after = os.fstat(fd)
+                    if (len(raw) != before.st_size or len(raw) > MAX_STATE_BYTES or
+                            (before.st_ino, before.st_dev, before.st_size,
+                             before.st_mtime_ns, before.st_ctime_ns) !=
+                            (after.st_ino, after.st_dev, after.st_size,
+                             after.st_mtime_ns, after.st_ctime_ns)):
+                        _deny_invalid("operator journal changed during locked read")
+                    state = unambiguous_json(raw)
+                    if (not isinstance(state, dict) or set(state) != STATE_FIELDS or
+                            state["schema"] != STATE_SCHEMA or
+                            type(state["last_sequence"]) is not int or
+                            state["last_sequence"] < 0 or
+                            not hex_digest(state["last_claim_sha256"]) or
+                            (state["last_sequence"] == 0 and
+                             state["last_claim_sha256"] != "0" * 64)):
+                        _deny_invalid("operator state missing, corrupted, or manually reset")
+                    if (authorization["sequence"] != state["last_sequence"] + 1 or
+                            authorization["previous_claim_sha256"] !=
+                            state["last_claim_sha256"]):
+                        _deny_invalid("authorization already used, stale, or wrong chained sequence")
+                    # A separately administered CAS must commit first: a restored
+                    # local journal cannot present a fresh high-water response.
+                    # If remote commit succeeds and local update fails, HOLD.
+                    _require_operator_parent_stable(path.parent, parent_fd)
+                    witness_evidence = commit_independent_highwater(
+                        sequence=authorization["sequence"],
+                        previous_claim_sha256=authorization["previous_claim_sha256"],
+                        claim_sha256=authorization_sha256,
+                        execution_id_sha256=authorization["runner_execution_id_sha256"],
+                        operator_public_key_sha256=operator_public_key_sha256,
+                        scorer_public_key_sha256=scorer_public_key_sha256,
+                        operator_authorization_bytes=operator_authorization_bytes)
+                    new_state = {
+                        "schema": STATE_SCHEMA,
+                        "last_sequence": authorization["sequence"],
+                        "last_claim_sha256": authorization_sha256,
+                    }
+                    data = json.dumps(new_state, sort_keys=True,
+                                      separators=(",", ":")).encode() + b"\n"
+                    # Independent CAS may have committed; changed path => HOLD.
+                    _require_operator_parent_stable(path.parent, parent_fd)
+                    # Recheck same path/inode before creating a durable claim.
+                    linked = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+                    if (linked.st_ino, linked.st_dev) != (before.st_ino, before.st_dev):
+                        _deny_invalid("operator claim journal replaced while locked")
+                    marker_id = authorization["runner_execution_id_sha256"]
+                    marker_path = path.with_name(path.name + ".used-" + marker_id)
+                    try:
+                        marker_fd = os.open(
+                            marker_path.name, os.O_WRONLY | os.O_CREAT |
+                            os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent_fd)
+                    except FileExistsError:
+                        _deny_invalid("scorer execution ID was already claimed, even with a new sequence")
+                    try:
+                        os.write(marker_fd, (authorization_sha256 + "\n").encode())
+                        os.fsync(marker_fd)
+                    finally:
+                        os.close(marker_fd)
+                    os.fsync(parent_fd)
+                    # If interrupted after marker creation, refuse later reuse.
+                    stream.seek(0)
+                    stream.write(data)
+                    stream.truncate()
+                    stream.flush()
+                    os.fsync(fd)
+                    _require_operator_parent_stable(path.parent, parent_fd)
+                    return {
+                        "operator_sequence": authorization["sequence"],
+                        "operator_authorization_sha256": authorization_sha256,
+                        **witness_evidence,
+                    }
+            finally:
+                os.close(fd)
         finally:
-            os.close(fd)
+            os.close(parent_fd)
     except (OSError, RuntimeError) as exc:
         _deny_invalid("operator journal unavailable/cannot be locked: " +
                       type(exc).__name__)

@@ -426,6 +426,72 @@ class SyntheticOperatorClaim(unittest.TestCase):
                     self.auth_path, self.scorer_private,
                     provenance=self.provenance, packet_sha256=self.packet)
 
+    def test_operator_journal_symlinked_ancestor_refused_before_fake_cas(self):
+        self.sign()
+        original = self.state_path
+        alias = self.operator_dir.parent / "invented-operator-dir-alias"
+        alias.symlink_to(self.operator_dir, target_is_directory=True)
+        self.state_path = alias / original.name
+        with self.assertRaisesRegex(ValueError, "HOLD"):
+            self.consume()
+        self.assertEqual(self.highwater[0], 0)
+        self.assertEqual(json.loads(original.read_text())["last_sequence"], 0)
+        self.assertEqual(list(self.operator_dir.glob("*.used-*")), [])
+
+    def test_missing_essential_os_nofollow_flags_refuses_before_fake_cas(self):
+        for flag in ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK"):
+            with self.subTest(flag=flag), patch.object(run.os, flag, 0):
+                self.sign()
+                with self.assertRaisesRegex(ValueError, "HOLD"):
+                    self.consume()
+                self.assertEqual(self.highwater[0], 0)
+                self.assertEqual(json.loads(self.state_path.read_text())["last_sequence"], 0)
+
+    def test_operator_parent_symlink_swap_during_fake_cas_fails_closed(self):
+        self.sign()
+        old_dir = self.operator_dir.parent / "moved-operator-original"
+        substitute = self.operator_dir.parent / "synthetic-substitute"
+        substitute.mkdir(mode=0o700)
+        actual_cas = self.synthetic_external_cas
+        def swap_after_remote(request):
+            answer = actual_cas(request)
+            self.operator_dir.rename(old_dir)
+            self.operator_dir.symlink_to(substitute, target_is_directory=True)
+            return answer
+        with patch.object(self, "synthetic_external_cas", side_effect=swap_after_remote):
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                self.consume()
+        # Witness advanced; a missing local marker cannot justify replay.
+        self.assertEqual(self.highwater[0], 1)
+        self.assertEqual(json.loads((old_dir / self.state_path.name).read_text())[
+            "last_sequence"], 0)
+        self.assertEqual(list(old_dir.glob("*.used-*")), [])
+        self.assertEqual(list(substitute.glob("*.used-*")), [])
+        self.assertFalse((substitute / self.state_path.name).exists())
+
+    def test_operator_parent_inode_swap_after_fake_cas_fails_closed(self):
+        self.sign()
+        old_dir = self.operator_dir.parent / "previous-operator-directory"
+        true_cas = self.synthetic_external_cas
+        def replace_directory_after_commit(request):
+            proof = true_cas(request)
+            self.operator_dir.rename(old_dir)
+            self.operator_dir.mkdir(mode=0o700)
+            # Even a NEW owner-controlled normal directory must not inherit
+            # a claim approved for an earlier parent inode.
+            self.create_state()
+            return proof
+        with patch.object(self, "synthetic_external_cas",
+                          side_effect=replace_directory_after_commit):
+            with self.assertRaisesRegex(ValueError, "HOLD"):
+                self.consume()
+        self.assertEqual(self.highwater[0], 1)
+        self.assertEqual(json.loads((old_dir / self.state_path.name).read_text())[
+            "last_sequence"], 0)
+        self.assertEqual(json.loads(self.state_path.read_text())["last_sequence"], 0)
+        self.assertEqual(list(old_dir.glob("*.used-*")), [])
+        self.assertEqual(list(self.operator_dir.glob("*.used-*")), [])
+
     def test_synthetic_concurrent_consumers_only_one_wins(self):
         self.sign()
         # All mock roots belong to ONE outer scope. Nested patch.object from
