@@ -273,3 +273,15 @@ and checks effective-user ownership prior to creation. Synthetic tests
 confirm static and swapped symlinks refuse without writing unrelated
 outputs; the source-only focused draft PR #40 holds this review slice.
 No private RACE text, real human key or model forward used; NO_GO_RESEARCH_ONLY.
+
+## Complete sealed answer-key case scope (October 19)
+
+Synthetic fixtures with all real trust roots explicitly mocked revealed a
+missing invariant: a 64-case invented packet with only 40 sealed answers
+could yield a fabricated human_approval result. The same attack is NOT known
+to bypass the immutable real manifest, pinned human roster or signature
+validation. The candidate now checks exactly 64 unique registered case IDs
+against exactly 64 sealed A/B/C/D answer labels before signed reviewers
+are read, and fails closed on malformed container shapes. Source-only draft
+PR #41 exposes this fix and synthetic tests. Real owner/weight pins remain
+empty, with independent reviewer custody and model inference on HOLD.
