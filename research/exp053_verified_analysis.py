@@ -3,8 +3,15 @@
 import argparse
 import hashlib
 import json
+import os
+import stat
 from pathlib import Path
-from exp053_race_review import MANIFEST,MANIFEST_SHA,digest,filehash,verified_admission,deny
+from exp053_race_review import (
+    MANIFEST as MANIFEST, MANIFEST_SHA as MANIFEST_SHA,
+    digest, filehash, verified_admission, deny,
+    _read_pinned_public_manifest, _read_private_admission_json,
+    _unique_private_fields, _invalid_private_constant, _finite_private_float,
+)
 from exp053_tokenizer_preflight import PRIVATE,PATHS,ROOT,WITHHELD,options_for,prompt
 from exp053_metrics import analyze, FIELDS as SCORE_FIELDS, rotate as rotate_label
 from exp053_execution_attestation import (
@@ -24,6 +31,65 @@ WEIGHT_REPORT_SHA=""
 WEIGHT_SPEC=ROOT/"EXP053-WEIGHT-ID-PREFLIGHT-SPEC-2026-10-16.md"
 WEIGHT_SPEC_SHA="b89f573acc2567b114e65746b3026e36636aee9add6c6568c0fac6319f620a81"
 
+PUBLIC_RECEIPT_LIMIT = 1_000_000
+
+
+def _read_pinned_source_free_receipt(path, expected_sha):
+    """Verify and parse exactly the SAME bounded public metadata FD bytes."""
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not hex_digest(expected_sha):
+        deny("source-free receipt pin missing or invalid")
+    if not all(getattr(os, flag, 0) for flag in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("safe source-free receipt descriptor access unavailable")
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    try:
+        intended = absolute.resolve(strict=True)
+        fd = _open_no_symlink_ancestors(absolute)
+        try:
+            before = os.fstat(fd)
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
+                    not 1 <= before.st_size <= PUBLIC_RECEIPT_LIMIT):
+                deny("source-free receipt is not a bounded regular file")
+            data = bytearray()
+            while len(data) < PUBLIC_RECEIPT_LIMIT + 1:
+                chunk = os.read(fd, min(65536, PUBLIC_RECEIPT_LIMIT + 1 - len(data)))
+                if not chunk:
+                    break
+                data.extend(chunk)
+            after = os.fstat(fd)
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if len(data) != before.st_size or identity(before) != identity(after):
+                deny("source-free receipt changed during read")
+            if hashlib.sha256(data).hexdigest() != expected_sha:
+                deny("pinned source-free receipt bytes do not match")
+            if absolute.resolve(strict=True) != intended:
+                deny("source-free receipt pathname changed during read")
+            final_fd = _open_no_symlink_ancestors(absolute)
+            try:
+                newest = os.fstat(final_fd)
+                if (newest.st_dev, newest.st_ino) != (before.st_dev, before.st_ino):
+                    deny("source-free receipt inode changed during read")
+            finally:
+                os.close(final_fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        deny("source-free receipt unavailable or unsafe")
+    try:
+        value = json.loads(data.decode("utf-8"),
+                           object_pairs_hook=_unique_private_fields,
+                           parse_constant=_invalid_private_constant,
+                           parse_float=_finite_private_float)
+    except (ValueError, UnicodeError, RecursionError, OverflowError):
+        deny("source-free receipt JSON malformed or ambiguous")
+    if not isinstance(value, dict):
+        deny("source-free receipt JSON must be an object")
+    return value
+
+
 def sha(s):return hashlib.sha256(s.encode("utf8")).hexdigest()
 def hex_digest(s):return isinstance(s,str) and len(s)==64 and all(c in "0123456789abcdef" for c in s)
 
@@ -34,9 +100,7 @@ def admitted_weight_inventory(scan):
         deny("frozen checkpoint identity protocol changed")
     if not WEIGHT_REPORT_SHA:
         deny("HOLD no independently accepted checkpoint file-identity receipt")
-    if not WEIGHT_REPORT.is_file() or filehash(WEIGHT_REPORT)!=WEIGHT_REPORT_SHA:
-        deny("approved checkpoint identity receipt absent or modified")
-    report=json.loads(WEIGHT_REPORT.read_text())
+    report=_read_pinned_source_free_receipt(WEIGHT_REPORT, WEIGHT_REPORT_SHA)
     if (report.get("schema")!="exp053-source-only-weight-identity-v1" or
             report.get("spec_sha256")!=WEIGHT_SPEC_SHA or
             report.get("tokenizer_receipt_sha256")!=PREFLIGHT_SHA or
@@ -105,23 +169,14 @@ def admitted_weight_inventory(scan):
     return identities
 
 def require_sources(private_dir=None):
-    if not PREFLIGHT.is_file() or filehash(PREFLIGHT)!=PREFLIGHT_SHA:
-        deny("tokenizer feasibility receipt modified")
+    scan=_read_pinned_source_free_receipt(PREFLIGHT, PREFLIGHT_SHA)
     if not PROMPT_CODE.is_file() or filehash(PROMPT_CODE)!=PROMPT_CODE_SHA:
         deny("prompt builder source drift")
-    if not MANIFEST.is_file() or filehash(MANIFEST)!=MANIFEST_SHA:
-        deny("frozen public manifest changed")
-    scan=json.loads(PREFLIGHT.read_text())
+    manifest=_read_pinned_public_manifest()
     if set(scan["models"])!=set(PATHS) or scan["model_forward_passes"]!=0:
         deny("tokenizer feasibility report invalid")
     source_packet=(PRIVATE if private_dir is None else Path(private_dir)/"packet.json")
-    if not source_packet.is_file():
-        deny("private source packet absent from selected review directory")
-    try:
-        packet=json.loads(source_packet.read_text())
-    except (OSError, ValueError) as exc:
-        deny("private source packet unreadable or malformed: "+type(exc).__name__)
-    manifest=json.loads(MANIFEST.read_text())
+    packet=_read_private_admission_json(source_packet)
     if digest(packet)!=manifest["packet_sha256"]:
         deny("private packet does not match the public hash")
     return packet,manifest,scan
