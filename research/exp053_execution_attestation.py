@@ -39,27 +39,32 @@ def hex_digest(s):
 
 
 def private_regular_file(path, private_dir, *, small_limit=None):
-    """Read verified private bytes via one descriptor, never follow a symlink.
+    """Read private evidence from one safe fd, refusing symlink ancestors.
 
-    When small_limit=None, hash large files incrementally rather than retain
-    private scores or retry logs in memory.
+    Preserve incremental hashing for large score and attempt-log files;
+    only small bounded JSON evidence is retained as in-memory bytes.
     """
-    path = Path(path)
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+
+    if not all(getattr(os, flag, 0) for flag in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("secure execution evidence pathname traversal unavailable")
+    private_root = Path(os.path.abspath(os.fspath(private_dir)))
+    path = Path(os.path.abspath(os.fspath(path)))
+    if path == private_root or not path.is_relative_to(private_root):
+        deny("execution evidence must reside inside selected private directory")
+    if (small_limit is not None and
+            (type(small_limit) is not int or small_limit < 1)):
+        deny("execution evidence size limit invalid")
+
     try:
-        directory = Path(private_dir).resolve(strict=True)
-        target = path.resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        deny("private execution evidence path missing or unsafe: " + type(exc).__name__)
-    if path.is_symlink() or not target.is_relative_to(directory):
-        deny("execution evidence must reside in a private non-symlink file")
-    flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0)
-    try:
-        fd = os.open(path, flags)
+        fd = _open_no_symlink_ancestors(path)
         try:
             before = os.fstat(fd)
             if (not stat.S_ISREG(before.st_mode) or before.st_mode & 0o077 or
-                    before.st_nlink != 1 or before.st_size < 1):
-                deny("execution evidence is not a private regular file")
+                    before.st_nlink != 1 or before.st_uid != os.geteuid() or
+                    before.st_size < 1):
+                deny("execution evidence is not a private owner regular file")
             if small_limit is not None and before.st_size > small_limit:
                 deny("execution attestation exceeds bounded JSON size")
             digest = hashlib.sha256()
@@ -81,6 +86,15 @@ def private_regular_file(path, private_dir, *, small_limit=None):
                         st.st_ctime_ns)
             if identity(before) != identity(after) or size != before.st_size:
                 deny("execution evidence mutated while hashing")
+            # Check the opened fd is still the inode reached by the caller's
+            # ORIGINAL lexical path, not a symlink-resolved substitute.
+            reopened = _open_no_symlink_ancestors(path)
+            try:
+                current = os.fstat(reopened)
+                if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
+                    deny("execution evidence pathname/inode changed during hashing")
+            finally:
+                os.close(reopened)
             return digest.hexdigest(), bytes(data) if data is not None else None
         finally:
             os.close(fd)

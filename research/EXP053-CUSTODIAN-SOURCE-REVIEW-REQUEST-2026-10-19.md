@@ -326,3 +326,14 @@ before, after and at completion of mock CAS. A post-CAS redirect HOLDS without
 resetting high-water or emitting misplaced marker. Draft PR #44 carries this
 source-only change. All real operator/witness/roster/weight approvals remain
 unconfigured; no licensed corpus or model was used. NO_GO_RESEARCH_ONLY.
+
+## Scorer evidence path ancestor protections (October 20)
+
+A disposable invented private evidence path passed verification through an
+intermediate symlink under the private root. Execution evidence now requires
+Linux non-following traversal for every pathname component and all safe
+OS flags, owner/mode/single-link checks, stable same-fd incremental hash,
+and a final inode recheck. New synthetic tests include same-byte inode
+substitution and malformed evidence paths; draft PR #45 carries the exact
+review slice. No licensed RACE, actual signed human forms, weights or
+operator real claims were accessed; NO_GO_RESEARCH_ONLY.
