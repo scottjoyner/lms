@@ -229,6 +229,17 @@ class Audit:
                       json.dumps(policy, sort_keys=True) == json.dumps(end_policy, sort_keys=True))
             self.record(stable, 'policy_stable_across_snapshot',
                         'Repository ruleset unchanged throughout the effective-branch read')
+        # Re-enumerate targets after individual branch reads. A branch created or
+        # deleted during the scan must never inherit a claim based on an older
+        # inventory (the policy re-read above detects ruleset drift separately).
+        refreshed = self.paginated('/branches')
+        end_names = sorted({b.get('name') for b in refreshed if isinstance(b, dict)
+                            and isinstance(b.get('name'), str)
+                            and (b['name'] == 'main' or b['name'].startswith('research/exp053'))})
+        self.record(names == end_names, 'branch_inventory_stable',
+                    'EXP-053 target branch inventory unchanged during read-only audit'
+                    if names == end_names else
+                    'EXP-053 target branch inventory changed during audit; rerun from scratch')
         status = 'POLICY_METADATA_VERIFIED' if all(item['ok'] for item in self.events) else 'NO_GO_GOVERNANCE'
         return {'repository': REPO, 'observed_at_utc': datetime.now(timezone.utc).isoformat(),
                 'governance_status': status, 'scientific_status': 'NO_GO_RESEARCH_ONLY',
