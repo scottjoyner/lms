@@ -265,3 +265,15 @@ The unified source now explicitly disables PyArrow reader threads, and
 synthetic tests require the setting. This is a limited synthetic API witness,
 NOT a licensed RACE corpus rebuild, independent observer signature, or
 science release approval. See native PyArrow findings. NO_GO_RESEARCH_ONLY.
+
+## Source-only private output ancestor symlink hardening (October 19)
+
+The public PR chain originally retained a legacy `open(path,"xb")` writer;
+the unified candidate already used a more secure 0600-from-birth exclusive
+writer, but it still followed symlinked intermediate output directories.
+A disposable fake alias reproduced the custody-path failure. The writer
+now uses `_open_no_symlink_ancestors` for both initial/rechecked parents
+and checks effective-user ownership prior to creation. Synthetic tests
+confirm static and swapped symlinks refuse without writing unrelated
+outputs; the source-only focused draft PR #40 holds this review slice.
+No private RACE text, real human key or model forward used; NO_GO_RESEARCH_ONLY.

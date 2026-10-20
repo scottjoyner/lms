@@ -310,18 +310,23 @@ def save_private(path, obj):
     A successful local file write is not a human review or custody approval.
     The opened parent and output inode bind all checks/cleanup to this attempt.
     """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
     if not all(getattr(os, name, 0) for name in
-               ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
+               ("O_PATH", "O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
         deny("secure private-file creation is unavailable")
     path = Path(path)
     data = canonical(obj) + b"\n"
-    parent_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     file_flags = (os.O_RDWR | os.O_CREAT | os.O_EXCL |
                   os.O_NOFOLLOW | os.O_NONBLOCK)
-    parent_fd = os.open(path.parent, parent_flags)
+    # O_NOFOLLOW on the last parent is not enough: secure EVERY ancestor.
+    parent_fd = _open_no_symlink_ancestors(path.parent)
     fd = None
     created_inode = None
     try:
+        parent_initial = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent_initial.st_mode) or
+                parent_initial.st_uid != os.geteuid()):
+            deny("private output parent directory owner or type invalid")
         fd = os.open(path.name, file_flags, 0o600, dir_fd=parent_fd)
         try:
             info = os.fstat(fd)
@@ -358,7 +363,7 @@ def save_private(path, obj):
                     current.st_mtime_ns != after.st_mtime_ns or
                     current.st_ctime_ns != after.st_ctime_ns):
                 deny("private artifact pathname changed during write")
-            fresh_parent = os.open(path.parent, parent_flags)
+            fresh_parent = _open_no_symlink_ancestors(path.parent)
             try:
                 refreshed = os.fstat(fresh_parent)
                 original = os.fstat(parent_fd)
