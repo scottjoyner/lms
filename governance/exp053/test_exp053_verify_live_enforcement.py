@@ -1,0 +1,147 @@
+"""Synthetic-only negative cases for EXP-053 audit; no network, no science data."""
+import copy
+import json
+import unittest
+from pathlib import Path
+from urllib.parse import unquote
+from exp053_verify_live_enforcement import Audit, ApiError, BASE
+
+CANDIDATE=json.loads((BASE/'EXP053_github_ruleset_candidate_2026-10-20.json').read_text())
+EVIDENCE=json.loads((BASE/'EXP053_ruleset_validation_evidence_2026-10-20.json').read_text())
+BRANCHES=['main']+EVIDENCE['baseline']['research_exp053_branches']
+
+class FakeServer:
+    def __init__(self, active=True, bypass_visibility=True, branch_rules=True):
+        self.active=active
+        self.bypass_visibility=bypass_visibility
+        self.branch_rules=branch_rules
+        self.names=list(BRANCHES)
+        self.bad_branch=None
+        self.rewrite_app=False
+        self.wrong_source=False
+        self.duplicate_context=False
+        self.foreign_effective=False
+        self.wrong_effective_id=False
+        self.mutate_policy_after=False
+        self.policy_reads=0
+
+    def __call__(self,path):
+        path=path.split('?')[0]
+        if path=='/rulesets':
+            return [{'id': 42,'name':CANDIDATE['name'],'target':'branch',
+                     'enforcement':'active'}] if self.active else []
+        if path=='/rulesets/42':
+            self.policy_reads += 1
+            data=copy.deepcopy(CANDIDATE)
+            data['id']=42
+            if self.mutate_policy_after and self.policy_reads > 1:
+                data['enforcement']='evaluate'
+            data['source_type']='Repository'
+            data['source']='scottjoyner/lms'
+            if self.wrong_source:
+                data['source']='different-owner/different-repo'
+            if not self.bypass_visibility:
+                del data['bypass_actors']
+            return data
+        if path=='/branches':
+            return [{'name':x} for x in self.names]
+        if path.startswith('/branches/'):
+            name=unquote(path[len('/branches/'):])
+            return {'name':name,'protected':self.active}
+        if path.startswith('/rules/branches/'):
+            name=unquote(path[len('/rules/branches/'):])
+            if not (self.active and self.branch_rules):
+                return []
+            rules=copy.deepcopy(CANDIDATE['rules'])
+            if name==self.bad_branch:
+                rules=[x for x in rules if x['type']!='required_status_checks']
+            if self.duplicate_context:
+                rules[1]['parameters']['required_status_checks'].append(copy.deepcopy(rules[1]['parameters']['required_status_checks'][0]))
+            if self.rewrite_app:
+                rules[1]['parameters']['required_status_checks'][0]['integration_id']=1
+            for rule in rules:
+                rule.update(ruleset_id=99 if self.wrong_effective_id else 42,
+                            ruleset_source='scottjoyner/lms', ruleset_source_type='Repository')
+            if self.foreign_effective:
+                for rule in rules:
+                    rule['ruleset_id']=99
+            return rules
+        raise ApiError('unexpected fixture path '+path)
+
+class EnforcementTests(unittest.TestCase):
+    def test_all_passing_is_metadata_only(self):
+        report=Audit(FakeServer()).run()
+        self.assertEqual(report['governance_status'],'POLICY_METADATA_VERIFIED')
+        self.assertEqual(report['scientific_status'],'NO_GO_RESEARCH_ONLY')
+        self.assertIn('no negative merge challenge',report['enforcement_claim_limit'])
+        self.assertEqual(len(report['branches']),12)
+
+    def test_no_rulesets_critical_hold(self):
+        report=Audit(FakeServer(active=False)).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertEqual(report['branches'][0]['effective_rules'],[])
+
+    def test_redacted_bypass_never_assumed_empty(self):
+        report=Audit(FakeServer(bypass_visibility=False)).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events'] if x['code']=='bypass_visibility')['ok'])
+
+    def test_one_missing_branch_ci_blocks_status(self):
+        server=FakeServer();server.bad_branch=BRANCHES[-1]
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(report['branches'][-1]['required_rule_set_observed'])
+
+    def test_wrong_status_check_source_blocks(self):
+        server=FakeServer();server.rewrite_app=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_nested_branch_not_covered_by_wildcard(self):
+        server=FakeServer();server.names.append('research/exp053-nested/extra')
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events'] if x['code']=='branch_inventory')['ok'])
+
+    def test_missing_branch_protection_blocks(self):
+        server=FakeServer();server.active=False
+        report=Audit(server).run()
+        self.assertFalse(any(x['protected'] for x in report['branches']))
+
+    def test_foreign_policy_cannot_pass(self):
+        server=FakeServer(); server.wrong_source=True
+        result=Audit(server).run()
+        self.assertEqual(result['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_dropped_baseline_branch_holds(self):
+        server=FakeServer(); server.names.pop()
+        result=Audit(server).run()
+        self.assertFalse(next(x for x in result['events'] if x['code']=='baseline_target_retention')['ok'])
+
+    def test_duplicate_ci_context_holds(self):
+        server=FakeServer(); server.duplicate_context=True
+        result=Audit(server).run()
+        self.assertEqual(result['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_effective_rules_from_foreign_policy_do_not_count(self):
+        server=FakeServer(); server.foreign_effective=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events'] if e['code']=='effective_origin:main')['ok'])
+
+    def test_wrong_effective_ruleset_id_holds(self):
+        server=FakeServer(); server.wrong_effective_id=True
+        self.assertEqual(Audit(server).run()['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_policy_modified_during_branch_scan_holds(self):
+        server=FakeServer(); server.mutate_policy_after=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events'] if e['code']=='policy_stable_across_snapshot')['ok'])
+
+    def test_api_errors_are_not_silenced(self):
+        def fails(path): raise ApiError('simulated denied request')
+        with self.assertRaises(ApiError):Audit(fails).run()
+
+if __name__=='__main__':
+    unittest.main()
