@@ -7,21 +7,52 @@ from unittest.mock import patch
 from exp053_admin_activation import (main, activate, preflight_api, verify_local,
                                       ActivationError, CONFIRMATION, REPO, BASELINE)
 from pathlib import Path
+from hashlib import sha256
+from urllib.parse import unquote
 
 EVIDENCE=json.loads(Path(BASELINE).read_text())
 
 class FakeAdmin:
-    def __init__(self, existing=False, changed=False):
+    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False):
         self.existing=existing
         self.changed=changed
         self.calls=[]
         self.created=None
+        self.missing_ci=missing_ci
+        self.wrong_app=wrong_app
+        self.moving_head=moving_head
+        self.protected=protected
+        self.duplicate_ci=duplicate_ci
+        self.branch_reads={}
+        self.changed_roster=changed_roster
+        self.branch_listings=0
     def call(self,method,path,payload=None):
         self.calls.append(method+' '+path)
         if method=='GET' and path.startswith('/rulesets?'):
             return [{'id':11}] if self.existing else []
         if method=='GET' and path.startswith('/branches?'):
-            return [{'name':x} for x in ['main']+EVIDENCE['baseline']['research_exp053_branches']]
+            self.branch_listings+=1
+            names=['main']+EVIDENCE['baseline']['research_exp053_branches']
+            if self.changed_roster and self.branch_listings>1:
+                names=names+['research/exp053-new-after-inventory']
+            return [{'name':x} for x in names]
+        if method=='GET' and path.startswith('/branches/'):
+            name=unquote(path[len('/branches/'):])
+            self.branch_reads[name]=self.branch_reads.get(name,0)+1
+            head=sha256(name.encode()).hexdigest()[:40]
+            if self.moving_head and self.branch_reads[name]>1:
+                head='0'*40
+            return {'name':name,'commit':{'sha':head},'protected':self.protected}
+        if method=='GET' and path.startswith('/commits/') and path.endswith('/check-runs?per_page=100'):
+            head=path[len('/commits/'):].split('/')[0]
+            checks=[{'name':name,'status':'completed','conclusion':'success',
+                     'head_sha':head,'app':{'id':1 if self.wrong_app else 15368}}
+                    for name in EVIDENCE['verified_successful_check_contexts']]
+            if self.missing_ci:
+                checks.pop()
+            if self.duplicate_ci:
+                checks.append(copy.deepcopy(checks[0]))
+            return {'total_count':len(checks),'check_runs':checks}
         if method=='POST' and path=='/rulesets':
             self.created=copy.deepcopy(payload)
             return {'id': 54}
@@ -62,6 +93,42 @@ class Tests(unittest.TestCase):
         fake=FakeAdmin()
         self.assertEqual(activate(fake,CONFIRMATION),54)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+    def test_missing_current_check_prevents_write(self):
+        fake=FakeAdmin(missing_ci=True)
+        with self.assertRaisesRegex(ActivationError,'Missing or ambiguous current'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_foreign_github_app_prevents_write(self):
+        fake=FakeAdmin(wrong_app=True)
+        with self.assertRaisesRegex(ActivationError,'source-bound'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_moving_branch_head_prevents_write(self):
+        fake=FakeAdmin(moving_head=True)
+        with self.assertRaisesRegex(ActivationError,'moved'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_existing_protection_needs_re_review(self):
+        fake=FakeAdmin(protected=True)
+        with self.assertRaisesRegex(ActivationError,'identity/protection/head'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_duplicate_check_name_prevents_write(self):
+        fake=FakeAdmin(duplicate_ci=True)
+        with self.assertRaisesRegex(ActivationError,'Missing or ambiguous'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_changed_target_roster_prevents_write(self):
+        fake=FakeAdmin(changed_roster=True)
+        with self.assertRaisesRegex(ActivationError,'roster changed'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
     def test_readback_wrong_origin_fails_closed_no_retry(self):
         fake=FakeAdmin(changed=True)
         with self.assertRaises(ActivationError):activate(fake,CONFIRMATION)
