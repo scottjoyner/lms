@@ -508,6 +508,51 @@ def decisions_for(review,packet,required_ids=None):
         check_decision(d,lookup[cid]);out[cid]=d
     if set(out)!=expected:deny("unexpected decision scope")
     return out
+def _validate_sealed_case_scope(packet, seal, manifest):
+    """Require exactly one sealed answer for every registered packet case.
+
+    Digest binding alone is not a structural guarantee: fail closed if a
+    different trusted manifest ever pins an incomplete or malformed key map.
+    This does NOT assert any human review or signer authorization.
+    """
+    if (not isinstance(manifest, dict) or
+            not isinstance(manifest.get("sealed_answer_key_sha256"), str) or
+            len(manifest["sealed_answer_key_sha256"]) != 64 or
+            any(c not in "0123456789abcdef" for c in
+                manifest["sealed_answer_key_sha256"])):
+        deny("public manifest sealed answer-key digest is invalid")
+    if not isinstance(seal, dict) or set(seal) != {"packet_sha256", "answer_key"}:
+        deny("sealed answer-key record fields are missing or unexpected")
+    if seal["packet_sha256"] != digest(packet):
+        deny("sealed answer-key packet identity mismatch")
+    answers = seal["answer_key"]
+    if not isinstance(answers, dict):
+        deny("sealed answer-key case map must be an object")
+    if digest(answers) != manifest["sealed_answer_key_sha256"]:
+        deny("answer key differs from committed manifest")
+    if (not isinstance(packet, dict) or
+            packet.get("schema") != "exp053-packet-v1" or
+            not isinstance(packet.get("cases"), list) or
+            len(packet["cases"]) != TARGET):
+        deny("source packet must contain exactly 64 registered cases")
+    case_ids = []
+    for item in packet["cases"]:
+        if not isinstance(item, dict):
+            deny("source packet case must be an object")
+        cid = item.get("case_id")
+        if not isinstance(cid, str) or not cid:
+            deny("source packet has invalid case identity")
+        case_ids.append(cid)
+    if len(set(case_ids)) != TARGET:
+        deny("source packet has duplicate case identity")
+    if set(answers) != set(case_ids):
+        deny("sealed answer-key case scope differs from source packet")
+    if any(not isinstance(label, str) or len(label) != 1 or
+           label not in LETTERS for label in answers.values()):
+        deny("sealed answer key contains an invalid option label")
+    return answers
+
+
 def verified_admission(private_dir,keys_path,adjudicator_file=None):
     # There is no scientific authorization without an independently approved
     # owner roster. Refuse BEFORE hashing licensed source bytes or opening
@@ -537,9 +582,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if packet.get("source_sha256")!=SOURCE_SHA or packet.get("protocol_sha256")!=PROTOCOL_SHA:
         deny("packet custody mismatch")
     if digest(packet)!=manifest["packet_sha256"]:deny("packet differs from manifest")
-    if (seal["packet_sha256"]!=digest(packet) or
-        digest(seal["answer_key"])!=manifest["sealed_answer_key_sha256"]):
-        deny("answer key differs from committed manifest")
+    sealed_answers=_validate_sealed_case_scope(packet,seal,manifest)
     trust=roster["keys"]
     observations=[];signer_ids=[]
     for slot in ("A","B"):
@@ -550,7 +593,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
     if signer_ids[0]==signer_ids[1] or trust[signer_ids[0]]==trust[signer_ids[1]]:
         deny("two reviewers must have independent signer keys")
     accepted={};rejected=0;unresolved=[]
-    for cid,key in seal["answer_key"].items():
+    for cid,key in sealed_answers.items():
         a,b=[rv[cid] for rv in observations]
         if a["decision"]=="reject" and b["decision"]=="reject":
             rejected+=1;continue
@@ -576,7 +619,7 @@ def verified_admission(private_dir,keys_path,adjudicator_file=None):
             v=ruling[cid]
             if v["decision"]=="reject":
                 rejected+=1;continue
-            if v["supported_option"]!=seal["answer_key"][cid]:
+            if v["supported_option"]!=sealed_answers[cid]:
                 deny("third ruling does not match sealed human exam key")
             accepted[cid]={"supported":v["supported_option"],"foil":v["foil_option"]}
     if len(accepted)<MIN_REVIEWED:
