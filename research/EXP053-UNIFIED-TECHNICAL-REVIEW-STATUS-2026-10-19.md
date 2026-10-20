@@ -309,3 +309,16 @@ after the claim. Directory substitution denies before file creation.
 Review-only PR #43 carries this change; real owner reviewer/weight pins
 remain empty, and no model, licensed corpus or real signed claim was used.
 NO_GO_RESEARCH_ONLY.
+
+## Owner operator journal and single-use used-marker ancestor safety (October 20)
+
+The prior journal/marker writer protected the final leaf but followed an
+intermediate symlinked operator directory. A synthetic operator + ephemeral
+witness fixture showed an unapproved ancestor alias could advance the mock
+claim journal/marker. The unified source now requires safe Linux file flags,
+per-component nonfollowing owner-controlled operator directory descriptors,
+fd-relative journal/used-marker operations, and stable parent identity
+before, after and at completion of mock CAS. A post-CAS redirect HOLDS without
+resetting high-water or emitting misplaced marker. Draft PR #44 carries this
+source-only change. All real operator/witness/roster/weight approvals remain
+unconfigured; no licensed corpus or model was used. NO_GO_RESEARCH_ONLY.
