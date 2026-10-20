@@ -179,12 +179,72 @@ def _read_pinned_public_manifest():
     return manifest
 
 
+SOURCE_MAX_BYTES = 64_000_000
+
+
 def corpus():
-    if not SOURCE.is_file() or filehash(SOURCE)!=SOURCE_SHA:deny("source authority mismatch")
-    if filehash(PROTOCOL)!=PROTOCOL_SHA:deny("preregistered protocol drift")
-    import pyarrow.parquet as pq
-    items=pq.read_table(SOURCE).to_pylist()
-    if len(items)<2500:deny("insufficient test corpus")
+    """Bind the pinned source SHA and Parquet decode to ONE file descriptor.
+
+    A Hugging Face snapshot may be a symlink to a content-addressed blob.
+    Resolve it, securely open that one target, hash and decode from its fd,
+    and refuse if the lexical pointer or underlying file changes.
+    """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if (not isinstance(SOURCE_SHA, str) or len(SOURCE_SHA) != 64 or
+            any(c not in "0123456789abcdef" for c in SOURCE_SHA)):
+        deny("source authority digest invalid")
+    if filehash(PROTOCOL) != PROTOCOL_SHA:
+        deny("preregistered protocol drift")
+    if not all(getattr(os, key, 0) for key in
+               ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")):
+        deny("secure source file traversal unavailable")
+    try:
+        import pyarrow.parquet as pq
+    except ImportError:
+        deny("source parquet backend unavailable")
+    try:
+        resolved = SOURCE.resolve(strict=True)
+        fd = _open_no_symlink_ancestors(resolved)
+        with os.fdopen(fd, "rb", closefd=True) as source:
+            before = os.fstat(source.fileno())
+            if (not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or
+                    not 1 <= before.st_size <= SOURCE_MAX_BYTES):
+                deny("source is not a bounded single-link regular file")
+            hasher = hashlib.sha256()
+            counted = 0
+            while True:
+                data = source.read(min(65536, SOURCE_MAX_BYTES + 1 - counted))
+                if not data:
+                    break
+                counted += len(data)
+                hasher.update(data)
+                if counted > SOURCE_MAX_BYTES:
+                    deny("source exceeds bounded size")
+            after_hash = os.fstat(source.fileno())
+            def identity(st):
+                return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns,
+                        st.st_ctime_ns)
+            if (counted != before.st_size or identity(before) != identity(after_hash) or
+                    hasher.hexdigest() != SOURCE_SHA):
+                deny("source bytes do not match the pinned authority")
+            source.seek(0)
+            items = pq.read_table(source).to_pylist()  # Never use SOURCE path.
+            after_decode = os.fstat(source.fileno())
+            if identity(before) != identity(after_decode):
+                deny("source changed during Parquet decoding")
+            if SOURCE.resolve(strict=True) != resolved:
+                deny("source snapshot symlink changed during decoding")
+            final_fd = _open_no_symlink_ancestors(resolved)
+            try:
+                last = os.fstat(final_fd)
+                if (last.st_dev, last.st_ino) != (before.st_dev, before.st_ino):
+                    deny("source resolved inode changed during decoding")
+            finally:
+                os.close(final_fd)
+    except OSError:
+        deny("source snapshot cannot be read safely")
+    if len(items) < 2500:
+        deny("insufficient test corpus")
     return items
 def cohort(rows):
     grouped=defaultdict(list);article_hash={}
