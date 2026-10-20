@@ -249,3 +249,15 @@ rechecks source, symlink and inode stability. Tests use a synthetic pyarrow
 stand-in; native PyArrow decoding has NOT been witnessed on this host.
 The source-only focused draft PR #39 carries this change. All real human
 approval, licensed packet construction and model forwards remain HOLD.
+
+## Native PyArrow serial-fd compatibility check (October 19)
+
+Only a temporary invented 2500-row Parquet file was used on xwing.
+Native PyArrow 25.0.0 default threaded `read_table(source)` decoded the
+fictional bytes but exited abnormally 255 at Python shutdown. Non-threaded
+`read_table(source,use_threads=False)` exited normally; three exact chained
+`read_table(...).to_pylist()` serial trials each passed with exit code 0.
+The unified source now explicitly disables PyArrow reader threads, and
+synthetic tests require the setting. This is a limited synthetic API witness,
+NOT a licensed RACE corpus rebuild, independent observer signature, or
+science release approval. See native PyArrow findings. NO_GO_RESEARCH_ONLY.

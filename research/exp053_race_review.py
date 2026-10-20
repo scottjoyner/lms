@@ -228,7 +228,10 @@ def corpus():
                     hasher.hexdigest() != SOURCE_SHA):
                 deny("source bytes do not match the pinned authority")
             source.seek(0)
-            items = pq.read_table(source).to_pylist()  # Never use SOURCE path.
+            # Native PyArrow may keep threaded reader handles live after the
+            # Python file closes, causing a process-shutdown abort. A bounded,
+            # serial read owns this fd for the entire decoded table lifetime.
+            items = pq.read_table(source, use_threads=False).to_pylist()
             after_decode = os.fstat(source.fileno())
             if identity(before) != identity(after_decode):
                 deny("source changed during Parquet decoding")
