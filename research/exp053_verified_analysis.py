@@ -243,10 +243,39 @@ def check_private_archive(rows,approved,packet,scan,weight_ids):
             deny("only separate base-mode score receipts are permitted")
     return len(rows)
 
+def _aggregate_output_parent_identity(output):
+    """Pin the approved output directory before consuming the operator claim."""
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if (not all(getattr(os, flag, 0) for flag in
+                ("O_PATH", "O_DIRECTORY", "O_NOFOLLOW", "O_NONBLOCK")) or
+            not isinstance(output, Path)):
+        deny("secure aggregate output directory unavailable")
+    try:
+        if (output.parent.resolve(strict=True) != ROOT.resolve(strict=True) or
+                output.exists() or output.is_symlink()):
+            deny("public aggregate output must be a new file inside research")
+        fd = _open_no_symlink_ancestors(output.parent)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISDIR(info.st_mode) or
+                    info.st_uid != os.geteuid() or info.st_mode & 0o022):
+                deny("public aggregate output directory owner or mode invalid")
+            return (info.st_dev, info.st_ino)
+        finally:
+            os.close(fd)
+    except OSError:
+        deny("public aggregate output directory missing or unsafe")
+
+
+def _persist_source_free_aggregate(output, summary, expected_parent_inode):
+    """Exclusive, mode-0600 source-free aggregate via the audited writer."""
+    from exp053_race_review import save_private
+    save_private(output, summary, required_parent_inode=expected_parent_inode)
+
+
 def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
            execution_attestation=None,attempt_log=None,operator_authorization=None):
-    if not output.parent.is_dir() or output.parent.resolve()!=ROOT.resolve() or output.exists():
-        deny("public aggregate output must be a new file inside research")
+    aggregate_parent_inode = _aggregate_output_parent_identity(output)
     if not score_archive.resolve().is_relative_to(private_dir.resolve()):
         deny("individual score archive must be private")
     admission=verified_admission(private_dir,trust_roots,adjudicator)
@@ -299,7 +328,7 @@ def replay(private_dir,trust_roots,score_archive,output,adjudicator=None,
         operator_authorization,private_dir,provenance=provenance,
         packet_sha256=digest(packet))
     summary.update(operator_claim)
-    with output.open("x") as f:f.write(json.dumps(summary,sort_keys=True,indent=2)+"\n")
+    _persist_source_free_aggregate(output, summary, aggregate_parent_inode)
     return summary
 
 def main():

@@ -302,7 +302,7 @@ def public_manifest(items,packet):
             "candidate_articles":len(items),"human_reviewed_articles":0,
             "minimum_human_reviewed":MIN_REVIEWED,"evaluation_admitted":False,
             "copyright":"no licensed RACE text reproduced in repository","rows":source}
-def save_private(path, obj):
+def save_private(path, obj, *, required_parent_inode=None):
     """Exclusively persist canonical JSON with 0600 permissions FROM creation.
 
     A successful local file write is not a human review or custody approval.
@@ -325,6 +325,12 @@ def save_private(path, obj):
         if (not stat.S_ISDIR(parent_initial.st_mode) or
                 parent_initial.st_uid != os.geteuid()):
             deny("private output parent directory owner or type invalid")
+        if required_parent_inode is not None:
+            if (not isinstance(required_parent_inode, tuple) or
+                    len(required_parent_inode) != 2 or
+                    (parent_initial.st_dev, parent_initial.st_ino) !=
+                    required_parent_inode):
+                deny("private output parent differs from approved directory")
         fd = os.open(path.name, file_flags, 0o600, dir_fd=parent_fd)
         try:
             info = os.fstat(fd)
