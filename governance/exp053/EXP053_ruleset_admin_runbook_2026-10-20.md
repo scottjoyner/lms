@@ -34,6 +34,19 @@ python3 EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
 
 The validator checks branch glob coverage, prevents an overbroad branch pattern, requires approvals and review-thread controls, checks expected GitHub Actions names/IDs, and verifies that the snapshot makes no scientific approval claim. It does **not** make API calls or alter GitHub.
 
+## V8 live preflight (read-only GitHub GET requests)
+
+From `governance/exp053`, the new guarded helper can independently check the **current** main and research target HEADs, without activating a ruleset:
+
+```bash
+python3 exp053_admin_activation.py --live-preflight
+```
+
+This command checks that no ruleset has appeared since the historical snapshot; verifies the target branch inventory is unchanged during the scan; and checks each branch's HEAD has all five required, successful GitHub Actions contexts from app `15368`. It refuses missing, duplicate, stale or wrong-source checks, unexpected existing protection, and branch movement. It **only calls GET endpoints** through a dedicated read-only client; `--activate` is mutually exclusive with `--live-preflight`, and the live mode rejects `--confirm`. `GITHUB_TOKEN` is optional for public data and only supplies authentication for GET access, if present. On missing permissions/rate limits, treat a failed run as unverified, not an authorization override.
+
+On 2026-10-20, Fleet Commander x1-370 ran this command against all **12** observed target branches and returned `LIVE_READ_ONLY_PREFLIGHT_VALID` / `writes_performed: 0`. A passing preflight proves current CI *metadata* only: **no active ruleset, actual GitHub merge denial, independent reviewers, bypass custody, or scientific execution approval** follows. Do not run this pre-activation-only check as a replacement for the post-activation effective-rule audit.
+
+
 ## Administrator activation (deliberate manual action)
 
 1. Open [`Settings → Rules → Rulesets`](https://github.com/scottjoyner/lms/settings/rules) as an authorized repository administrator. Review P0 issue #47 and the JSON candidate. Configure a branch ruleset with the matching targets and rules; verify **Active** mode, not Evaluate/Disabled. Confirm bypass/recovery design. Alternatively, an administrator with a GitHub access token bearing **Administration: write** can apply the JSON through the [GitHub REST repository rulesets create endpoint](https://docs.github.com/en/rest/repos/rules#create-a-repository-ruleset); this has **not** been executed by the assistant.
