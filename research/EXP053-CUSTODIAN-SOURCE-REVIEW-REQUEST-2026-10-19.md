@@ -289,3 +289,15 @@ against exactly 64 sealed A/B/C/D answer labels before signed reviewers
 are read, and fails closed on malformed container shapes. Source-only draft
 PR #41 exposes this fix and synthetic tests. Real owner/weight pins remain
 empty, with independent reviewer custody and model inference on HOLD.
+
+## Atomic source-free scoring receipt provenance (October 19)
+
+A synthetic metadata-only checkpoint inventory A/B substitution proved that
+the scoring replay previously SHA-checked A before parsing B and returning
+B's internally consistent model receipt. The real operator weight SHA is
+still empty; no current production approval bypass was demonstrated.
+The scorer now validates checkpoint inventory and tokenizer preflight JSON
+against the exact same bounded, stable, nonfollowing fd bytes, reusing
+atomic public cohort manifest and owner-private packet readers. Draft #42
+contains this source-only review slice. No genuine reviewer enrollment,
+model weights, licensed source or model inference accessed. NO_GO_RESEARCH_ONLY.
