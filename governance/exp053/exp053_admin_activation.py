@@ -26,6 +26,7 @@ REPO = 'scottjoyner/lms'
 URL = f'https://api.github.com/repos/{REPO}'
 CONFIRMATION = 'I-ACCEPT-EXP053-TWO-REVIEWER-ENFORCEMENT'
 BASELINE = BASE / 'EXP053_ruleset_validation_evidence_2026-10-20.json'
+EVIDENCE_SHA256 = 'dfc303135946a57064597b9097c80cdcbdb471959e6afd61d92bf45113a6a599'
 
 
 class ActivationError(Exception):
@@ -62,6 +63,14 @@ class GitHub:
             raise ActivationError(f'GitHub {method} failed: {type(exc).__name__}') from None
 
 
+def verified_evidence():
+    # Historic branch/check evidence is authorization-critical, not an editable input.
+    raw = BASELINE.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != EVIDENCE_SHA256:
+        raise ActivationError('Evidence SHA-256 changed; administrator re-review required')
+    return json.loads(raw)
+
+
 def verify_local():
     data = POLICY.read_bytes()
     if hashlib.sha256(data).hexdigest() != SHA256:
@@ -86,7 +95,7 @@ def verify_local():
         raise ActivationError('Human approval requirements differ from handoff')
     status = rules['required_status_checks']['parameters']
     contexts = status['required_status_checks']
-    evidence = json.loads(BASELINE.read_text())
+    evidence = verified_evidence()
     if not status.get('strict_required_status_checks_policy') or \
             [c.get('context') for c in contexts] != evidence['verified_successful_check_contexts'] or \
             len(contexts) != 5 or any(c.get('integration_id') != 15368 for c in contexts):
@@ -114,7 +123,7 @@ def preflight_api(api):
         raise ActivationError('Rulesets now exist: refuse automatic overlap or replacement')
     branches = paginated(api, '/branches')
     names = [x.get('name') for x in branches]
-    expected = set(['main'] + json.loads(BASELINE.read_text())['baseline']['research_exp053_branches'])
+    expected = set(['main'] + verified_evidence()['baseline']['research_exp053_branches'])
     if not expected.issubset(set(names)):
         raise ActivationError('A baseline branch has disappeared; re-review target scope')
     from fnmatch import fnmatchcase

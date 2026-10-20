@@ -2,6 +2,8 @@
 import copy
 import json
 import unittest
+import tempfile
+from unittest.mock import patch
 from pathlib import Path
 from urllib.parse import unquote
 from exp053_verify_live_enforcement import Audit, ApiError, BASE
@@ -69,6 +71,21 @@ class FakeServer:
         raise ApiError('unexpected fixture path '+path)
 
 class EnforcementTests(unittest.TestCase):
+    def test_mutated_branch_baseline_rejected_before_api(self):
+        with tempfile.TemporaryDirectory() as d:
+            altered = Path(d)/'evidence.json'
+            changed = copy.deepcopy(EVIDENCE)
+            changed['baseline']['research_exp053_branches'] = []
+            altered.write_text(json.dumps(changed))
+            called = []
+            def never_get(path):
+                called.append(path)
+                raise AssertionError('No API calls expected for tampered evidence')
+            with patch('exp053_verify_live_enforcement.EVIDENCE', altered):
+                with self.assertRaisesRegex(ApiError, 'historical branch/CI evidence changed'):
+                    Audit(never_get).run()
+            self.assertEqual(called, [])
+
     def test_all_passing_is_metadata_only(self):
         report=Audit(FakeServer()).run()
         self.assertEqual(report['governance_status'],'POLICY_METADATA_VERIFIED')

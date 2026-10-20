@@ -25,6 +25,7 @@ CANDIDATE = BASE / 'EXP053_github_ruleset_candidate_2026-10-20.json'
 EVIDENCE = BASE / 'EXP053_ruleset_validation_evidence_2026-10-20.json'
 API_VERSION = '2022-11-28'
 CANDIDATE_SHA256 = '461c6bd54985f4c1b0523788d3dd56216ff061b8f27a9c5136f561d781012efd'
+EVIDENCE_SHA256 = 'dfc303135946a57064597b9097c80cdcbdb471959e6afd61d92bf45113a6a599'
 EXPECTED_CONTEXTS = (
     'lint-and-test (3.12)', 'focused-tests (3.12)',
     'qualification-tests (3.12)', 'operational-failure-injection (3.12)',
@@ -129,7 +130,10 @@ class Audit:
         if hashlib.sha256(raw_candidate).hexdigest() != CANDIDATE_SHA256:
             raise ApiError('Local candidate changed since authorized handoff')
         candidate = json.loads(raw_candidate)
-        evidence = json.loads(EVIDENCE.read_text())
+        raw_evidence = EVIDENCE.read_bytes()
+        if hashlib.sha256(raw_evidence).hexdigest() != EVIDENCE_SHA256:
+            raise ApiError('Pinned historical branch/CI evidence changed')
+        evidence = json.loads(raw_evidence)
         self.record(evidence.get('baseline', {}).get('scientific_authorization') == 'NO_GO_RESEARCH_ONLY',
                     'science_hold', 'No scientific authorization or model inference')
         checks = (candidate['rules'][1]['parameters']['required_status_checks'])

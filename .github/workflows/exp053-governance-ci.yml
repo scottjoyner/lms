@@ -1,0 +1,34 @@
+name: EXP-053 Governance Offline
+# Source-only checks. No GitHub token is passed to the scripts.
+on:
+  pull_request:
+    paths:
+      - 'governance/exp053/**'
+      - '.github/workflows/exp053-governance-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'governance/exp053/**'
+      - '.github/workflows/exp053-governance-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  governance-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: governance/exp053
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regression suite — synthetic only
+        run: python -m unittest -q test_exp053_admin_activation test_exp053_pr_head_ci_audit test_exp053_merge_ref_ci_audit test_exp053_verify_live_enforcement
+      - name: Offline policy candidate preflight
+        run: python EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
+      - name: Administrator tool must remain dry-run by default
+        run: python exp053_admin_activation.py

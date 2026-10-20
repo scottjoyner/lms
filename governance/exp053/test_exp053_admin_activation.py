@@ -2,6 +2,8 @@
 import copy
 import json
 import unittest
+import tempfile
+from unittest.mock import patch
 from exp053_admin_activation import (main, activate, preflight_api, verify_local,
                                       ActivationError, CONFIRMATION, REPO, BASELINE)
 from pathlib import Path
@@ -29,6 +31,18 @@ class FakeAdmin:
         raise AssertionError('unexpected call '+method+' '+path)
 
 class Tests(unittest.TestCase):
+    def test_mutated_evidence_denied_before_api_calls(self):
+        with tempfile.TemporaryDirectory() as d:
+            altered = Path(d)/'evidence.json'
+            changed = copy.deepcopy(EVIDENCE)
+            changed['baseline']['research_exp053_branches'] = changed['baseline']['research_exp053_branches'][:-1]
+            altered.write_text(json.dumps(changed))
+            fake = FakeAdmin()
+            with patch('exp053_admin_activation.BASELINE', altered):
+                with self.assertRaisesRegex(ActivationError, 'Evidence SHA-256'):
+                    activate(fake, CONFIRMATION)
+            self.assertEqual(fake.calls, [])
+
     def test_default_offline_dryrun(self):
         self.assertEqual(main([]),0)
     def test_activate_flag_alone_does_not_write(self):
