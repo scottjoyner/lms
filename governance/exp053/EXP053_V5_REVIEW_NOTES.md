@@ -41,3 +41,18 @@ Commits [3388119](https://github.com/scottjoyner/lms/commit/3388119939c4b5981e86
 **Limits:** Two successful inventory reads are not a transactionally consistent snapshot; a branch or policy may change immediately after the last read. The verifier explicitly claims metadata verification at most. The `do_not_enforce_on_create=true` status-check exception in the candidate still needs accountable administrator approval and observed branch-creation behavior. Effective rules, negative merge-eligibility challenges, bypass visibility, and independent human reviews remain prerequisites for governance release.
 
 **HOLD remains** `NO_GO_GOVERNANCE` / `NO_GO_RESEARCH_ONLY`. No ruleset activation, merge, code-owner/reviewer assertion, production deployment, or scientific execution.
+
+## V7 follow-up — current-head CI preflight before an authorized ruleset activation (2026-10-20)
+
+Source-only commits [41c9b61](https://github.com/scottjoyner/lms/commit/41c9b61504fa9de074dbc000af0567fca69ec53f) and [848758a](https://github.com/scottjoyner/lms/commit/848758a1cbb09f3d7cb62bf7f08cd388733a6211) add an activation-time, **read-only** check over current `main` and all existing `research/exp053*` branch HEADs.
+
+Before any authorized POST, the installer now requires the five pinned required status checks on each current HEAD to be uniquely present, successful and source-bound to GitHub Actions app `15368`; it verifies each branch identity/protection state, reads each HEAD again for stability, and rejects target-roster changes mid-scan. Missing, duplicated, pending, wrong-app or wrong-head checks fail closed. Unexpected existing protection fails closed for independent policy review. The installer still performs **zero writes by default**; its explicit opt-in path is unchanged.
+
+- Local Fleet Commander x1-370: **54/54** synthetic offline tests PASS, candidate validator PASS, default dry run `OFFLINE_DRY_RUN_VALID` / `writes_performed: 0`, diff check clean.
+- [Hosted EXP-053 Governance Offline run 39507559334](https://github.com/scottjoyner/lms/actions/runs/39507559334): **54/54 tests PASS**, policy preflight PASS, dry run zero writes.
+- A **read-only, public GitHub API probe of `main`** with the added method passed. Other target-head paths were not independently probed live using administrator credentials; production activation remains unattempted.
+- GitHub connected updates match the SHA-1 Git blob hashes of locally tested source files byte-for-byte. Candidate JSON and pinned evidence unchanged.
+
+**Limitations:** preflight API reads are not atomic and cannot guarantee GitHub state after the last GET. A passing CI check is not approval, and `do_not_enforce_on_create=true` still needs an explicit owner decision and post-install negative enforcement challenge. No independent reviewer custody or science authorization is implied.
+
+Still draft/unmerged; `NO_GO_GOVERNANCE` / `NO_GO_RESEARCH_ONLY`. No ruleset activation, bypass, merge, signing, licensed RACE processing, model execution or fleet deployment.
