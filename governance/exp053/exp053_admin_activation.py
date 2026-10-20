@@ -64,6 +64,33 @@ class GitHub:
             raise ActivationError(f'GitHub {method} failed: {type(exc).__name__}') from None
 
 
+class ReadOnlyGitHub:
+    """Dedicated GET-only transport; does not share the POST-capable client."""
+    def call(self, method, path, payload=None):
+        if (method != 'GET' or payload is not None or
+                not path.startswith('/') or '..' in path or '://' in path):
+            raise ActivationError('Live preflight forbids writes or unsafe endpoints')
+        headers = {
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'EXP053-read-only-live-preflight',
+            'X-GitHub-Api-Version': '2022-11-28',
+        }
+        token = os.environ.get('GITHUB_TOKEN', '')
+        if token:
+            headers['Authorization'] = 'Bearer ' + token
+        req = Request(URL + path, method='GET', headers=headers)
+        try:
+            with urlopen(req, timeout=20) as result:
+                content = result.read(4_000_001)
+                if len(content) > 4_000_000:
+                    raise ActivationError('Read-only API response too large')
+                return json.loads(content)
+        except HTTPError as exc:
+            raise ActivationError(f'Read-only GitHub GET rejected: HTTP {exc.code}') from None
+        except (URLError, TimeoutError, ValueError) as exc:
+            raise ActivationError(f'Read-only GitHub GET failed: {type(exc).__name__}') from None
+
+
 def verified_evidence():
     # Historic branch/check evidence is authorization-critical, not an editable input.
     raw = BASELINE.read_bytes()
@@ -220,11 +247,27 @@ def activate(api, confirmation):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--activate', action='store_true', help='Explicitly request one admin policy creation POST')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--activate', action='store_true', help='Explicitly request one admin policy creation POST')
+    mode.add_argument('--live-preflight', action='store_true',
+                      help='Read-only current-head CI and branch check; never activates anything')
     parser.add_argument('--confirm', default='', help='Exact accountable-administrator confirmation phrase')
     args = parser.parse_args(argv)
     try:
         payload=verify_local()
+        if args.live_preflight:
+            if args.confirm:
+                raise ActivationError('Read-only mode refuses administrator confirmation phrase')
+            api=ReadOnlyGitHub()
+            branches=preflight_api(api)
+            verify_current_required_checks(api, branches)
+            print(json.dumps({'status':'LIVE_READ_ONLY_PREFLIGHT_VALID',
+                'repository':REPO,
+                'target_branches_checked':sum(1 for name in branches if name=='main' or name.startswith('research/exp053')),
+                'writes_performed':0,
+                'governance_status':'NO_GO_GOVERNANCE',
+                'scientific_status':'NO_GO_RESEARCH_ONLY'},indent=2))
+            return 0
         if not args.activate:
             print(json.dumps({'status':'OFFLINE_DRY_RUN_VALID','repository':REPO,
                 'payload_sha256': SHA256, 'name':payload['name'],
