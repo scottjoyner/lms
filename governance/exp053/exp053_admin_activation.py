@@ -17,6 +17,7 @@ import os
 import sys
 from pathlib import Path
 from urllib.request import Request, urlopen
+from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 
 BASE = Path(__file__).resolve().parent
@@ -137,11 +138,72 @@ def preflight_api(api):
     return names
 
 
+def verify_current_required_checks(api, branches):
+    """Fail closed if current protected-target heads lack pinned, successful CI.
+
+    Historical evidence is a signed-off baseline, not a substitute for checking
+    fresh head commits. This function performs GETs only; it never authorizes
+    merge or research inference.
+    """
+    required = tuple(verified_evidence()['verified_successful_check_contexts'])
+    expected = set(required)
+    if len(required) != 5 or len(expected) != 5:
+        raise ActivationError('Pinned required CI context list is incomplete')
+    for name in sorted(branches):
+        if name != 'main' and not name.startswith('research/exp053'):
+            continue
+        path = '/branches/' + quote(name, safe='')
+        before = api.call('GET', path)
+        head = (before.get('commit') or {}).get('sha') if isinstance(before, dict) else None
+        if (not isinstance(before, dict) or before.get('name') != name or
+                before.get('protected') is not False or not isinstance(head, str) or
+                len(head) != 40 or any(c not in '0123456789abcdef' for c in head)):
+            raise ActivationError('Unexpected branch identity/protection/head; no policy write')
+        result = api.call('GET', f'/commits/{head}/check-runs?per_page=100')
+        if not isinstance(result, dict):
+            raise ActivationError('Current check-runs API shape is unknown')
+        runs = result.get('check_runs')
+        count = result.get('total_count')
+        if (not isinstance(runs, list) or type(count) is not int or count != len(runs)
+                or count > 100):
+            raise ActivationError('Current check-runs listing incomplete; no policy write')
+        found = {context: [] for context in required}
+        for run in runs:
+            if not isinstance(run, dict):
+                raise ActivationError('Invalid check run; no policy write')
+            context = run.get('name')
+            if context in expected:
+                found[context].append(run)
+        for context, matching in found.items():
+            if len(matching) != 1:
+                raise ActivationError('Missing or ambiguous current required CI check; no policy write')
+            run = matching[0]
+            if (run.get('head_sha') != head or run.get('status') != 'completed'
+                    or run.get('conclusion') != 'success' or
+                    (run.get('app') or {}).get('id') != 15368):
+                raise ActivationError('Current required CI check is not successful and source-bound')
+        after = api.call('GET', path)
+        if not isinstance(after, dict) or (after.get('commit') or {}).get('sha') != head:
+            raise ActivationError('Branch head moved during CI preflight; no policy write')
+    # A target branch created or deleted during this multi-branch scan cannot
+    # be certified by a snapshot that did not include it.
+    refreshed = paginated(api, '/branches')
+    def targets(items):
+        return sorted(row['name'] for row in items if isinstance(row, dict)
+                      and isinstance(row.get('name'), str)
+                      and (row['name'] == 'main' or row['name'].startswith('research/exp053')))
+    initial_targets = sorted(name for name in branches if isinstance(name, str)
+                             and (name == 'main' or name.startswith('research/exp053')))
+    if initial_targets != targets(refreshed):
+        raise ActivationError('Target branch roster changed during CI preflight; no policy write')
+
+
 def activate(api, confirmation):
     if confirmation != CONFIRMATION:
         raise ActivationError('Exact administrator confirmation phrase is required')
     payload = verify_local()
-    preflight_api(api)
+    branches = preflight_api(api)
+    verify_current_required_checks(api, branches)
     # Exactly one write. If the response is uncertain do NOT retry the POST.
     created = api.call('POST', '/rulesets', payload)
     identifier = created.get('id') if isinstance(created,dict) else None
