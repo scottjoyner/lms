@@ -297,3 +297,15 @@ against the exact same bounded, stable, nonfollowing fd bytes, reusing
 atomic public cohort manifest and owner-private packet readers. Draft #42
 contains this source-only review slice. No genuine reviewer enrollment,
 model weights, licensed source or model inference accessed. NO_GO_RESEARCH_ONLY.
+
+## Safe source-free aggregate output destination binding (October 19)
+
+Synthetic directory rename and symlink substitution between aggregate
+location precheck and `output.open("x")` redirected a fabricated source-free
+aggregate outside research. The scorer now records the approved directory
+device/inode BEFORE consuming an irreversible operator claim, and saves
+via exclusive audited mode-0600 writer requiring the same parent identity
+after the claim. Directory substitution denies before file creation.
+Review-only PR #43 carries this change; real owner reviewer/weight pins
+remain empty, and no model, licensed corpus or real signed claim was used.
+NO_GO_RESEARCH_ONLY.
