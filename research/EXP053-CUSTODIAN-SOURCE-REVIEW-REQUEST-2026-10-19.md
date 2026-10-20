@@ -337,3 +337,14 @@ and a final inode recheck. New synthetic tests include same-byte inode
 substitution and malformed evidence paths; draft PR #45 carries the exact
 review slice. No licensed RACE, actual signed human forms, weights or
 operator real claims were accessed; NO_GO_RESEARCH_ONLY.
+
+## Prevent scorer JSON float exponent overflow and silent underflow (October 20)
+
+Invented SHA-pinned score `-1e-999` was silently parsed to `-0.0`, potentially
+altering statistical margins without a detectable nonfinite value. The
+source-only shared execution evidence parser now refuses nonfinite float
+conversion and nonzero mantissas underflowed to zero, while preserving true
+zero, ordinary finite values and representable subnormals. Draft PR #46
+contains frozen spec, synthetic tests and independent-review handoff. No
+actual licensed text, model weight, real human/runner signatures, live CAS
+or inference used. Real approval pins remain empty; NO_GO_RESEARCH_ONLY.
