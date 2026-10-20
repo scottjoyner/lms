@@ -5,7 +5,8 @@ import unittest
 import tempfile
 from unittest.mock import patch
 from exp053_admin_activation import (main, activate, preflight_api, verify_local,
-                                      ActivationError, CONFIRMATION, REPO, BASELINE)
+                                      ActivationError, CONFIRMATION, REPO, BASELINE,
+                                      ReadOnlyGitHub)
 from pathlib import Path
 from hashlib import sha256
 from urllib.parse import unquote
@@ -128,6 +129,36 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ActivationError,'roster changed'):
             activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_readonly_transport_never_reaches_network_for_mutations(self):
+        fake=ReadOnlyGitHub()
+        with patch('exp053_admin_activation.urlopen') as network:
+            for method, path, payload in [
+                ('POST', '/rulesets', {}),
+                ('GET', '/rulesets', {}),
+                ('GET', 'https://evil.invalid/path', None),
+            ]:
+                with self.assertRaises(ActivationError):
+                    fake.call(method, path, payload)
+            network.assert_not_called()
+
+    def test_live_preflight_cli_uses_get_only_fake(self):
+        fake=FakeAdmin()
+        with patch('exp053_admin_activation.ReadOnlyGitHub', return_value=fake):
+            self.assertEqual(main(['--live-preflight']), 0)
+        self.assertEqual(fake.branch_listings, 2)
+        self.assertFalse(any(call.startswith('POST') for call in fake.calls))
+
+    def test_live_preflight_cli_fails_closed_for_existing_ruleset(self):
+        fake=FakeAdmin(existing=True)
+        with patch('exp053_admin_activation.ReadOnlyGitHub', return_value=fake):
+            self.assertEqual(main(['--live-preflight']), 2)
+        self.assertFalse(any(call.startswith('POST') for call in fake.calls))
+
+    def test_live_preflight_refuses_admin_confirmation(self):
+        with patch('exp053_admin_activation.ReadOnlyGitHub') as live:
+            self.assertEqual(main(['--live-preflight','--confirm',CONFIRMATION]), 2)
+            live.assert_not_called()
 
     def test_readback_wrong_origin_fails_closed_no_retry(self):
         fake=FakeAdmin(changed=True)
