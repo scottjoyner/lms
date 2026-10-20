@@ -302,10 +302,95 @@ def public_manifest(items,packet):
             "candidate_articles":len(items),"human_reviewed_articles":0,
             "minimum_human_reviewed":MIN_REVIEWED,"evaluation_admitted":False,
             "copyright":"no licensed RACE text reproduced in repository","rows":source}
-def save_private(path,obj):
-    with open(path,"xb") as f:
-        os.fchmod(f.fileno(),0o600)
-        f.write(canonical(obj)+b"\n")
+def save_private(path, obj):
+    """Exclusively persist canonical JSON with 0600 permissions FROM creation.
+
+    A successful local file write is not a human review or custody approval.
+    The opened parent and output inode bind all checks/cleanup to this attempt.
+    """
+    from exp053_reviewer_roster import _open_no_symlink_ancestors
+    if not all(getattr(os, name, 0) for name in
+               ("O_PATH", "O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
+        deny("secure private-file creation is unavailable")
+    path = Path(path)
+    data = canonical(obj) + b"\n"
+    file_flags = (os.O_RDWR | os.O_CREAT | os.O_EXCL |
+                  os.O_NOFOLLOW | os.O_NONBLOCK)
+    # O_NOFOLLOW on the last parent is not enough: secure EVERY ancestor.
+    parent_fd = _open_no_symlink_ancestors(path.parent)
+    fd = None
+    created_inode = None
+    try:
+        parent_initial = os.fstat(parent_fd)
+        if (not stat.S_ISDIR(parent_initial.st_mode) or
+                parent_initial.st_uid != os.geteuid()):
+            deny("private output parent directory owner or type invalid")
+        fd = os.open(path.name, file_flags, 0o600, dir_fd=parent_fd)
+        try:
+            info = os.fstat(fd)
+            created_inode = (info.st_dev, info.st_ino)
+            if (not stat.S_ISREG(info.st_mode) or
+                    info.st_uid != os.geteuid() or info.st_nlink != 1 or
+                    info.st_mode & 0o077):
+                deny("new private artifact has unsafe identity or permissions")
+            os.fchmod(fd, 0o600)  # Never widens group/other access.
+            offset = 0
+            while offset < len(data):
+                written = os.write(fd, data[offset:])
+                if written <= 0:
+                    deny("private artifact write did not advance")
+                offset += written
+            os.fsync(fd)
+            os.lseek(fd, 0, os.SEEK_SET)
+            buf = bytearray()
+            while len(buf) < len(data) + 1:
+                piece = os.read(fd, len(data) + 1 - len(buf))
+                if not piece:
+                    break
+                buf.extend(piece)
+            after = os.fstat(fd)
+            if (bytes(buf) != data or after.st_size != len(data) or
+                    (after.st_dev, after.st_ino) != created_inode or
+                    stat.S_IMODE(after.st_mode) != 0o600 or after.st_nlink != 1):
+                deny("private artifact failed descriptor-bound readback")
+            # Refuse a path swap between creation and the final inode check.
+            current = os.stat(path.name, dir_fd=parent_fd, follow_symlinks=False)
+            if (not stat.S_ISREG(current.st_mode) or
+                    (current.st_dev, current.st_ino) != created_inode or
+                    current.st_size != len(data) or
+                    current.st_mtime_ns != after.st_mtime_ns or
+                    current.st_ctime_ns != after.st_ctime_ns):
+                deny("private artifact pathname changed during write")
+            fresh_parent = _open_no_symlink_ancestors(path.parent)
+            try:
+                refreshed = os.fstat(fresh_parent)
+                original = os.fstat(parent_fd)
+                if (refreshed.st_dev, refreshed.st_ino) != (
+                        original.st_dev, original.st_ino):
+                    deny("private artifact parent changed during write")
+            finally:
+                os.close(fresh_parent)
+            os.fsync(parent_fd)
+        except BaseException:
+            if created_inode is None:
+                try:
+                    i = os.fstat(fd)
+                    created_inode = (i.st_dev, i.st_ino)
+                except OSError:
+                    pass
+            if created_inode is not None:
+                try:
+                    found = os.stat(path.name, dir_fd=parent_fd,
+                                    follow_symlinks=False)
+                    if (found.st_dev, found.st_ino) == created_inode:
+                        os.unlink(path.name, dir_fd=parent_fd)
+                except OSError:
+                    pass
+            raise
+        finally:
+            os.close(fd)
+    finally:
+        os.close(parent_fd)
 def build(private_dir,public):
     if public.exists() or not public.parent.is_dir():deny("public output exists / parent absent")
     if private_dir.exists():deny("private review directory already exists")
