@@ -51,3 +51,21 @@ are not replaced by these local source tests.
 `python3 -m pytest -q tests/test_exp053_source_parquet_same_fd.py`
 
 **Decision: NO_GO_RESEARCH_ONLY.**
+
+## Supplemental native PyArrow cross-check on xwing
+
+After the original finding, a system-wide read-only package survey found
+PyArrow 25.0.0 installed on xwing. Using ONLY 2500 invented Parquet rows in
+an automatically deleted /tmp directory, the first native threaded
+`pq.read_table(source)` correctly decoded the rows but the interpreter
+subsequently ABORTED at shutdown (exit 255, `terminate called without an
+active exception`). This is not a passing runtime test. A non-threaded
+`pq.read_table(source, use_threads=False)` decoded 2500 rows with clean
+shutdown. An additional three separate interpreter processes repeated the
+exact chained native `read_table(..., use_threads=False).to_pylist()` call
+and all exited 0 with 2500 rows, a stable file descriptor and symlink
+pointer. The code now explicitly uses `use_threads=False`. Its source-only
+mock tests fail if threading is reenabled. See the separate frozen native
+smoke findings document. These synthetic checks do not validate the exact
+licensed corpus, a real human receipt, or deployment on the production
+research host. Independent code review and scientific NO-GO remain.

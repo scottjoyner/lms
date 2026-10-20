@@ -34,3 +34,16 @@ claim human independence, issue scorer approval or run model forwards.
 **NO_GO_RESEARCH_ONLY**; at least 40 independently co-reviewed articles,
 external witness operator/high-water control and owner model authorization
 remain unsatisfied.
+
+## Native PyArrow 25 synthetic integration finding (2026-10-19)
+
+A read-only fleet package survey found PyArrow 25.0.0 on xwing (none on
+x1-370, lenovo or destroyer). In a **synthetic-only native Parquet** test on
+xwing, `pq.read_table(source)` decoded 2500 invented rows but its Python
+process aborted at shutdown (exit 255). `pq.read_table(source,
+use_threads=False)` decoded the same synthetic file and exited normally,
+including THREE repeated exact chained `read_table(...).to_pylist()` trials
+with exit 0. The candidate now explicitly disables reader threads and the
+synthetic fake-PyArrow tests assert that setting. No actual RACE file was
+opened or copied, no real packet rebuilt, no service installed or deployed.
+Review the separately documented limitations in the native smoke finding.

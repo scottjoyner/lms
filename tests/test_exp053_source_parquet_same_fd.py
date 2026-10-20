@@ -30,7 +30,12 @@ class SyntheticPinnedParquetSource(unittest.TestCase):
 
     def fake_parquet(self, read_table=None):
         pq = types.ModuleType("pyarrow.parquet")
-        pq.read_table = self.read_table if read_table is None else read_table
+        def checked_reader(fileobj, *, use_threads=None, **kwargs):
+            self.assertIs(use_threads, False,
+                          "source descriptor must not outlive threaded PyArrow readers")
+            self.assertFalse(kwargs, "unexpected extra source read options")
+            return (self.read_table if read_table is None else read_table)(fileobj)
+        pq.read_table = checked_reader
         pyarrow = types.ModuleType("pyarrow")
         pyarrow.__path__ = []
         pyarrow.parquet = pq
