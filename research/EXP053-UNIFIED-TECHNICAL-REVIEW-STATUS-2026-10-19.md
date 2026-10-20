@@ -237,3 +237,15 @@ now checks hash and strict JSON against one bounded no-follow fd buffer,
 with stability/inode recheck and negative synthetic tests. Public draft PR
 #38 contains the same source-only fix; no genuine private review material,
 human enrollment, scoring or inference was authorized. NO_GO_RESEARCH_ONLY.
+
+## Pinned packet source hash/Parquet same-fd binding (October 19)
+
+The prospectively pinned Parquet path is a Hugging Face snapshot symlink.
+A fully synthetic source A/B fixture demonstrated that the previous
+`filehash(SOURCE)` then path-based `pq.read_table(SOURCE)` could accept
+replacement source B rows under the hash of A. The current candidate binds
+SHA and decode to one resolved, securely opened file descriptor, then
+rechecks source, symlink and inode stability. Tests use a synthetic pyarrow
+stand-in; native PyArrow decoding has NOT been witnessed on this host.
+The source-only focused draft PR #39 carries this change. All real human
+approval, licensed packet construction and model forwards remain HOLD.
