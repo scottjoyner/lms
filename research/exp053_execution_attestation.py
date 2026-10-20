@@ -7,6 +7,7 @@ their numerical outputs. Both independent operator pins remain EMPTY.
 import base64
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -111,11 +112,26 @@ def unambiguous_json(data):
             output[k] = v
         return output
     def reject_nonfinite(value):
-        raise ValueError("non-finite JSON value: " + value)
+        raise ValueError("non-finite JSON constant")
+
+    def finite_decimal_float(raw):
+        """Reject overflow and silent nonzero→zero binary64 underflow."""
+        parsed = float(raw)
+        if not math.isfinite(parsed):
+            raise ValueError("unrepresentable JSON decimal exponent")
+        # Exponent digits describe magnitude and cannot establish whether
+        # the ORIGINAL mantissa was zero. Only all-zero mantissas may round
+        # to float zero without silently changing scientific measurements.
+        mantissa = raw.partition("e")[0].partition("E")[0]
+        if parsed == 0.0 and any(char in "123456789" for char in mantissa):
+            raise ValueError("nonzero scientific JSON decimal underflow")
+        return parsed
+
     try:
         return json.loads(data, object_pairs_hook=reject_duplicates,
-                          parse_constant=reject_nonfinite)
-    except (ValueError, UnicodeDecodeError) as exc:
+                          parse_constant=reject_nonfinite,
+                          parse_float=finite_decimal_float)
+    except (ValueError, UnicodeDecodeError, OverflowError) as exc:
         deny("invalid or ambiguous execution-attestation JSON: " + type(exc).__name__)
 
 
