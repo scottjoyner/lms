@@ -57,6 +57,29 @@ def screen(api, number, expected_base):
             (base.get('repo') or {}).get('full_name') != REPO or
             (head.get('repo') or {}).get('full_name') != REPO):
         raise ChallengeError('Unexpected target or repository identity')
+    # A challenge should never repurpose a production/security PR. Keep its
+    # entire change set to one small, newly added, human-reviewed text fixture.
+    # This scope gate does not determine whether the content itself is safe.
+    changes = paginated(api, f'/pulls/{number}/files')
+    if len(changes) != 1 or not isinstance(changes[0], dict):
+        raise ChallengeError('Challenge must change exactly one documentation fixture')
+    file = changes[0]
+    name = file.get('filename')
+    prefix = 'governance/exp053/challenges/exp053-merge-denial-'
+    if (not isinstance(name, str) or not name.startswith(prefix) or
+            not name.endswith('.md') or '/' in name[len(prefix):] or
+            not 1 <= len(name[len(prefix):-3]) <= 40 or
+            not all(c in 'abcdefghijklmnopqrstuvwxyz0123456789-' for c in name[len(prefix):-3]) or
+            file.get('status') != 'added' or
+            type(file.get('additions')) is not int or
+            not 1 <= file['additions'] <= 15 or
+            file.get('deletions') != 0 or
+            type(file.get('changes')) is not int or
+            file['changes'] != file['additions'] or
+            not isinstance(file.get('patch'), str) or
+            not 0 < len(file['patch']) <= 2000 or
+            '+# EXP-053 governance challenge fixture' not in file['patch']):
+        raise ChallengeError('Challenge file scope/content markers are not isolated or bounded')
     reviews = paginated(api, f'/pulls/{number}/reviews')
     if any(not isinstance(r,dict) for r in reviews):
         raise ChallengeError('Unrecognized review history')
@@ -89,6 +112,9 @@ def screen(api, number, expected_base):
     found_after = paginated(api, '/rulesets?includes_parents=true')
     if found_after != found:
         raise ChallengeError('Ruleset inventory changed during challenge audit')
+    changes_after = paginated(api, f'/pulls/{number}/files')
+    if changes_after != changes:
+        raise ChallengeError('Challenge file inventory changed during audit')
     return {
         'status':'HUMAN_MERGE_DENIAL_INSPECTION_CANDIDATE_ONLY',
         'repository':REPO,'pr':number,'base':expected_base,
