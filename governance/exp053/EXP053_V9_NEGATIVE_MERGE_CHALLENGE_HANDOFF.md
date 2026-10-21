@@ -152,3 +152,25 @@ Actions workflow, with no network credentials or repository mutation.
 An accountable administrator must still approve/activate the ruleset and
 commission human-witnessed non-draft negative challenges before claiming
 protection. Governance and scientific execution remain NO-GO.
+
+## V22 — isolate review-approval denial from other merge blockers
+
+The read-only challenge-screening path now requires **zero prior submitted
+review events** (not merely zero `APPROVED` events), and **zero inline pull
+request review comments**. A `CHANGES_REQUESTED` review or unresolved
+review discussion can prevent a merge independently of the configured
+two-approval rule, making a negative test ambiguous. Both GET-only collections
+are read again after CI and policy verification; additions or changes during
+the audit fail closed. The output records the observed zero review and zero
+inline-comment counts.
+
+This requirement intentionally rejects even harmless prior `COMMENTED`
+reviews or resolved historical inline comments: use a **fresh, isolated,
+human-inspected challenge PR** rather than attempting to clean up an existing
+review history. GitHub's REST inline comments are not an authoritative
+GraphQL review-thread resolution report, so this is a conservative screen,
+**not** proof that a merge box refused the PR specifically for missing
+approvals. The human witness must still verify the actual refusal in GitHub,
+all required checks, no other reported blockers, unchanged branch and PR
+identity, and no auto-merge or merge action. No policy or scientific
+authorization changes follow from passing these synthetic regressions.
