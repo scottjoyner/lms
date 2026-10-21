@@ -58,6 +58,40 @@ An actual installation still requires administrator acceptance, active
 effective rules, an independent negative merge challenge, and human reviews.
 Neither candidate JSON nor its SHA-256 pin is changed.
 
+## V24 — fail closed on governance-suite deletion after adoption
+
+V23 made the existing proposed required `CI / lint-and-test (3.12)` check run
+the offline governance tests **if** the `governance/exp053` directory existed.
+A PR removing the directory could otherwise skip all governance tests while
+keeping that required check green.
+
+V24's required CI step uses a two-parent-depth checkout and inspects
+`HEAD^:governance/exp053` (the protected target's first parent in an ordinary
+GitHub `pull_request` test-merge checkout). When the **base already has** the
+governance tree, deleting the tree in the proposed head now explicitly **fails
+the required job**. Retaining the tree runs all `test_exp053_*.py` tests,
+candidate validator and zero-write default administrator preflight; creating
+a partial tree without the activation module also fails. No first-parent Git
+object means fail closed instead of silently assuming pre-adoption.
+
+This is a **bootstrap-aware, in-repository** protection only. Before
+`governance/exp053` exists on the target base, unrelated PRs may still
+skip this suite to avoid blocking initial rollout; an authorized merge must
+first adopt the files and updated CI into `main` and subsequently every
+relevant research base as applicable. The workflow itself is editable via
+source PRs, so an actual two-human ruleset and independent reviewer scrutiny
+remain necessary and no claim of tamper resistance is made. GitHub Actions
+checkout behavior, real target/base ancestry and negative merge refusal
+still require the previously defined physical readback/challenge gates.
+The immutable candidate ruleset and all NO-GO statuses are unchanged.
+
+Five new tests in `test_exp053_ci_adoption_gate.py` create disposable local
+Git repositories and execute the **real workflow shell block** with stub
+offline test/validator/administrator commands. They verify allowed first
+adoption, refusal of suite deletion, continued runs after adoption, refusal
+of incomplete new suites, and refusal of missing parent history. No actual
+GitHub operation, science run or production write is performed.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
