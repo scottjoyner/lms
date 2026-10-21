@@ -18,7 +18,7 @@ DOC={'filename':'governance/exp053/challenges/exp053-merge-denial-example.md',
      'patch':'@@ -0,0 +1,2 @@\\n+# EXP-053 governance challenge fixture\\n+No production or scientific content.'}
 
 class Fake:
-    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False, files=None, file_drift=False, target_drift=False, target_unprotected=False, target_wrong_sha=False):
+    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False, files=None, file_drift=False, target_drift=False, target_unprotected=False, target_wrong_sha=False, comments=None, comment_drift=False):
         self.pr=copy.deepcopy(PR if pr is None else pr)
         self.rules=rules
         self.reviews=reviews if reviews is not None else []
@@ -26,6 +26,9 @@ class Fake:
         self.calls=[]
         self.pr_reads=0
         self.review_reads=0
+        self.comments=comments if comments is not None else []
+        self.comment_drift=comment_drift
+        self.comment_reads=0
         self.policy_reads=0
         self.list_reads=0
         self.review_drift=review_drift
@@ -71,6 +74,11 @@ class Fake:
             if self.review_drift and self.review_reads>1:
                 return self.reviews+[{'id':999,'state':'APPROVED'}]
             return self.reviews
+        if path.startswith('/pulls/49/comments?'):
+            self.comment_reads+=1
+            if self.comment_drift and self.comment_reads>1:
+                return self.comments+[{'id':999,'body':'late inline review comment'}]
+            return self.comments
         if path=='/pulls/49':
             self.pr_reads+=1
             p=copy.deepcopy(self.pr)
@@ -123,8 +131,31 @@ class Screening(unittest.TestCase):
         with self.assertRaisesRegex(ChallengeError,'Existing EXP-053 PR'):
             screen(Fake(),46,'main')
     def test_already_approved_is_not_missing_approval(self):
-        with self.assertRaisesRegex(ChallengeError,'Already approved'):
+        with self.assertRaisesRegex(ChallengeError,'empty submitted review history'):
             screen(Fake(reviews=[{'state':'APPROVED'}]),49,'main')
+    def test_changes_requested_review_not_suitable_for_isolated_denial(self):
+        with self.assertRaisesRegex(ChallengeError, 'empty submitted review history'):
+            screen(Fake(reviews=[{'state':'CHANGES_REQUESTED'}]),49,'main')
+
+    def test_commented_review_not_suitable_for_isolated_denial(self):
+        with self.assertRaisesRegex(ChallengeError, 'empty submitted review history'):
+            screen(Fake(reviews=[{'state':'COMMENTED'}]),49,'main')
+
+    def test_inline_review_comment_not_suitable_for_isolated_denial(self):
+        with self.assertRaisesRegex(ChallengeError, 'zero inline review comments'):
+            screen(Fake(comments=[{'id':7, 'body':'unresolved discussion'}]),49,'main')
+
+    def test_inline_comment_added_during_audit_is_rejected(self):
+        with self.assertRaisesRegex(ChallengeError, 'Inline review comments changed'):
+            screen(Fake(comment_drift=True),49,'main')
+
+    def test_clean_challenge_checks_reviews_and_inline_comments_twice(self):
+        fake=Fake()
+        result=screen(fake,49,'main')
+        self.assertEqual(fake.review_reads,2)
+        self.assertEqual(fake.comment_reads,2)
+        self.assertEqual(result['inline_review_comments_observed'],0)
+
     def test_head_change_rejected(self):
         with self.assertRaisesRegex(ChallengeError,'changed'):
             screen(Fake(drift=True),49,'main')
