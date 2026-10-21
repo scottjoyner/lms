@@ -10,6 +10,7 @@ from exp053_admin_activation import (main, activate, preflight_api, verify_local
 from pathlib import Path
 from hashlib import sha256
 from urllib.parse import unquote
+from urllib.error import HTTPError
 
 EVIDENCE=json.loads(Path(BASELINE).read_text())
 
@@ -129,6 +130,36 @@ class Tests(unittest.TestCase):
         with self.assertRaisesRegex(ActivationError,'roster changed'):
             activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_anonymous_rate_limit_is_not_permission_denial(self):
+        headers={'X-RateLimit-Remaining':'0','X-RateLimit-Reset':'1792553031'}
+        failure=HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                          403,'rate limited',headers,None)
+        with patch('exp053_admin_activation.urlopen', side_effect=failure) as network:
+            with patch.dict('exp053_admin_activation.os.environ', {'GITHUB_TOKEN':''}):
+                with self.assertRaisesRegex(ActivationError,
+                        'RATE_LIMITED_READ_ONLY.*reset_epoch=1792553031'):
+                    ReadOnlyGitHub().call('GET','/rulesets')
+            network.assert_called_once()
+
+    def test_403_without_rate_limit_is_not_misclassified(self):
+        failure=HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                          403,'permission denied',{'X-RateLimit-Remaining':'17'},None)
+        with patch('exp053_admin_activation.urlopen', side_effect=failure) as network:
+            with self.assertRaisesRegex(ActivationError,'rejected: HTTP 403'):
+                ReadOnlyGitHub().call('GET','/rulesets')
+            network.assert_called_once()
+
+    def test_bad_rate_reset_header_not_leaked(self):
+        failure=HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                          429,'secret diagnostic',{'X-RateLimit-Remaining':'0',
+                          'X-RateLimit-Reset':'SECRET_URI_AND_IP'},None)
+        with patch('exp053_admin_activation.urlopen', side_effect=failure) as network:
+            with self.assertRaisesRegex(ActivationError,
+                    'RATE_LIMITED_READ_ONLY.*reset_epoch=unknown') as caught:
+                ReadOnlyGitHub().call('GET','/rulesets')
+            self.assertNotIn('SECRET_URI_AND_IP',str(caught.exception))
+            network.assert_called_once()
 
     def test_readonly_transport_never_reaches_network_for_mutations(self):
         fake=ReadOnlyGitHub()
