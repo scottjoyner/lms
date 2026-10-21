@@ -12,7 +12,7 @@ Scope: **inventory only, not model admission**. This change does not assert that
 
 ## Proposal
 
-The upstream `fleet_node_reporter.py` has a disabled-by-default `--joyner-llama-discovery` option. On hostname `joyner` only, it performs bounded GET-only checks against `127.0.0.1:1234` and `127.0.0.1:1236`, requiring **all three**:
+The upstream reporter **enforces preview-only operation for the new discovery flag**. An attempt to use it in the normal reporting loop fails before discovery or POST. The upstream `fleet_node_reporter.py` has a disabled-by-default `--joyner-llama-discovery` option. On hostname `joyner` only, it performs bounded GET-only checks against `127.0.0.1:1234` and `127.0.0.1:1236`, requiring **all three**:
 
 1. `/health` must say `status=ok`.
 2. `/props` must match the hardcoded expected alias and **exact model file path**.
