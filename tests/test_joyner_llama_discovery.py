@@ -1,10 +1,19 @@
+import importlib.util
 import io
 import json
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
 from unittest.mock import patch
 
-import fleet_node_reporter as reporter
+# The packaged CI test runner does not put repository root on sys.path.
+# Load the standalone reporter explicitly from its tracked path.
+_SPEC = importlib.util.spec_from_file_location(
+    "fleet_node_reporter", Path(__file__).resolve().parents[1] / "fleet_node_reporter.py"
+)
+assert _SPEC is not None and _SPEC.loader is not None
+reporter = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(reporter)
 
 
 class JoynerDiscoveryTests(unittest.TestCase):
