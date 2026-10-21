@@ -86,6 +86,16 @@ class ReadOnlyGitHub:
                     raise ActivationError('Read-only API response too large')
                 return json.loads(content)
         except HTTPError as exc:
+            # Rate exhaustion is missing evidence, not an admin permission denial.
+            # Never leak GitHub's diagnostic response body or requester IP.
+            headers = exc.headers
+            remaining = headers.get('X-RateLimit-Remaining') if headers else None
+            reset = headers.get('X-RateLimit-Reset') if headers else None
+            if exc.code in (403, 429) and remaining == '0':
+                reset = reset if isinstance(reset, str) and reset.isdecimal() and len(reset) <= 12 else 'unknown'
+                raise ActivationError(
+                    f'RATE_LIMITED_READ_ONLY: GitHub GET quota exhausted; reset_epoch={reset}; '
+                    'no write attempted') from None
             raise ActivationError(f'Read-only GitHub GET rejected: HTTP {exc.code}') from None
         except (URLError, TimeoutError, ValueError) as exc:
             raise ActivationError(f'Read-only GitHub GET failed: {type(exc).__name__}') from None
