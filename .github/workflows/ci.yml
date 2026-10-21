@@ -55,6 +55,32 @@ jobs:
           fi
           if [ -d governance/exp053 ]; then
             test -f governance/exp053/exp053_admin_activation.py
+            # unittest discovery passes when it discovers *zero* tests. Require
+            # actual test modules, and retain every module adopted by the base.
+            shopt -s nullglob
+            current_tests=(governance/exp053/test_exp053_*.py)
+            if [ "${#current_tests[@]}" -eq 0 ]; then
+              echo 'Refusing governance suite with zero test modules' >&2
+              exit 1
+            fi
+            if [ "$base_had_governance" = true ]; then
+              base_test_count=0
+              while IFS= read -r baseline_file; do
+                case "$baseline_file" in
+                  governance/exp053/test_exp053_*.py)
+                    base_test_count=$((base_test_count + 1))
+                    if [ ! -f "$baseline_file" ]; then
+                      echo "Refusing removal of adopted governance test: $baseline_file" >&2
+                      exit 1
+                    fi
+                    ;;
+                esac
+              done < <(git ls-tree -r --name-only 'HEAD^' -- governance/exp053)
+              if [ "$base_test_count" -eq 0 ]; then
+                echo 'Refusing adopted base with zero governance test modules' >&2
+                exit 1
+              fi
+            fi
             python -m unittest discover -s governance/exp053 -p 'test_exp053_*.py' -q
             python governance/exp053/EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
             python governance/exp053/exp053_admin_activation.py
