@@ -15,7 +15,7 @@ from urllib.error import HTTPError
 EVIDENCE=json.loads(Path(BASELINE).read_text())
 
 class FakeAdmin:
-    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False):
+    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False, head_moves_prepost=False, protection_appears_prepost=False):
         self.existing=existing
         self.changed=changed
         self.calls=[]
@@ -31,6 +31,8 @@ class FakeAdmin:
         self.ruleset_reads=0
         self.ruleset_appears_late=ruleset_appears_late
         self.roster_changes_prepost=roster_changes_prepost
+        self.head_moves_prepost=head_moves_prepost
+        self.protection_appears_prepost=protection_appears_prepost
     def call(self,method,path,payload=None):
         self.calls.append(method+' '+path)
         if method=='GET' and path.startswith('/rulesets?'):
@@ -47,9 +49,12 @@ class FakeAdmin:
             name=unquote(path[len('/branches/'):])
             self.branch_reads[name]=self.branch_reads.get(name,0)+1
             head=sha256(name.encode()).hexdigest()[:40]
-            if self.moving_head and self.branch_reads[name]>1:
+            if ((self.moving_head and self.branch_reads[name]>1) or
+                    (self.head_moves_prepost and self.branch_reads[name]>2)):
                 head='0'*40
-            return {'name':name,'commit':{'sha':head},'protected':self.protected}
+            protected=(self.protected or
+                       (self.protection_appears_prepost and self.branch_reads[name]>2))
+            return {'name':name,'commit':{'sha':head},'protected':protected}
         if method=='GET' and path.startswith('/commits/') and path.endswith('/check-runs?per_page=100'):
             head=path[len('/commits/'):].split('/')[0]
             checks=[{'name':name,'status':'completed','conclusion':'success',
@@ -109,6 +114,26 @@ class Tests(unittest.TestCase):
             activate(fake,CONFIRMATION)
         self.assertEqual(fake.branch_listings,3)
         self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+
+    def test_late_branch_head_change_blocks_policy_creation(self):
+        fake=FakeAdmin(head_moves_prepost=True)
+        with self.assertRaisesRegex(ActivationError,'head/protection changed before policy POST'):
+            activate(fake,CONFIRMATION)
+        self.assertEqual(fake.ruleset_reads,2)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_late_branch_protection_change_blocks_policy_creation(self):
+        fake=FakeAdmin(protection_appears_prepost=True)
+        with self.assertRaisesRegex(ActivationError,'head/protection changed before policy POST'):
+            activate(fake,CONFIRMATION)
+        self.assertFalse(any(c.startswith('POST') for c in fake.calls))
+
+    def test_before_create_checks_every_target_head_three_times(self):
+        fake=FakeAdmin()
+        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(len(fake.branch_reads),12)
+        self.assertEqual(set(fake.branch_reads.values()),{3})
+        self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
     def test_synthetic_success_rechecks_before_single_post(self):
         fake=FakeAdmin()
