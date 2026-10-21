@@ -15,7 +15,7 @@ from urllib.error import HTTPError
 EVIDENCE=json.loads(Path(BASELINE).read_text())
 
 class FakeAdmin:
-    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False):
+    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False):
         self.existing=existing
         self.changed=changed
         self.calls=[]
@@ -28,14 +28,19 @@ class FakeAdmin:
         self.branch_reads={}
         self.changed_roster=changed_roster
         self.branch_listings=0
+        self.ruleset_reads=0
+        self.ruleset_appears_late=ruleset_appears_late
+        self.roster_changes_prepost=roster_changes_prepost
     def call(self,method,path,payload=None):
         self.calls.append(method+' '+path)
         if method=='GET' and path.startswith('/rulesets?'):
-            return [{'id':11}] if self.existing else []
+            self.ruleset_reads+=1
+            return [{'id':11}] if self.existing or (self.ruleset_appears_late and self.ruleset_reads>1) else []
         if method=='GET' and path.startswith('/branches?'):
             self.branch_listings+=1
             names=['main']+EVIDENCE['baseline']['research_exp053_branches']
-            if self.changed_roster and self.branch_listings>1:
+            if ((self.changed_roster and self.branch_listings>1) or
+                    (self.roster_changes_prepost and self.branch_listings>2)):
                 names=names+['research/exp053-new-after-inventory']
             return [{'name':x} for x in names]
         if method=='GET' and path.startswith('/branches/'):
@@ -91,6 +96,27 @@ class Tests(unittest.TestCase):
         fake=FakeAdmin()
         with self.assertRaises(ActivationError):activate(fake,'wrong')
         self.assertEqual(fake.calls,[])
+    def test_new_ruleset_during_ci_scan_prevents_post(self):
+        fake=FakeAdmin(ruleset_appears_late=True)
+        with self.assertRaisesRegex(ActivationError, 'Rulesets now exist'):
+            activate(fake,CONFIRMATION)
+        self.assertEqual(fake.ruleset_reads,2)
+        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+
+    def test_late_target_roster_change_prevents_post(self):
+        fake=FakeAdmin(roster_changes_prepost=True)
+        with self.assertRaisesRegex(ActivationError, 'roster changed before policy POST'):
+            activate(fake,CONFIRMATION)
+        self.assertEqual(fake.branch_listings,3)
+        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+
+    def test_synthetic_success_rechecks_before_single_post(self):
+        fake=FakeAdmin()
+        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(fake.ruleset_reads,2)
+        self.assertEqual(fake.branch_listings,3)
+        self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+
     def test_synthetic_optin_creates_exactly_once(self):
         fake=FakeAdmin()
         self.assertEqual(activate(fake,CONFIRMATION),54)
