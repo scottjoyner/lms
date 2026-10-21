@@ -129,3 +129,26 @@ The preflight also performs GET-only `/branches/{target}` reads **before and aft
 This defends against a newly created, unprotected, mismatched or moving target branch being mistaken for a valid test environment. Tests cover an omitted audit target, absent protection, PR base/head mismatch, mid-audit branch movement, an unprotected audited target, and the expected two branch reads. No GET snapshot is atomic: actual enforcement and an independently observed GitHub merge-denial still require contemporaneous human verification.
 
 **Do not activate rulesets, create challenge PRs, or merge automatically.** The research release remains `NO_GO_RESEARCH_ONLY`, regardless of candidate-screening results.
+
+## V21 — cross-module offline challenge integration (synthetic, no GitHub writes)
+
+The earlier V10–V18 screening regressions mocked both the effective GitHub ruleset auditor
+(`Audit.run`) and the head/test-merge CI witness (`audit_pr`). The new
+`test_exp053_challenge_chain_integration.py` tests the **actual implementations
+end to end**, passing only a strictly GET-only synthetic GitHub API fixture
+with the pinned candidate ruleset, all 12 target branches, per-branch effective
+rule provenance, a harmless new-file PR, and five app-15368 check runs.
+
+Six integration cases exercise the full **candidate-only** path for exact
+test-merge checks and the documented no-merge-activity HEAD fallback, plus
+fail-closed paths for an unapplied or unprotected target, a missing required
+merge check, and a generated merge commit with incorrect parent binding.
+They confirm the result is **not an attested merge denial** and never sends
+a POST/Merge request. This checks API contracts between the modules, not actual
+GitHub policy enforcement, independent reviewer identity, or UI merge denial.
+
+The same test module is now part of the existing offline governance GitHub
+Actions workflow, with no network credentials or repository mutation.
+An accountable administrator must still approve/activate the ruleset and
+commission human-witnessed non-draft negative challenges before claiming
+protection. Governance and scientific execution remain NO-GO.
