@@ -70,3 +70,20 @@ References:
 - https://docs.github.com/en/pull-requests/how-tos/create-pull-requests/changing-the-stage-of-a-pull-request
 - https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks
 - https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets
+
+## V10: read-only candidate preflight (does not test denial)
+
+The existing draft PR now includes `exp053_readonly_challenge_preflight.py` and offline synthetic regression tests. Once an authorized administrator activates the reviewed ruleset, an independently authorized observer can screen a *separate* harmless non-draft challenge PR before visiting GitHub's real merge UI:
+
+```bash
+cd governance/exp053
+python3 exp053_readonly_challenge_preflight.py --pr <actual-challenge-PR-number> --expect-base main
+# Repeat with --expect-base research/exp053-<actual-protected-target>
+```
+
+This command issues **GET requests only** and checks the named active policy plus independently inspected effective rules on all observed protected branches. It rejects existing draft governance/security PRs #37–#48, an unrelated PR target or repository, a draft or conflicted challenge, prior approving reviews, a changing PR snapshot, or unverifiable GitHub head/test-merge CI selection. By default the historical merge-ref auditor remains restricted to #37–#46; its new isolated-challenge option is permitted only by this explicit screening flow.
+
+Passing returns `HUMAN_MERGE_DENIAL_INSPECTION_CANDIDATE_ONLY` with `merge_denial_attested: false` and `writes_performed: 0`. **A passing result never demonstrates that GitHub blocked a merge.** A real independent human must still observe a specific missing-review denial in the authenticated merge UI, capture a privately held evidence record, and independently evaluate admin/bypass routes. The checker must not be used before activation as a substitute for the original `--live-preflight`, and must not be pointed at a production PR that could be accidentally merged.
+
+The new synthetic tests are included in `.github/workflows/exp053-governance-ci.yml`. No genuine test PR, administrator approval, real negative merge challenge, policy activation, or scientific authorization was created by this V10 software work.
+
