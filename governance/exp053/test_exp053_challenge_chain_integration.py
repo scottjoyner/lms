@@ -23,12 +23,14 @@ class GitHubFixture:
     """Exact repository-relative GET contract; fails on any unexpected endpoint."""
 
     def __init__(self, *, check_selection='merge', applied=True, main_protected=True,
-                 corrupt_merge_parents=False):
+                 corrupt_merge_parents=False, review_events=None, inline_notes=None):
         self.calls = []
         self.check_selection = check_selection
         self.applied = applied
         self.main_protected = main_protected
         self.corrupt_merge_parents = corrupt_merge_parents
+        self.review_events = copy.deepcopy(review_events if review_events is not None else [])
+        self.inline_notes = copy.deepcopy(inline_notes if inline_notes is not None else [])
         self.branch_names = ['main', *verified_evidence()['baseline']['research_exp053_branches']]
         self.policy = {
             **verify_local(), 'id': 42, 'source_type': 'Repository', 'source': REPO
@@ -75,7 +77,9 @@ class GitHubFixture:
         if path.startswith('/pulls/49/files?'):
             return [copy.deepcopy(self.doc)]
         if path.startswith('/pulls/49/reviews?'):
-            return []
+            return copy.deepcopy(self.review_events)
+        if path.startswith('/pulls/49/comments?'):
+            return copy.deepcopy(self.inline_notes)
         if path == '/commits/' + MERGE_SHA:
             return {'sha': MERGE_SHA, 'parents': [
                 {'sha': BASE_SHA}, {'sha': BASE_SHA if self.corrupt_merge_parents else HEAD_SHA}
@@ -128,6 +132,18 @@ class CompleteChallengeChain(unittest.TestCase):
         fake = GitHubFixture(main_protected=False)
         with self.assertRaisesRegex(ChallengeError, 'effective governance rules'):
             screen(fake, 49, 'main')
+
+    def test_real_chain_rejects_preexisting_changes_requested(self):
+        fake = GitHubFixture(review_events=[{'id': 3, 'state': 'CHANGES_REQUESTED'}])
+        with self.assertRaisesRegex(ChallengeError, 'empty submitted review history'):
+            screen(fake, 49, 'main')
+        self.assertFalse(any(route.startswith('/commits/') for route in fake.calls))
+
+    def test_real_chain_rejects_inline_review_discussion(self):
+        fake = GitHubFixture(inline_notes=[{'id': 4, 'body': 'blocking discussion'}])
+        with self.assertRaisesRegex(ChallengeError, 'zero inline review comments'):
+            screen(fake, 49, 'main')
+        self.assertFalse(any(route.startswith('/commits/') for route in fake.calls))
 
     def test_real_ci_audit_rejects_missing_merge_check(self):
         fake = GitHubFixture(check_selection='missing')
