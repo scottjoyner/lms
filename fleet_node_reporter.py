@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import platform
@@ -27,6 +28,13 @@ from urllib.error import URLError, HTTPError
 
 
 LM_PORT = 1234
+
+# Explicitly pinned Joyner loopback lanes. Discovery is opt-in, library-only.
+# This does not authorize inference, measure GPU residency, or select routes.
+_JOYNER_LANES = (
+    (1234, "joyner-toolcall", "/home/scott/fleet-gpu/models/MiniCPM5-1B-Q4_K_M.gguf"),
+    (1236, "joyner-ling", "/home/scott/fleet-gpu/models/Ling-3.0-tiny-abliterated-APEX-I-Compact.gguf"),
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -256,15 +264,73 @@ def _library(lm_url: str) -> List[Dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- #
+# Opt-in Joyner llama.cpp catalog discovery (no model loaded/ready claims).
+# --------------------------------------------------------------------------- #
+def _joyner_loopback_json(port: int, endpoint: str) -> Optional[Dict[str, Any]]:
+    """GET-only bounded local API response; no supplied URL, credentials or GPU work."""
+    if port not in (1234, 1236) or endpoint not in ("/health", "/props", "/v1/models"):
+        return None
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=2.0)
+    try:
+        connection.request("GET", endpoint, headers={"Accept": "application/json"})
+        response = connection.getresponse()
+        if response.status != 200:  # also rejects redirects; never follow arbitrary URLs
+            return None
+        payload = response.read(256 * 1024 + 1)
+        if len(payload) > 256 * 1024:
+            return None
+        value = json.loads(payload)
+        return value if isinstance(value, dict) else None
+    except (OSError, ValueError, UnicodeError, http.client.HTTPException):
+        return None
+    finally:
+        connection.close()
+
+
+def _joyner_llama_library() -> List[Dict[str, Any]]:
+    """Require three matching local observations, report catalog only, never loaded."""
+    if socket.gethostname() != "joyner":
+        return []
+    found: List[Dict[str, Any]] = []
+    for port, alias, model_path in _JOYNER_LANES:
+        health = _joyner_loopback_json(port, "/health")
+        props = _joyner_loopback_json(port, "/props")
+        catalog = _joyner_loopback_json(port, "/v1/models")
+        if not (health and health.get("status") == "ok"):
+            continue
+        if not (props and props.get("model_alias") == alias
+                and props.get("model_path") == model_path):
+            continue
+        data = catalog.get("data") if catalog else None
+        if not isinstance(data, list) or not any(
+            isinstance(item, dict) and item.get("id") == alias
+            for item in data
+        ):
+            continue
+        # Empty model path avoids emitting home paths via fleet data.
+        found.append({"id": alias, "path": ""})
+    return found
+
+
+# --------------------------------------------------------------------------- #
 # Report + loop
 # --------------------------------------------------------------------------- #
-def build_report(lm_url: str) -> Dict[str, Any]:
+def build_report(lm_url: str, *, joyner_llama_discovery: bool = False) -> Dict[str, Any]:
     specs = _specs()
     hostname = socket.gethostname()
+    library = _library(lm_url)
+    if joyner_llama_discovery and hostname == "joyner":
+        existing = {row["id"] for row in library if isinstance(row, dict) and "id" in row}
+        for lane in _joyner_llama_library():
+            if lane["id"] not in existing:
+                library.append(lane)
+                existing.add(lane["id"])
+    # Deliberately do not add llama.cpp HTTP health to "loaded"; the only
+    # existing loaded-model detector is LM Studio-specific.
     return {
         "hostname": hostname,
         "host_name": hostname,
-        "library": _library(lm_url),
+        "library": library,
         "loaded": _loaded_models(lm_url),
         "specs": specs,
     }
@@ -292,7 +358,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--router-url", default="http://100.64.43.123:8088")
     parser.add_argument("--lmstudio-url", default=f"http://localhost:{LM_PORT}")
     parser.add_argument("--interval", type=float, default=30.0)
+    parser.add_argument(
+        "--joyner-llama-discovery", action="store_true",
+        help="Opt-in, pinned loopback llama.cpp library entries on Joyner only; never loaded",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Print one local report and exit without POST or service changes",
+    )
     args = parser.parse_args(argv)
+    if args.dry_run:
+        print(json.dumps(build_report(
+            args.lmstudio_url, joyner_llama_discovery=args.joyner_llama_discovery,
+        ), indent=2, sort_keys=True))
+        return 0
 
     print(
         f"reporter: router={args.router_url} lmstudio={args.lmstudio_url} "
@@ -300,7 +379,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         flush=True,
     )
     while True:
-        report = build_report(args.lmstudio_url)
+        report = build_report(
+            args.lmstudio_url, joyner_llama_discovery=args.joyner_llama_discovery,
+        )
         ok = post_report(args.router_url, report)
         print(
             f"report {report['hostname']}: library={len(report['library'])} "
