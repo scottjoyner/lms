@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Regression suite — synthetic only
-        run: python -m unittest -q test_exp053_admin_activation test_exp053_pr_head_ci_audit test_exp053_merge_ref_ci_audit test_exp053_verify_live_enforcement test_exp053_readonly_challenge_preflight
+        run: python -m unittest -q test_exp053_admin_activation test_exp053_pr_head_ci_audit test_exp053_merge_ref_ci_audit test_exp053_verify_live_enforcement test_exp053_readonly_challenge_preflight test_exp053_challenge_chain_integration
       - name: Offline policy candidate preflight
         run: python EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
       - name: Administrator tool must remain dry-run by default
