@@ -18,7 +18,7 @@ DOC={'filename':'governance/exp053/challenges/exp053-merge-denial-example.md',
      'patch':'@@ -0,0 +1,2 @@\\n+# EXP-053 governance challenge fixture\\n+No production or scientific content.'}
 
 class Fake:
-    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False, files=None, file_drift=False):
+    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False, files=None, file_drift=False, target_drift=False, target_unprotected=False, target_wrong_sha=False):
         self.pr=copy.deepcopy(PR if pr is None else pr)
         self.rules=rules
         self.reviews=reviews if reviews is not None else []
@@ -35,6 +35,10 @@ class Fake:
         self.files=copy.deepcopy([DOC] if files is None else files)
         self.file_drift=file_drift
         self.file_reads=0
+        self.target_reads=0
+        self.target_drift=target_drift
+        self.target_unprotected=target_unprotected
+        self.target_wrong_sha=target_wrong_sha
     def call(self,method,path,payload=None):
         if method!='GET' or payload is not None:
             raise AssertionError('Read-only preflight attempted a write')
@@ -48,6 +52,11 @@ class Fake:
             if self.list_drift and self.list_reads>1:
                 items.append({'id':43,'name':'unexpected ruleset'})
             return items
+        if path.startswith('/branches/'):
+            self.target_reads+=1
+            return {'name':'main',
+                    'protected':not self.target_unprotected,
+                    'commit':{'sha':('c'*40 if self.target_wrong_sha or (self.target_drift and self.target_reads>1) else BASE)}}
         if path=='/rulesets/42':
             self.policy_reads+=1
             return {'id':42,'enforcement':'evaluate' if self.policy_drift and self.policy_reads>1 else 'active'}
@@ -79,7 +88,8 @@ class Screening(unittest.TestCase):
         self.audit_cls=self.audit.start()
         self.ci_fun=self.ci.start()
         self.audit_cls.return_value.run.return_value={
-            'governance_status':'POLICY_METADATA_VERIFIED'}
+            'governance_status':'POLICY_METADATA_VERIFIED',
+            'branches':[{'branch':'main','protected':True,'required_rule_set_observed':True}]}
         self.ci_fun.return_value={
             'status':'CI_SELECTION_VERIFIED_HEAD','pr':49,
             'head_sha':SHA,'base_sha':BASE,
@@ -128,7 +138,7 @@ class Screening(unittest.TestCase):
         with self.assertRaisesRegex(ChallengeError,'not verified'):
             screen(Fake(),49,'main')
     def test_wrong_branch_rejected(self):
-        with self.assertRaisesRegex(ChallengeError,'Unexpected target'):
+        with self.assertRaisesRegex(ChallengeError,'not individually protected'):
             screen(Fake(),49,'research/exp053-nonmatching')
     def test_nested_branch_rejected_without_network(self):
         f=Fake()
@@ -218,6 +228,34 @@ class Screening(unittest.TestCase):
         f=Fake()
         screen(f,49,'main')
         self.assertEqual(f.file_reads,2)
+
+    def test_target_not_in_effective_audit_is_rejected(self):
+        self.audit_cls.return_value.run.return_value['branches']=[]
+        with self.assertRaisesRegex(ChallengeError,'not individually protected'):
+            screen(Fake(),49,'main')
+
+    def test_unprotected_target_is_rejected(self):
+        with self.assertRaisesRegex(ChallengeError,'identity/protection'):
+            screen(Fake(target_unprotected=True),49,'main')
+
+    def test_pr_base_must_match_live_protected_branch_head(self):
+        with self.assertRaisesRegex(ChallengeError,'differs from current'):
+            screen(Fake(target_wrong_sha=True),49,'main')
+
+    def test_protected_target_moving_mid_audit_is_rejected(self):
+        with self.assertRaisesRegex(ChallengeError,'branch changed'):
+            screen(Fake(target_drift=True),49,'main')
+
+    def test_effective_audit_must_report_actual_protection(self):
+        self.audit_cls.return_value.run.return_value['branches']=[
+            {'branch':'main','protected':False,'required_rule_set_observed':True}]
+        with self.assertRaisesRegex(ChallengeError,'not individually protected'):
+            screen(Fake(),49,'main')
+
+    def test_success_reads_target_head_twice(self):
+        f=Fake()
+        screen(f,49,'main')
+        self.assertEqual(f.target_reads,2)
 
 if __name__=='__main__':
     unittest.main()
