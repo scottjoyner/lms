@@ -14,28 +14,48 @@ PR={'number':49,'state':'open','draft':False,'merged_at':None,
             'repo':{'full_name':'scottjoyner/lms'}}}
 
 class Fake:
-    def __init__(self, pr=None, rules=True, reviews=None, drift=False):
+    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False):
         self.pr=copy.deepcopy(PR if pr is None else pr)
         self.rules=rules
         self.reviews=reviews if reviews is not None else []
         self.drift=drift
         self.calls=[]
         self.pr_reads=0
+        self.review_reads=0
+        self.policy_reads=0
+        self.list_reads=0
+        self.review_drift=review_drift
+        self.policy_drift=policy_drift
+        self.list_drift=list_drift
+        self.mergeable_drift=mergeable_drift
     def call(self,method,path,payload=None):
         if method!='GET' or payload is not None:
             raise AssertionError('Read-only preflight attempted a write')
         self.calls.append(path)
         if path.startswith('/rulesets?'):
-            return ([{'name':'EXP-053 require independent human review and verified CI',
+            self.list_reads+=1
+            if not self.rules:
+                return []
+            items=[{'name':'EXP-053 require independent human review and verified CI',
                       'enforcement':'active','target':'branch','id':42}]
-                    if self.rules else [])
+            if self.list_drift and self.list_reads>1:
+                items.append({'id':43,'name':'unexpected ruleset'})
+            return items
+        if path=='/rulesets/42':
+            self.policy_reads+=1
+            return {'id':42,'enforcement':'evaluate' if self.policy_drift and self.policy_reads>1 else 'active'}
         if path.startswith('/pulls/49/reviews?'):
+            self.review_reads+=1
+            if self.review_drift and self.review_reads>1:
+                return self.reviews+[{'id':999,'state':'APPROVED'}]
             return self.reviews
         if path=='/pulls/49':
             self.pr_reads+=1
             p=copy.deepcopy(self.pr)
             if self.drift and self.pr_reads>1:
                 p['head']['sha']='d'*40
+            if self.mergeable_drift and self.pr_reads>1:
+                p['mergeable']=False
             return p
         raise AssertionError('Unexpected GET '+path)
 
@@ -48,7 +68,8 @@ class Screening(unittest.TestCase):
         self.audit_cls.return_value.run.return_value={
             'governance_status':'POLICY_METADATA_VERIFIED'}
         self.ci_fun.return_value={
-            'status':'CI_SELECTION_VERIFIED_HEAD',
+            'status':'CI_SELECTION_VERIFIED_HEAD','pr':49,
+            'head_sha':SHA,'base_sha':BASE,
             'selected_commit_sha':SHA,
             'checks_selected_from':'HEAD_FALLBACK_NO_MERGE_STATUS'}
         self.addCleanup(self.audit.stop)
@@ -106,6 +127,40 @@ class Screening(unittest.TestCase):
         with self.assertRaisesRegex(ChallengeError,'Invalid pull request'):
             screen(f,0,'main')
         self.assertEqual(f.calls,[])
+
+    def test_review_added_mid_audit_blocks_candidate(self):
+        with self.assertRaisesRegex(ChallengeError,'Review history changed'):
+            screen(Fake(review_drift=True),49,'main')
+
+    def test_active_policy_changed_mid_audit_blocks_candidate(self):
+        with self.assertRaisesRegex(ChallengeError,'Active policy changed'):
+            screen(Fake(policy_drift=True),49,'main')
+
+    def test_policy_inventory_changed_mid_audit_blocks_candidate(self):
+        with self.assertRaisesRegex(ChallengeError,'Ruleset inventory changed'):
+            screen(Fake(list_drift=True),49,'main')
+
+    def test_mergeability_change_mid_audit_blocks_candidate(self):
+        with self.assertRaisesRegex(ChallengeError,'identity/state changed'):
+            screen(Fake(mergeable_drift=True),49,'main')
+
+    def test_stale_ci_witness_binding_blocks_candidate(self):
+        self.ci_fun.return_value['head_sha']='f'*40
+        with self.assertRaisesRegex(ChallengeError,'different PR revision'):
+            screen(Fake(),49,'main')
+
+    def test_auto_merge_enabled_blocks_candidate(self):
+        p=copy.deepcopy(PR)
+        p['auto_merge']={'enabled_by':{'login':'somebody'}}
+        with self.assertRaisesRegex(ChallengeError,'conflict-free'):
+            screen(Fake(pr=p),49,'main')
+
+    def test_success_rechecks_policy_and_reviews(self):
+        fake=Fake()
+        screen(fake,49,'main')
+        self.assertEqual(fake.review_reads,2)
+        self.assertEqual(fake.policy_reads,2)
+        self.assertEqual(fake.list_reads,2)
 
 if __name__=='__main__':
     unittest.main()
