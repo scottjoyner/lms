@@ -44,6 +44,24 @@ def screen(api, number, expected_base):
     state = Audit(transport=lambda route: api.call('GET', route)).run()
     if state['governance_status'] != 'POLICY_METADATA_VERIFIED':
         raise ChallengeError('Active effective governance rules not verified')
+    audited_branches = state.get('branches')
+    if not isinstance(audited_branches, list):
+        raise ChallengeError('Effective branch audit did not report target coverage')
+    audited_target = [row for row in audited_branches if isinstance(row, dict)
+                      and row.get('branch') == expected_base]
+    if (len(audited_target) != 1 or audited_target[0].get('protected') is not True
+            or audited_target[0].get('required_rule_set_observed') is not True):
+        raise ChallengeError('Challenge target not individually protected in effective rules audit')
+    branch_route = '/branches/' + quote(expected_base, safe='')
+    target_before = api.call('GET', branch_route)
+    if (not isinstance(target_before, dict)
+            or target_before.get('name') != expected_base
+            or target_before.get('protected') is not True):
+        raise ChallengeError('Current target branch identity/protection is unverified')
+    target_sha = (target_before.get('commit') or {}).get('sha')
+    if (not isinstance(target_sha, str) or len(target_sha) != 40
+            or any(c not in '0123456789abcdef' for c in target_sha)):
+        raise ChallengeError('Current target branch SHA is unverified')
     before = api.call('GET', f'/pulls/{number}')
     if not isinstance(before,dict) or before.get('number') != number:
         raise ChallengeError('Malformed challenge PR response')
@@ -57,6 +75,8 @@ def screen(api, number, expected_base):
             (base.get('repo') or {}).get('full_name') != REPO or
             (head.get('repo') or {}).get('full_name') != REPO):
         raise ChallengeError('Unexpected target or repository identity')
+    if base.get('sha') != target_sha:
+        raise ChallengeError('PR base revision differs from current protected branch HEAD')
     # A challenge should never repurpose a production/security PR. Keep its
     # entire change set to one small, newly added, human-reviewed text fixture.
     # This scope gate does not determine whether the content itself is safe.
@@ -115,10 +135,16 @@ def screen(api, number, expected_base):
     changes_after = paginated(api, f'/pulls/{number}/files')
     if changes_after != changes:
         raise ChallengeError('Challenge file inventory changed during audit')
+    target_after = api.call('GET', branch_route)
+    if (not isinstance(target_after, dict) or target_after.get('name') != expected_base
+            or target_after.get('protected') is not True
+            or (target_after.get('commit') or {}).get('sha') != target_sha):
+        raise ChallengeError('Protected target branch changed during challenge audit')
     return {
         'status':'HUMAN_MERGE_DENIAL_INSPECTION_CANDIDATE_ONLY',
         'repository':REPO,'pr':number,'base':expected_base,
-        'head_sha':head.get('sha'),'evaluated_ci_sha':ci['selected_commit_sha'],
+        'head_sha':head.get('sha'),'protected_base_sha':target_sha,
+        'evaluated_ci_sha':ci['selected_commit_sha'],
         'ci_source':ci['checks_selected_from'],
         'reviews_observed':len(reviews),'writes_performed':0,
         'merge_denial_attested':False,'merge_action_performed':False,
