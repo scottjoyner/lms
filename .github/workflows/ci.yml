@@ -35,6 +35,21 @@ jobs:
           # No live Neo4j in CI; graph-sync smoke tests mock the driver.
           NEO4J_PASSWORD: ""
 
+      # This job's Python 3.12 result is one of the five pinned required
+      # GitHub check contexts. The separate EXP-053 governance workflow uses
+      # a path filter and is NOT itself required by the candidate ruleset.
+      - name: EXP-053 offline governance gate (when present in checkout)
+        if: matrix.python-version == '3.12'
+        run: |
+          if [ -d governance/exp053 ]; then
+            test -f governance/exp053/exp053_admin_activation.py
+            python -m unittest discover -s governance/exp053 -p 'test_exp053_*.py' -q
+            python governance/exp053/EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
+            python governance/exp053/exp053_admin_activation.py
+          else
+            echo 'EXP-053 governance not present in this pre-adoption checkout'
+          fi
+
       - name: Build distributable wheel and source archive
         run: python -m build --no-isolation --wheel --sdist --outdir dist
 
