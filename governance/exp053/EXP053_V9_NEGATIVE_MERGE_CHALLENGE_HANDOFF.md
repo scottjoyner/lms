@@ -119,3 +119,13 @@ This is a **post-activation**, separate-PR operator procedure only. A new fixtur
 
 Fleet Commander x1-370: **86/86** synthetic tests passed after eight new changed-file scope and drift regression cases. The existing candidate policy JSON, pinned evidence files, and all governance/scientific release HOLDs remain unchanged.
 
+
+## V13 — challenge target branch bound to effective protection and exact base HEAD
+
+V13 adds a distinct missing evidence boundary to the read-only challenge candidate preflight. The specific `--expect-base` branch must now be present **exactly once** in the independent effective-rule audit's branch results with both `protected: true` and `required_rule_set_observed: true`. A successful overall policy report no longer suffices when the selected target was not individually inspected.
+
+The preflight also performs GET-only `/branches/{target}` reads **before and after** the PR/CI/file/review scan. Both must show the selected branch, `protected: true`, and the same current HEAD SHA. The PR's `base.sha` must match that current protected-branch SHA. The screening report records `protected_base_sha` for comparison by the independent operator.
+
+This defends against a newly created, unprotected, mismatched or moving target branch being mistaken for a valid test environment. Tests cover an omitted audit target, absent protection, PR base/head mismatch, mid-audit branch movement, an unprotected audited target, and the expected two branch reads. No GET snapshot is atomic: actual enforcement and an independently observed GitHub merge-denial still require contemporaneous human verification.
+
+**Do not activate rulesets, create challenge PRs, or merge automatically.** The research release remains `NO_GO_RESEARCH_ONLY`, regardless of candidate-screening results.
