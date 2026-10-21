@@ -130,6 +130,13 @@ class JoynerDiscoveryTests(unittest.TestCase):
         self.assertEqual(json.loads(buf.getvalue())["loaded"], [])
         post.assert_not_called()
 
+    def test_discovery_cannot_publish_without_dry_run(self):
+        with patch.object(reporter, "post_report") as post,              patch.object(reporter, "_joyner_llama_library") as discovery,              redirect_stdout(io.StringIO()),              self.assertRaises(SystemExit) as exc:
+            reporter.main(["--joyner-llama-discovery", "--interval", "30"])
+        self.assertEqual(exc.exception.code, 2)
+        post.assert_not_called()
+        discovery.assert_not_called()
+
     def test_url_allowlist_never_accepts_unrecognized_port_or_route(self):
         with patch.object(reporter.http.client, "HTTPConnection") as conn:
             self.assertIsNone(reporter._joyner_loopback_json(1237, "/health"))
