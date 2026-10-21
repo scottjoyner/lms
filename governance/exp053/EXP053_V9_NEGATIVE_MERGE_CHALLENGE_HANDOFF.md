@@ -96,3 +96,26 @@ New synthetic negative cases cover review-history drift, ruleset-detail drift, r
 
 The proposed ruleset candidate, historical evidence hashes, `NO_GO_GOVERNANCE`, and `NO_GO_RESEARCH_ONLY` remain unchanged.
 
+
+
+## V12 — isolate the entire challenge diff
+
+The V12 screening tool now rejects a prospective challenge PR unless GitHub's complete `/pulls/{number}/files` listing contains **exactly one newly added documentation fixture**. The only accepted path form is:
+
+```text
+governance/exp053/challenges/exp053-merge-denial-<lowercase-alphanumeric-or-hyphen-slug>.md
+```
+
+The fixture must be new (not a modification or rename), contain **1–15 added lines**, **zero deletions**, and a GitHub text patch no longer than **2,000 characters**. It must include an added Markdown heading `# EXP-053 governance challenge fixture`. For example, a future *human-authorized* disposable fixture could contain:
+
+```markdown
+# EXP-053 governance challenge fixture
+Read-only governance denial exercise; no production or scientific data.
+```
+
+The same file list is fetched again at the end of the audit. A changed file set, additional modified code, a binary/omitted patch, a larger diff, or a different path fails closed. **These mechanical checks cannot prove fixture content is safe or non-sensitive.** The independent human operator must inspect the exact proposed text, target branch and permissions before creating a challenge PR.
+
+This is a **post-activation**, separate-PR operator procedure only. A new fixture cannot be used as evidence until a qualified human witnesses GitHub's missing-approvals denial on an otherwise acceptable, non-draft, conflict-free PR with valid required checks. A markdown-only PR may skip some CI workflows; missing checks must be treated as a confounder rather than a merge-denial proof. No challenge PR was created in V12.
+
+Fleet Commander x1-370: **86/86** synthetic tests passed after eight new changed-file scope and drift regression cases. The existing candidate policy JSON, pinned evidence files, and all governance/scientific release HOLDs remain unchanged.
+
