@@ -367,6 +367,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Print one local report and exit without POST or service changes",
     )
     args = parser.parse_args(argv)
+    # Self-reported library entries have not established owner-bound GPU
+    # residency and must never be published by accident.
+    if args.joyner_llama_discovery and not args.dry_run:
+        parser.error(
+            "--joyner-llama-discovery is preview-only; "
+            "use --dry-run until independent routing admission is approved"
+        )
     if args.dry_run:
         print(json.dumps(build_report(
             args.lmstudio_url, joyner_llama_discovery=args.joyner_llama_discovery,
