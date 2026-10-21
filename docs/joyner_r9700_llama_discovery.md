@@ -39,3 +39,23 @@ Use the dry-run only on a trusted host where the expected services exist. The fl
 4. Require authenticated, fresh, owner-bound routing receipts, isolation, rollback, and a separate operator release decision. Successful GET probes and this opt-in reporter change **never** satisfy these gates.
 
 **Disposition:** review-only proposal; no production install, model launch, fleet-report POST or deployment.
+
+
+## October 21 — mixed-publisher inventory collision witness
+The existing production \`/api/fleet/node/joyner\` report alternated over one minute between:
+
+- \`library=[joyner-toolcall]\`, \`power_profile=daily\`, \`power_model_class=full\`, and minimal \`specs\` keys associated with the known 30-second node reporter; and
+- \`library=[]\`, empty power fields, and a different \`specs\` schema containing \`gpu_backend\`, \`gpu_device\`, and \`gpu_vram_gib\`.
+
+Both payloads reported the same hostname and Tailnet IP, with fresh timestamps. Joyner has a second 60-second heartbeat process, but its protected source was **not read** and the router does not carry an authenticated per-process writer identity. These are **strong circumstantial signs of two self-report publishers replacing the same hostname key**, not established PID-level attribution.
+
+Reproduce read-only on a trusted fleet operator node:
+
+\`\`\`bash
+python3 -m pytest -q tests/test_r9700_report_collision_audit.py
+python3 scripts/audit_r9700_report_collision.py --samples 13 --interval 5
+\`\`\`
+
+The witness makes bounded credential-free \`GET\` requests to the **pinned** router address and \`/api/fleet/node/joyner\` path, checks for divergent schemas/catalogs, and always reports \`model_gpu_residency_proven=false\`, \`authenticated_publisher_binding=false\`, and \`production_admission=NO_GO\`. It cannot stop or update either reporter, modify the router, or infer which process emitted an HTTP POST. It never echoes arbitrary \`specs\` values, raw model paths, prompts or tokens.
+
+Track reconciliation in [lms issue #50](https://github.com/scottjoyner/lms/issues/50), with the per-user and provider receipt trust requirements in [auto-router issue #37](https://github.com/scottjoyner/auto-router/issues/37). Do not restore 'stable' fleet readiness by caching old catalog entries or pretending that a reported \`loaded\` list proves GPU residency.
