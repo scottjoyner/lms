@@ -12,15 +12,16 @@ MERGE='c'*40
 class Fake:
     def __init__(self, merge_checks=False, head_checks=True, other_merge_job=False,
                  wrong_parents=False, drift=False, queued=False, legacy_failed=False,
-                 legacy_merge_only=False):
+                 legacy_merge_only=False, number=46):
         self.merge_checks=merge_checks; self.head_checks=head_checks
         self.other_merge_job=other_merge_job; self.wrong_parents=wrong_parents
         self.drift=drift; self.queued=queued; self.legacy_failed=legacy_failed
         self.legacy_merge_only=legacy_merge_only; self.pull_calls=0
+        self.number=number
 
     def __call__(self, path):
         path=path.split('?')[0]
-        if path=='/pulls/46':
+        if path==f'/pulls/{self.number}':
             self.pull_calls+=1
             return {'merge_commit_sha':('d'*40 if self.drift and self.pull_calls>1 else MERGE),
                     'head':{'sha':HEAD},'base':{'sha':BASE}}
@@ -51,6 +52,14 @@ class Fake:
         raise AssertionError('unexpected route '+path)
 
 class MergeRefTests(unittest.TestCase):
+    def test_isolated_challenge_requires_explicit_opt_in(self):
+        fixture=GithubReadOnly(Fake(number=49))
+        with self.assertRaisesRegex(SnapshotError, 'allowlisted'):
+            audit_pr(fixture,49,CTX)
+        result=audit_pr(GithubReadOnly(Fake(number=49)),49,CTX,
+                        allow_isolated_challenge=True)
+        self.assertEqual(result['status'],'CI_SELECTION_VERIFIED_HEAD')
+
     def test_missing_merge_checks_selects_head_per_docs(self):
         r=audit_pr(GithubReadOnly(Fake()),46,CTX)
         self.assertEqual(r['status'],'CI_SELECTION_VERIFIED_HEAD')
