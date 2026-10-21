@@ -241,6 +241,13 @@ def activate(api, confirmation):
     payload = verify_local()
     branches = preflight_api(api)
     verify_current_required_checks(api, branches)
+    # A multi-branch CI scan is long enough for a second administrator to add
+    # a ruleset or modify the target roster. Recheck both immediately before
+    # the only permitted POST. These GETs narrow, but cannot eliminate, the
+    # final GET-to-POST race; the operator must independently read back.
+    refreshed_branches = preflight_api(api)
+    if sorted(branches) != sorted(refreshed_branches):
+        raise ActivationError('Target branch roster changed before policy POST; no write')
     # Exactly one write. If the response is uncertain do NOT retry the POST.
     created = api.call('POST', '/rulesets', payload)
     identifier = created.get('id') if isinstance(created,dict) else None
