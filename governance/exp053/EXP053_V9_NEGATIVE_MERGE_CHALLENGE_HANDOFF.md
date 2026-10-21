@@ -87,3 +87,12 @@ Passing returns `HUMAN_MERGE_DENIAL_INSPECTION_CANDIDATE_ONLY` with `merge_denia
 
 The new synthetic tests are included in `.github/workflows/exp053-governance-ci.yml`. No genuine test PR, administrator approval, real negative merge challenge, policy activation, or scientific authorization was created by this V10 software work.
 
+
+## V11: fail-closed freshness at the end of candidate screening
+
+The V11 challenge preflight now captures the named active ruleset's exact ID and detail before inspecting the PR, and verifies them again **after** CI and PR identity checks. It likewise re-fetches the repository/parent ruleset inventory and the complete PR review history before reporting a screening candidate. Any change blocks screening rather than producing a potentially stale report. The selected CI witness must explicitly match the PR number and current head/base SHA. The final PR read also rechecks non-draft/open/unmerged/conflict-free state and refuses pre-enabled auto-merge.
+
+New synthetic negative cases cover review-history drift, ruleset-detail drift, ruleset-inventory drift, mergeability changes, stale CI witness binding, and auto-merge, plus proof that a passing fixture makes two independent review/policy/inventory reads. **This is not a transactional snapshot:** updates immediately after the final GET remain possible. Therefore the independent operator must still observe the exact current state in GitHub's authenticated merge box at the moment of testing. The checker never calls a merge endpoint or claims a merge was blocked.
+
+The proposed ruleset candidate, historical evidence hashes, `NO_GO_GOVERNANCE`, and `NO_GO_RESEARCH_ONLY` remain unchanged.
+
