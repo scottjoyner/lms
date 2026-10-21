@@ -91,6 +91,36 @@ class RequiredGovernanceStep(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Refusing removal', result.stderr)
 
+    def test_removing_only_adopted_test_module_fails_required_check(self):
+        self.add_suite()
+        self.commit('base with governance test module')
+        (self.repo / 'governance/exp053/test_exp053_synthetic.py').unlink()
+        self.commit('attempt to remove last test')
+        result = self.run_required_step()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('zero test modules', result.stderr)
+
+    def test_removing_one_of_two_adopted_test_modules_fails_required_check(self):
+        self.add_suite()
+        other = self.repo / 'governance/exp053/test_exp053_more.py'
+        other.write_text('import unittest\nclass More(unittest.TestCase):\n'
+                         '    def test_more(self):\n        self.assertTrue(True)\n')
+        self.commit('base with two governance test modules')
+        other.unlink()
+        self.commit('attempt to drop one test while retaining other')
+        result = self.run_required_step()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Refusing removal of adopted governance test', result.stderr)
+
+    def test_initial_adoption_without_test_modules_fails_closed(self):
+        self.commit('base without suite')
+        self.add_suite()
+        (self.repo / 'governance/exp053/test_exp053_synthetic.py').unlink()
+        self.commit('attempt governance adoption with zero tests')
+        result = self.run_required_step()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('zero test modules', result.stderr)
+
     def test_existing_governance_suite_runs_tests_and_two_guards(self):
         self.add_suite()
         self.commit('adopt governance suite in base')
