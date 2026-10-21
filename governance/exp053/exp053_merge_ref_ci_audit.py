@@ -55,8 +55,8 @@ def check_legacy_collisions(statuses, contexts):
     return failing
 
 
-def audit_pr(source, number, contexts):
-    if number not in NUMBERS:
+def audit_pr(source, number, contexts, *, allow_isolated_challenge=False):
+    if number not in NUMBERS and not (allow_isolated_challenge and type(number) is int and number > 0):
         raise SnapshotError('PR not in allowlisted EXP-053 review stack')
     before = source.get(f'/pulls/{number}')
     if not isinstance(before, dict):
