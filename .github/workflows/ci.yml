@@ -13,6 +13,10 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch the first parent of the PR test merge commit so the required
+          # 3.12 job can detect removal of an already-adopted governance suite.
+          fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -41,13 +45,24 @@ jobs:
       - name: EXP-053 offline governance gate (when present in checkout)
         if: matrix.python-version == '3.12'
         run: |
+          # On pull_request, HEAD^ is the protected target/base parent of
+          # GitHub's test-merge commit. Fail closed if the checkout is shallow.
+          git rev-parse --verify 'HEAD^' >/dev/null
+          if git cat-file -e 'HEAD^:governance/exp053' 2>/dev/null; then
+            base_had_governance=true
+          else
+            base_had_governance=false
+          fi
           if [ -d governance/exp053 ]; then
             test -f governance/exp053/exp053_admin_activation.py
             python -m unittest discover -s governance/exp053 -p 'test_exp053_*.py' -q
             python governance/exp053/EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
             python governance/exp053/exp053_admin_activation.py
+          elif [ "$base_had_governance" = true ]; then
+            echo 'Refusing removal of an already-adopted governance suite' >&2
+            exit 1
           else
-            echo 'EXP-053 governance not present in this pre-adoption checkout'
+            echo 'EXP-053 governance not present in pre-adoption base or checkout'
           fi
 
       - name: Build distributable wheel and source archive
