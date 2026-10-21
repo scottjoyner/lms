@@ -13,8 +13,12 @@ PR={'number':49,'state':'open','draft':False,'merged_at':None,
     'base':{'sha':BASE,'ref':'main',
             'repo':{'full_name':'scottjoyner/lms'}}}
 
+DOC={'filename':'governance/exp053/challenges/exp053-merge-denial-example.md',
+     'status':'added','additions':2,'deletions':0,'changes':2,
+     'patch':'@@ -0,0 +1,2 @@\\n+# EXP-053 governance challenge fixture\\n+No production or scientific content.'}
+
 class Fake:
-    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False):
+    def __init__(self, pr=None, rules=True, reviews=None, drift=False, review_drift=False, policy_drift=False, list_drift=False, mergeable_drift=False, files=None, file_drift=False):
         self.pr=copy.deepcopy(PR if pr is None else pr)
         self.rules=rules
         self.reviews=reviews if reviews is not None else []
@@ -28,6 +32,9 @@ class Fake:
         self.policy_drift=policy_drift
         self.list_drift=list_drift
         self.mergeable_drift=mergeable_drift
+        self.files=copy.deepcopy([DOC] if files is None else files)
+        self.file_drift=file_drift
+        self.file_reads=0
     def call(self,method,path,payload=None):
         if method!='GET' or payload is not None:
             raise AssertionError('Read-only preflight attempted a write')
@@ -44,6 +51,12 @@ class Fake:
         if path=='/rulesets/42':
             self.policy_reads+=1
             return {'id':42,'enforcement':'evaluate' if self.policy_drift and self.policy_reads>1 else 'active'}
+        if path.startswith('/pulls/49/files?'):
+            self.file_reads+=1
+            rows=copy.deepcopy(self.files)
+            if self.file_drift and self.file_reads>1:
+                rows.append({'filename':'unexpected.py'})
+            return rows
         if path.startswith('/pulls/49/reviews?'):
             self.review_reads+=1
             if self.review_drift and self.review_reads>1:
@@ -161,6 +174,50 @@ class Screening(unittest.TestCase):
         self.assertEqual(fake.review_reads,2)
         self.assertEqual(fake.policy_reads,2)
         self.assertEqual(fake.list_reads,2)
+
+    def test_program_code_change_rejected(self):
+        f=copy.deepcopy(DOC)
+        f['filename']='src/unsafe.py'
+        with self.assertRaisesRegex(ChallengeError,'file scope'):
+            screen(Fake(files=[f]),49,'main')
+
+    def test_multiple_changed_files_rejected(self):
+        with self.assertRaisesRegex(ChallengeError,'exactly one'):
+            screen(Fake(files=[DOC,DOC]),49,'main')
+
+    def test_existing_document_modified_not_disposable(self):
+        f=copy.deepcopy(DOC)
+        f['status']='modified'
+        with self.assertRaisesRegex(ChallengeError,'file scope'):
+            screen(Fake(files=[f]),49,'main')
+
+    def test_oversized_fixture_rejected(self):
+        f=copy.deepcopy(DOC)
+        f['additions']=24
+        f['changes']=24
+        with self.assertRaisesRegex(ChallengeError,'file scope'):
+            screen(Fake(files=[f]),49,'main')
+
+    def test_binary_or_missing_patch_rejected(self):
+        f=copy.deepcopy(DOC)
+        f.pop('patch')
+        with self.assertRaisesRegex(ChallengeError,'file scope'):
+            screen(Fake(files=[f]),49,'main')
+
+    def test_marker_missing_rejected(self):
+        f=copy.deepcopy(DOC)
+        f['patch']='@@ -0,0 +1 @@\\n+Unrelated notes'
+        with self.assertRaisesRegex(ChallengeError,'file scope'):
+            screen(Fake(files=[f]),49,'main')
+
+    def test_changed_file_roster_rejected(self):
+        with self.assertRaisesRegex(ChallengeError,'file inventory changed'):
+            screen(Fake(file_drift=True),49,'main')
+
+    def test_success_reads_fixture_twice(self):
+        f=Fake()
+        screen(f,49,'main')
+        self.assertEqual(f.file_reads,2)
 
 if __name__=='__main__':
     unittest.main()
