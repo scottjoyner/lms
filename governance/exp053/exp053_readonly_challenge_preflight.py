@@ -100,11 +100,17 @@ def screen(api, number, expected_base):
             not 0 < len(file['patch']) <= 2000 or
             '+# EXP-053 governance challenge fixture' not in file['patch']):
         raise ChallengeError('Challenge file scope/content markers are not isolated or bounded')
+    # A requested-changes review, even with no approvals, can independently
+    # block a merge. Require an entirely unreviewed isolated challenge.
     reviews = paginated(api, f'/pulls/{number}/reviews')
-    if any(not isinstance(r,dict) for r in reviews):
-        raise ChallengeError('Unrecognized review history')
-    if any(r.get('state') == 'APPROVED' for r in reviews):
-        raise ChallengeError('Already approved PR cannot establish missing-review denial')
+    if reviews:
+        raise ChallengeError('Challenge needs empty submitted review history')
+    # GitHub's review-thread resolution rule is another independent blocker.
+    # REST cannot authoritatively report thread resolution; zero inline review
+    # comments is a conservative necessary check, not a complete UI witness.
+    inline_comments = paginated(api, f'/pulls/{number}/comments')
+    if inline_comments:
+        raise ChallengeError('Challenge needs zero inline review comments')
     contexts=verified_evidence()['verified_successful_check_contexts']
     ci=audit_pr(GithubReadOnly(lambda route: api.call('GET',route)), number, contexts,
                 allow_isolated_challenge=True)
@@ -126,6 +132,9 @@ def screen(api, number, expected_base):
     reviews_after = paginated(api, f'/pulls/{number}/reviews')
     if reviews_after != reviews:
         raise ChallengeError('Review history changed during challenge audit')
+    inline_comments_after = paginated(api, f'/pulls/{number}/comments')
+    if inline_comments_after != inline_comments:
+        raise ChallengeError('Inline review comments changed during audit')
     installed_after = api.call('GET', f'/rulesets/{selected_id}')
     if installed_after != installed_before:
         raise ChallengeError('Active policy changed during challenge audit')
@@ -146,7 +155,8 @@ def screen(api, number, expected_base):
         'head_sha':head.get('sha'),'protected_base_sha':target_sha,
         'evaluated_ci_sha':ci['selected_commit_sha'],
         'ci_source':ci['checks_selected_from'],
-        'reviews_observed':len(reviews),'writes_performed':0,
+        'reviews_observed':len(reviews),'inline_review_comments_observed':len(inline_comments),
+        'writes_performed':0,
         'merge_denial_attested':False,'merge_action_performed':False,
         'governance_status':'NO_GO_GOVERNANCE',
         'scientific_status':'NO_GO_RESEARCH_ONLY'
