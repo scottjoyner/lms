@@ -186,6 +186,7 @@ def verify_current_required_checks(api, branches):
     expected = set(required)
     if len(required) != 5 or len(expected) != 5:
         raise ActivationError('Pinned required CI context list is incomplete')
+    validated_heads = {}
     for name in sorted(branches):
         if name != 'main' and not name.startswith('research/exp053'):
             continue
@@ -222,6 +223,7 @@ def verify_current_required_checks(api, branches):
         after = api.call('GET', path)
         if not isinstance(after, dict) or (after.get('commit') or {}).get('sha') != head:
             raise ActivationError('Branch head moved during CI preflight; no policy write')
+        validated_heads[name] = head
     # A target branch created or deleted during this multi-branch scan cannot
     # be certified by a snapshot that did not include it.
     refreshed = paginated(api, '/branches')
@@ -233,6 +235,7 @@ def verify_current_required_checks(api, branches):
                              and (name == 'main' or name.startswith('research/exp053')))
     if initial_targets != targets(refreshed):
         raise ActivationError('Target branch roster changed during CI preflight; no policy write')
+    return validated_heads
 
 
 def activate(api, confirmation):
@@ -240,7 +243,7 @@ def activate(api, confirmation):
         raise ActivationError('Exact administrator confirmation phrase is required')
     payload = verify_local()
     branches = preflight_api(api)
-    verify_current_required_checks(api, branches)
+    validated_heads = verify_current_required_checks(api, branches)
     # A multi-branch CI scan is long enough for a second administrator to add
     # a ruleset or modify the target roster. Recheck both immediately before
     # the only permitted POST. These GETs narrow, but cannot eliminate, the
@@ -248,6 +251,16 @@ def activate(api, confirmation):
     refreshed_branches = preflight_api(api)
     if sorted(branches) != sorted(refreshed_branches):
         raise ActivationError('Target branch roster changed before policy POST; no write')
+    # All original heads passed CI, but the branch roster can be unchanged
+    # while an existing target is advanced or its protection state changes.
+    # Re-read all target refs and refuse the POST if ANY is stale.
+    for name, validated_head in sorted(validated_heads.items()):
+        current = api.call('GET', '/branches/' + quote(name, safe=''))
+        if (not isinstance(current, dict) or current.get('name') != name
+                or current.get('protected') is not False
+                or (current.get('commit') or {}).get('sha') != validated_head):
+            raise ActivationError(
+                'Target branch head/protection changed before policy POST; no write')
     # Exactly one write. If the response is uncertain do NOT retry the POST.
     created = api.call('POST', '/rulesets', payload)
     identifier = created.get('id') if isinstance(created,dict) else None
