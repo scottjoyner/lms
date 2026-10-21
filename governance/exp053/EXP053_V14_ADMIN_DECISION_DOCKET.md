@@ -31,6 +31,33 @@ A decision to **REVISE** any material rule means the immutable candidate is supe
 5. An independent human uses the V9–V13 [negative merge-denial protocol](EXP053_V9_NEGATIVE_MERGE_CHALLENGE_HANDOFF.md): two otherwise mergeable **non-draft** harmless fixture PRs, one against `main` and one representative protected research branch, with passing required checks. Capture GitHub's *specific lack-of-human-approvals* refusal, without invoking Merge or enabling auto-merge. Capture current SHA, observed ruleset ID, human identity, screenshots/evidence digest in separately controlled storage. Draft PRs #37–#46 **cannot** serve as negative challenges.
 6. Nominate and request actual human review on exact draft PR heads only when the independent review gate exists. Keep the draft PRs unmerged until genuine approvals and policy-readback evidence are recorded. Any merge must be a separate authorized maintainer decision.
 
+## V23 — make a pinned required check execute the governance suite
+
+**Previously discovered gap:** the separate `EXP-053 Governance Offline` workflow is
+path-filtered and its `governance-offline` job is **not** among the five status
+contexts in the immutable proposed ruleset. Those five checks could have
+succeeded even if the governance-only workflow failed.
+
+The draft changes the existing **required** `CI / lint-and-test (3.12)` job:
+after its regular test suite, when `governance/exp053` is present in the PR
+checkout, it runs the full offline `test_exp053_*.py` unittest discovery,
+pinned policy candidate validator, and **zero-write** administrator dry run.
+The normal shell exit code gates the existing `lint-and-test (3.12)` check:
+a governance test failure fails that already-proposed required check.
+This avoids making the path-filtered governance job a sixth required check
+that could be absent on unrelated changes.
+
+**Scope and limitations:** the source workflow itself must be present on the
+target protected branch after a separately authorized merge; this draft alone
+does not change the checks configured on `main` or the existing research
+branches. The step deliberately skips the governance gate on a checkout where
+the governance directory has *not yet been adopted* (as on baseline `main`);
+deleting or altering workflows/files in a later PR remains a possible bypass
+subject to independent human review, not a tamper-resistant external check.
+An actual installation still requires administrator acceptance, active
+effective rules, an independent negative merge challenge, and human reviews.
+Neither candidate JSON nor its SHA-256 pin is changed.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
