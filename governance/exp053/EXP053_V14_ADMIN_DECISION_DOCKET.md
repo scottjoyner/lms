@@ -92,6 +92,31 @@ adoption, refusal of suite deletion, continued runs after adoption, refusal
 of incomplete new suites, and refusal of missing parent history. No actual
 GitHub operation, science run or production write is performed.
 
+## V26 — retain adopted governance test modules in the required check
+
+V24 detected complete removal of the governance directory, but Python
+`unittest discover` exits successfully when **zero tests are discovered**.
+An attempted deletion of individual `test_exp053_*.py` files could therefore
+leave the existing required `lint-and-test (3.12)` job green, even after
+governance tests had been adopted on the target base.
+
+The draft required job now requires at least one local `test_exp053_*.py`
+module wherever the governance directory exists. If the target/base parent
+already contains governance, the job inventories every `test_exp053_*.py`
+module from its exact Git tree and refuses to proceed if **any** adopted
+test file is absent from the candidate checkout. It also refuses an
+already-adopted base with no tests. Three additional disposable Git-history
+tests cover removing the last module, removing only one of two adopted
+modules, and adopting a new governance directory without test files.
+The test suite is still discovery-based, so new test modules are included.
+
+This checks **module presence**, not immutable module contents: source files,
+tests and the CI workflow itself remain changeable by a source PR. The
+protected branch must first adopt the CI workflow, and independently
+authorized reviewer approvals and effective live GitHub rules remain required.
+The candidate policy hash is unchanged; V26 grants no admin or research
+authorization and performs no GitHub settings write or merge.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
