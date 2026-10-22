@@ -27,7 +27,7 @@ def screen(api, number, expected_base):
         raise ChallengeError('Existing EXP-053 PRs cannot be disposable challenge probes')
     found = paginated(api, '/rulesets?includes_parents=true')
     candidate = [r for r in found if isinstance(r,dict) and
-                 r.get('name') == 'EXP-053 require independent human review and verified CI'
+                 r.get('name') == 'EXP-053 require pull requests and pinned CI (zero approvals)'
                  and r.get('enforcement') == 'active' and r.get('target') == 'branch']
     if len(candidate) != 1:
         raise ChallengeError('Named active ruleset is not present exactly once')
