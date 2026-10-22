@@ -182,6 +182,34 @@ The candidate JSON and pinned SHA-256 are unchanged, and the installer
 defaults to zero-write dry-run. Neither this code nor CI green authorizes
 policy creation, a source merge, licensed corpus analysis or model inference.
 
+## V34 — retain real two-parent pull-request merge ancestry regression
+
+V33 verified GitHub's generated pull-request merge commit for draft PR #48:
+its first parent was the target `main` head, and its second parent was
+the proposed PR head. Three temporary physical Git merge fixtures also
+executed the real required CI shell step, proving deletion safeguards work
+when `HEAD^` is the target first parent. Those disposable probes were not
+retained as tracked regressions.
+
+V34 adds **four permanent disposable two-parent DAG tests** in
+`test_exp053_ci_adoption_gate.py`. Each fixture commits an actual target
+snapshot and feature branch, creates a non-fast-forward merge, explicitly
+asserts `HEAD^` matches target and `HEAD^2` matches the feature, then
+executes the **current actual required CI run block** rather than a copied
+implementation. They require the pinned job to (1) refuse deletion of one
+already-adopted test module, (2) refuse deletion of the whole adopted suite,
+(3) allow first adoption of the complete suite, and (4) keep running the
+test/validator/admin dry-runs when already adopted governance remains.
+Both temporary Git author settings and files stay within disposable fixtures,
+with zero network/policy/model or production operations.
+
+This is a persistent regression of Git ancestry semantics, **not proof of
+active GitHub enforcement**. The actual GitHub merge commit witness remains
+a separate point-in-time observation, and protection rules are not present
+until independently authorized administrator activation and code adoption.
+The candidate ruleset digest, branch scope, reviewer custody requirements,
+and both NO-GO statuses remain unchanged.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
