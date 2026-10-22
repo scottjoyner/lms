@@ -354,6 +354,26 @@ and pinned SHA-256 unchanged. No reviewer invites, production writes,
 source merges or EXP-053 inference are authorized. Both
 `NO_GO_GOVERNANCE` and `NO_GO_RESEARCH_ONLY` remain binding.
 
+## V39 — match branch identity and verify snapshot stability
+
+The V38 read-only auditor could report verified metadata when the API
+returned the main branch object for a research branch request. The
+branch protected flag alone did not establish the target identity.
+Separate synthetic fixtures also exposed head/protection drift across
+a multi-branch audit and malformed commit metadata.
+
+V39 requires each branch response name to equal the requested ref and
+each commit SHA to be a valid forty-character lowercase hexadecimal
+digest. It reads the 12 target branches a second time after effective
+rules are inspected. Identity, protection and SHA must remain equal
+to the first observation, otherwise the audit remains NO_GO.
+Four tests cover the distinct negative outcomes.
+
+This adds read-only GitHub requests and may increase rate-limit failures.
+It cannot make a multi-request snapshot atomic, establish human consent,
+or witness a blocked merge. No proposed policy bytes changed, and the
+governance and scientific release holds remain in effect.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
