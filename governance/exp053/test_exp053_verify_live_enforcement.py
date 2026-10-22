@@ -23,6 +23,11 @@ class FakeServer:
         self.rewrite_app=False
         self.wrong_source=False
         self.duplicate_context=False
+        self.extra_installed_context=False
+        self.extra_effective_context=False
+        self.duplicate_installed_ci_rule=False
+        self.duplicate_effective_ci_rule=False
+        self.reorder_contexts=False
         self.foreign_effective=False
         self.wrong_effective_id=False
         self.mutate_policy_after=False
@@ -48,6 +53,16 @@ class FakeServer:
                 data['source']='different-owner/different-repo'
             if not self.bypass_visibility:
                 del data['bypass_actors']
+            if self.extra_installed_context:
+                data['rules'][1]['parameters']['required_status_checks'].append(
+                    {'context':'unapproved-extra-required-job','integration_id':15368})
+            if self.duplicate_installed_ci_rule:
+                data['rules'].append({'type':'required_status_checks',
+                                     'parameters':{'strict_required_status_checks_policy':True,
+                                      'required_status_checks':[
+                                          {'context':'unapproved-extra-required-job','integration_id':15368}]}})
+            if self.reorder_contexts:
+                data['rules'][1]['parameters']['required_status_checks'].reverse()
             return data
         if path=='/branches':
             self.branch_listings += 1
@@ -69,6 +84,16 @@ class FakeServer:
                 rules=[x for x in rules if x['type']!='required_status_checks']
             if self.duplicate_context:
                 rules[1]['parameters']['required_status_checks'].append(copy.deepcopy(rules[1]['parameters']['required_status_checks'][0]))
+            if self.extra_effective_context:
+                rules[1]['parameters']['required_status_checks'].append(
+                    {'context':'unapproved-extra-required-job','integration_id':15368})
+            if self.duplicate_effective_ci_rule:
+                rules.append({'type':'required_status_checks',
+                              'parameters':{'strict_required_status_checks_policy':True,
+                               'required_status_checks':[
+                                   {'context':'unapproved-extra-required-job','integration_id':15368}]}})
+            if self.reorder_contexts:
+                rules[1]['parameters']['required_status_checks'].reverse()
             if self.rewrite_app:
                 rules[1]['parameters']['required_status_checks'][0]['integration_id']=1
             for rule in rules:
@@ -123,6 +148,44 @@ class EnforcementTests(unittest.TestCase):
         server=FakeServer();server.rewrite_app=True
         report=Audit(server).run()
         self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_extra_installed_status_context_must_fail_exact_policy(self):
+        server=FakeServer()
+        server.extra_installed_context=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='installed_policy.checks')['ok'])
+
+    def test_extra_effective_status_context_must_fail_exact_policy(self):
+        server=FakeServer()
+        server.extra_effective_context=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='effective:main.checks')['ok'])
+
+    def test_extra_installed_status_rule_cannot_hide_unapproved_required_job(self):
+        server=FakeServer()
+        server.duplicate_installed_ci_rule=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='installed_policy.checks')['ok'])
+
+    def test_extra_effective_status_rule_cannot_hide_unapproved_required_job(self):
+        server=FakeServer()
+        server.duplicate_effective_ci_rule=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='effective:main.checks')['ok'])
+
+    def test_harmless_reordering_of_five_contexts_does_not_fail(self):
+        server=FakeServer()
+        server.reorder_contexts=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'POLICY_METADATA_VERIFIED')
 
     def test_nested_branch_not_covered_by_wildcard(self):
         server=FakeServer();server.names.append('research/exp053-nested/extra')
