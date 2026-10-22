@@ -13,6 +13,10 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Fetch the first parent of the PR test merge commit so the required
+          # 3.12 job can detect removal of an already-adopted governance suite.
+          fetch-depth: 2
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -34,6 +38,58 @@ jobs:
         env:
           # No live Neo4j in CI; graph-sync smoke tests mock the driver.
           NEO4J_PASSWORD: ""
+
+      # This job's Python 3.12 result is one of the five pinned required
+      # GitHub check contexts. The separate EXP-053 governance workflow uses
+      # a path filter and is NOT itself required by the candidate ruleset.
+      - name: EXP-053 offline governance gate (when present in checkout)
+        if: matrix.python-version == '3.12'
+        run: |
+          # On pull_request, HEAD^ is the protected target/base parent of
+          # GitHub's test-merge commit. Fail closed if the checkout is shallow.
+          git rev-parse --verify 'HEAD^' >/dev/null
+          if git cat-file -e 'HEAD^:governance/exp053' 2>/dev/null; then
+            base_had_governance=true
+          else
+            base_had_governance=false
+          fi
+          if [ -d governance/exp053 ]; then
+            test -f governance/exp053/exp053_admin_activation.py
+            # unittest discovery passes when it discovers *zero* tests. Require
+            # actual test modules, and retain every module adopted by the base.
+            shopt -s nullglob
+            current_tests=(governance/exp053/test_exp053_*.py)
+            if [ "${#current_tests[@]}" -eq 0 ]; then
+              echo 'Refusing governance suite with zero test modules' >&2
+              exit 1
+            fi
+            if [ "$base_had_governance" = true ]; then
+              base_test_count=0
+              while IFS= read -r baseline_file; do
+                case "$baseline_file" in
+                  governance/exp053/test_exp053_*.py)
+                    base_test_count=$((base_test_count + 1))
+                    if [ ! -f "$baseline_file" ]; then
+                      echo "Refusing removal of adopted governance test: $baseline_file" >&2
+                      exit 1
+                    fi
+                    ;;
+                esac
+              done < <(git ls-tree -r --name-only 'HEAD^' -- governance/exp053)
+              if [ "$base_test_count" -eq 0 ]; then
+                echo 'Refusing adopted base with zero governance test modules' >&2
+                exit 1
+              fi
+            fi
+            python -m unittest discover -s governance/exp053 -p 'test_exp053_*.py' -q
+            python governance/exp053/EXP053_validate_ruleset_candidate_2026-10-20.py --dry-run
+            python governance/exp053/exp053_admin_activation.py
+          elif [ "$base_had_governance" = true ]; then
+            echo 'Refusing removal of an already-adopted governance suite' >&2
+            exit 1
+          else
+            echo 'EXP-053 governance not present in pre-adoption base or checkout'
+          fi
 
       - name: Build distributable wheel and source archive
         run: python -m build --no-isolation --wheel --sdist --outdir dist

@@ -1,0 +1,96 @@
+{
+  "baseline": {
+    "main_protected": false,
+    "merge_exemption_granted": false,
+    "repository_rulesets_returned": 0,
+    "requested_reviewers_on_draft_prs": 0,
+    "research_exp053_branches": [
+      "research/exp053-aggregate-fd-review-20261019",
+      "research/exp053-execution-evidence-ancestor-review-20261020",
+      "research/exp053-operator-journal-ancestors-review-20261020",
+      "research/exp053-owner-roster-read-review-20261019",
+      "research/exp053-private-admission-source-review-20261019",
+      "research/exp053-private-writer-ancestor-review-20261019",
+      "research/exp053-race-human-review-gate-20261016",
+      "research/exp053-replay-pinned-receipts-review-20261019",
+      "research/exp053-scorer-json-numeric-review-20261020",
+      "research/exp053-sealed-scope-review-20261019",
+      "research/exp053-source-fd-cohort-review-20261019"
+    ],
+    "scientific_authorization": "NO_GO_RESEARCH_ONLY",
+    "submitted_reviews_on_draft_prs": 0
+  },
+  "caveats": [
+    "Context names and source are point-in-time observations; rerun preflight before admin activation.",
+    "Active proposed ruleset is NOT installed.",
+    "No human reviewer nominated or approval submitted.",
+    "This does not authorize model inference or licensed research data use.",
+    "Rulesets can be scoped and supported features vary by plan; verify with actual GitHub UI and admin authorization."
+  ],
+  "check_contexts_verified_at": [
+    {
+      "branch_or_pr": "main",
+      "sha": "1f64776b3b31c581f88635a5ed3bc2a98a48f0c4"
+    },
+    {
+      "branch_or_pr": "PR #37",
+      "sha": "8244ece960a93fe02a97a9ed3451581e3c137286"
+    },
+    {
+      "branch_or_pr": "PR #38",
+      "sha": "68ffb084cec264330c488482ae447b4de063f697"
+    },
+    {
+      "branch_or_pr": "PR #39",
+      "sha": "0a473861fc8306728d3a62ab93919aed3513a356"
+    },
+    {
+      "branch_or_pr": "PR #40",
+      "sha": "8ed7a6b06b33efc625acae2f3068805c6986b865"
+    },
+    {
+      "branch_or_pr": "PR #41",
+      "sha": "0de5117178581310e697b2a8e05228f75a56f2a3"
+    },
+    {
+      "branch_or_pr": "PR #42",
+      "sha": "d96f66cacd8eb3f35644c88ee25de28a0a150550"
+    },
+    {
+      "branch_or_pr": "PR #43",
+      "sha": "54330c12718cd910ffe23001783be64d53a544e4"
+    },
+    {
+      "branch_or_pr": "PR #44",
+      "sha": "1085a7427eabfd33140fe52d5c3d397f870a1efd"
+    },
+    {
+      "branch_or_pr": "PR #45",
+      "sha": "afbc1f9090b79c57c1eaff4436b261402cd2a42d"
+    },
+    {
+      "branch_or_pr": "PR #46",
+      "sha": "e74a6f1492973cfbf915578a30cba051aadbd2dd"
+    }
+  ],
+  "check_source": {
+    "app_id": 15368,
+    "app_slug": "github-actions"
+  },
+  "default_branch": "main",
+  "github_api_sources": [
+    "GET /repos/scottjoyner/lms/branches/main",
+    "GET /repos/scottjoyner/lms/branches?per_page=100&page=1",
+    "GET /repos/scottjoyner/lms/rulesets",
+    "GET /repos/scottjoyner/lms/commits/{sha}/check-runs?per_page=100"
+  ],
+  "observation_date": "2026-10-20",
+  "repository": "scottjoyner/lms",
+  "verified_successful_check_contexts": [
+    "lint-and-test (3.12)",
+    "focused-tests (3.12)",
+    "qualification-tests (3.12)",
+    "operational-failure-injection (3.12)",
+    "prompt-cache-tests (3.10)"
+  ]
+}
