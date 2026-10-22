@@ -310,6 +310,50 @@ witnessed negative missing-approval merge refusal. No reviewer was
 invited, no real policy POST or merge occurred, and scientific execution
 remains disallowed.
 
+## V38 — fail closed on additional or inherited effective rulesets
+
+A separate read-only adversarial test of the V37 live-enforcement auditor
+revealed **three independent false-positive paths**. When the pinned
+EXP-053 ruleset was otherwise intact, (1) a second **active repository
+ruleset** with a different name, (2) an unapproved effective
+`required_deployments` rule from a separate repository ruleset, or
+(3) an inherited effective rule from an organization-level policy
+could each leave the final report at `POLICY_METADATA_VERIFIED`.
+This happened because the verifier deliberately selected only the
+correctly named policy and filtered its own rules, ignoring additional
+rules that might prevent merges. The real installation preflight already
+rejects overlapping rulesets, so accepting their presence in later
+enforcement verification would violate the proposed rollout contract.
+
+V38 requires exactly **one visible repository/parent ruleset**, matching
+the pinned repository policy ID, and rejects any additional active or
+inactive rule inventory entry pending human review. For every target
+branch, the entire returned effective-rule collection must trace to
+that exact policy ID, repository origin and source type; missing or
+foreign provenance cannot silently certify a mixed policy.
+The read-only audit now re-enumerates the repository/parent ruleset
+inventory at the **end** of the multi-branch scan as well as the
+beginning. A change to membership or reported ruleset fields is
+`NO_GO_GOVERNANCE` even if the selected pinned policy is unchanged;
+reordering inventory entries by GitHub is harmless.
+
+Four permanent negative tests reproduce these paths and late
+insertion of a second ruleset during the scan, all failing against the
+earlier audit and passing with this implementation. The test transport
+uses only synthetic GitHub responses; no real policy is installed or
+changed. When an organization or other administrator legitimately
+requires additional effective policy, this precise candidate must be
+re-reviewed and the compatibility/audit contract changed *with actual
+human authorization*, rather than silently accepting unexpected
+merge blockers.
+
+This audit verifies **API metadata only** and may still lack
+administrative visibility or human witnessing; real enforcement and
+negative merge denial remain separate gates. Ruleset candidate bytes
+and pinned SHA-256 unchanged. No reviewer invites, production writes,
+source merges or EXP-053 inference are authorized. Both
+`NO_GO_GOVERNANCE` and `NO_GO_RESEARCH_ONLY` remain binding.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
