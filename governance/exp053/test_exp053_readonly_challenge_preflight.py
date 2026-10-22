@@ -50,7 +50,7 @@ class Fake:
             self.list_reads+=1
             if not self.rules:
                 return []
-            items=[{'name':'EXP-053 require independent human review and verified CI',
+            items=[{'name':'EXP-053 require pull requests and pinned CI (zero approvals)',
                       'enforcement':'active','target':'branch','id':42}]
             if self.list_drift and self.list_reads>1:
                 items.append({'id':43,'name':'unexpected ruleset'})
