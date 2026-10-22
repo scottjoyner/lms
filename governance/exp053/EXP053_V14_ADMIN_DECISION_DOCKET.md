@@ -1,3 +1,5 @@
+> **V40 OVERRIDE (2026-10-22):** Repository owner withdrew the two-reviewer requirement. Current policy is **zero required GitHub approvals**, with PR/CI/branch-integrity guards retained. See [current operator policy](README.md). Earlier two-reviewer and missing-approval negative-challenge instructions below are historical only. Scientific release gates remain independent.
+
 # EXP-053 — administrator policy decision docket (V14)
 
 **Proposal only; no administrative approval is implied.** Repository: [scottjoyner/lms](https://github.com/scottjoyner/lms). Tracks [governance #47](https://github.com/scottjoyner/lms/issues/47), [draft governance PR #48](https://github.com/scottjoyner/lms/pull/48), and the separate [scientific issue #31](https://github.com/scottjoyner/lms/issues/31).
