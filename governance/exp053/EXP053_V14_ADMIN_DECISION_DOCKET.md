@@ -210,6 +210,34 @@ until independently authorized administrator activation and code adoption.
 The candidate ruleset digest, branch scope, reviewer custody requirements,
 and both NO-GO statuses remain unchanged.
 
+## V35 — distinguish anonymous API quota exhaustion from denial
+
+On 2026-10-22 the actual read-only `exp053_verify_live_enforcement.py`
+auditor initially returned a generic `GET returned HTTP 403`. A separate
+anonymous GET of GitHub's `/rate_limit` endpoint confirmed
+`X-RateLimit-Remaining: 0`. An unauthenticated rate limit is **missing
+evidence**, not a conclusive permissions failure, and it is never evidence
+of enforcement success.
+
+V35 updates this GET-only auditor to report
+`RATE_LIMITED_READ_ONLY` when GitHub responds with HTTP 403 and remaining
+quota zero, or with HTTP 429. It includes the reset epoch **only** if it is
+a short decimal integer; untrusted diagnostic headers, requester details
+and response bodies are not printed. HTTP 403 with positive remaining quota
+still reports an ordinary access failure. Four negative transport tests
+cover quota exhaustion, genuine 403 denial, explicit 429, and adversarial
+sensitive reset-header values; all remain fail-closed.
+
+An additional real, read-only live enforcement run later the same day
+succeeded **without any administrative writes**, inspecting **all 12**
+target branches. Its evidence shows **zero visible repo/parent rulesets**
+and each target branch `protected=false`, with empty effective rule
+collections. The reporter returned **`NO_GO_GOVERNANCE`, exit 2**.
+This is an affirmative snapshot of *absent enforcement*, not an
+authorization to change the ruleset. Any future policy installation still
+requires the independently approved human review and admin steps.
+`NO_GO_RESEARCH_ONLY` remains binding.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
