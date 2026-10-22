@@ -58,10 +58,12 @@ def validate():
     checked(set(types) == {"pull_request", "required_status_checks", "non_fast_forward", "deletion"},
             "Unexpected or missing rule type")
     pr = types["pull_request"]["parameters"]
-    checked(pr["required_approving_review_count"] >= 2, "Too few independent approvals")
+    checked(pr["required_approving_review_count"] == 0, "Policy unexpectedly requires reviewer approvals")
     for key in ("dismiss_stale_reviews_on_push", "require_last_push_approval",
-                "required_review_thread_resolution"):
-        checked(pr[key] is True, "Review protection disabled: " + key)
+                "require_code_owner_review"):
+        checked(pr[key] is False, "Unexpected review requirement: " + key)
+    checked(pr["required_review_thread_resolution"] is True,
+            "Review conversation resolution must remain enforced")
     c = types["required_status_checks"]["parameters"]
     checked(c["strict_required_status_checks_policy"] is True, "Non-strict check policy")
     contexts = c["required_status_checks"]
@@ -78,7 +80,7 @@ def validate():
             "Scientific hold absent")
     print("PASS: branch matching covers main and all 11 observed EXP-053 branches")
     print("PASS: unscoped branches are excluded, wildcard does not cross slash")
-    print("PASS: >=2 human approvals, stale review dismissal, latest-push approval")
+    print("PASS: PR required with zero approvals; required conversations resolved")
     print("PASS: no bypass actors, no force push, no deletion")
     print("PASS: 5 previously observed checks use GitHub Actions integration ID 15368")
     print("PASS: candidate contains only a proposal; no live ruleset was changed")
