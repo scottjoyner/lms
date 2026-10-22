@@ -24,7 +24,7 @@ BASE = Path(__file__).resolve().parent
 CANDIDATE = BASE / 'EXP053_github_ruleset_candidate_2026-10-20.json'
 EVIDENCE = BASE / 'EXP053_ruleset_validation_evidence_2026-10-20.json'
 API_VERSION = '2022-11-28'
-CANDIDATE_SHA256 = '461c6bd54985f4c1b0523788d3dd56216ff061b8f27a9c5136f561d781012efd'
+CANDIDATE_SHA256 = '259cd2b7fa7ec40faba9f8f5a7b7cd660307e2e296be0f92214a1aced2925f35'
 EVIDENCE_SHA256 = 'dfc303135946a57064597b9097c80cdcbdb471959e6afd61d92bf45113a6a599'
 EXPECTED_CONTEXTS = (
     'lint-and-test (3.12)', 'focused-tests (3.12)',
@@ -131,8 +131,8 @@ class Audit:
             actual = rule.get('parameters')
             if not isinstance(actual, dict):
                 return False
-            # A requirement for three rather than two approving reviewers,
-            # code-owner review, or narrowed merge methods may deadlock merges.
+            # Any new approval demand, code-owner review, or narrowed merge
+            # methods can deadlock a no-review merge workflow.
             # Each pinned semantic parameter must have the *approved* value.
             for key, wanted in pinned_review.items():
                 value = actual.get(key)
@@ -149,7 +149,7 @@ class Audit:
         pr_ok = (shape_ok and len(pr_rules) == 1
                  and pinned_review_matches(pr_rules[0]))
         self.record(pr_ok, prefix+'.reviews',
-                    'Exact pinned approval count, review safeguards and allowed merge methods')
+                    'Zero required approvals, exact pinned review settings and allowed merge methods')
         pinned_checks = next(r for r in candidate['rules']
                              if r['type'] == 'required_status_checks')['parameters']
         expected = {r['context']: r['integration_id'] for r in
