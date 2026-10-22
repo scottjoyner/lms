@@ -189,3 +189,116 @@ def test_safe_action_does_not_recommend_restart_or_swap_clear(trees):
     assert "Do not clear swap" in action
     assert "64 GiB RAM upgrade" in action
     assert not result["model_launch_allowed"]
+
+
+def test_series_two_samples_detects_changed_memory_without_claiming_cause(trees):
+    proc, cg = trees
+    slept = []
+
+    def change_at_interval(seconds):
+        slept.append(seconds)
+        old = (proc / "meminfo").read_text()
+        updated = old.replace("MemAvailable:   3090732", "MemAvailable:   4090732")
+        updated = updated.replace("Shmem:         2281208", "Shmem:         1181208")
+        (proc / "meminfo").write_text(updated)
+        (cg / "memory.stat").write_text(
+            f"shmem {1181208*1024}\nanon 0\n"
+        )
+        (cg / "user.slice/memory.stat").write_text(
+            f"shmem {159*2**20}\nanon 0\n"
+        )
+        (cg / "user.slice/user-1001.slice/joyner-lane.service/memory.stat").write_text(
+            f"shmem {159*2**20}\nanon 0\n"
+        )
+
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="joyner",
+        samples=2, interval_seconds=3, sleeper=change_at_interval,
+    )
+    assert result["status"] == "READ_ONLY_OBSERVATION"
+    assert result["samples_taken"] == 2
+    assert slept == [3]
+    assert result["delta_first_to_last"]["available_gib"] > 0
+    assert result["delta_first_to_last"]["shmem_mib"] < 0
+    assert result["cause_attribution"] == "NOT_PROVEN"
+    assert not result["model_launch_allowed"]
+    assert result["production_admission"] == "NO_GO"
+    assert "No memory ownership" in result["interpretation"]
+
+
+def test_missing_lane_reports_null_delta_not_zero(trees):
+    proc, cg = trees
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="joyner",
+        samples=1, interval_seconds=0, sleeper=lambda _: None,
+    )
+    assert result["samples_taken"] == 1
+    assert result["delta_first_to_last"]["available_gib"] == 0
+    assert result["samples"][0]["lane_1236_shmem_mib"] is None
+    assert result["delta_first_to_last"]["lane_1236_shmem_mib"] is None
+
+
+def test_incomplete_second_sample_returns_no_success_payload(trees):
+    proc, cg = trees
+
+    def fail_second(_):
+        (proc / "pressure/memory").write_text("")
+
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="joyner",
+        samples=2, interval_seconds=0, sleeper=fail_second,
+    )
+    assert result["status"] == "INCOMPLETE"
+    assert result["samples_taken"] == 1
+    assert result["model_launch_allowed"] is False
+    assert result["production_admission"] == "NO_GO"
+    assert "delta_first_to_last" not in result
+
+
+def test_wrong_host_refuses_sampling_without_sleep(trees):
+    proc, cg = trees
+    seen = []
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="control",
+        samples=3, interval_seconds=1, sleeper=seen.append,
+    )
+    assert result["status"] == "INCOMPLETE"
+    assert result["samples_taken"] == 0
+    assert not seen
+
+
+@pytest.mark.parametrize(
+    "count,seconds",
+    [(0, 1), (4, 1), (True, 1), ("2", 1), (2, -1), (2, 11),
+     (2, float("inf")), (2, float("nan")), (2, "1"), (2, True)],
+)
+def test_invalid_or_unbounded_sampling_options_fail(count, seconds, trees):
+    proc, cg = trees
+    with pytest.raises(ValueError):
+        triage.collect_bounded_series(
+            proc_root=proc, cgroup_root=cg, target_host="joyner",
+            samples=count, interval_seconds=seconds, sleeper=lambda _: None,
+        )
+
+
+def test_three_sample_cap_runs_only_two_intervals(trees):
+    proc, cg = trees
+    seen = []
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="joyner",
+        samples=3, interval_seconds=0.1, sleeper=seen.append,
+    )
+    assert result["samples_taken"] == 3
+    assert seen == [0.1, 0.1]
+    assert len(result["samples"]) == 3
+    assert result["production_admission"] == "NO_GO"
+
+
+def test_series_helper_never_blames_server(trees):
+    proc, cg = trees
+    result = triage.collect_bounded_series(
+        proc_root=proc, cgroup_root=cg, target_host="joyner",
+        samples=2, interval_seconds=0, sleeper=lambda _: None,
+    )
+    assert result["interpretation"].find("leak") >= 0
+    assert result["last_full_snapshot"]["cause_attribution"] == "NOT_PROVEN"

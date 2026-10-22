@@ -32,3 +32,53 @@ Memory cgroup `memory.stat` values are **hierarchical**. Never sum a parent and 
 The report fails closed for missing kernel counters, inconsistent memory/swap and missing PSI. It does not provide a `GO` path or benchmark authorization even when capacity later passes. The motherboard/RAM physical acceptance and independent model execution authorization remain separate.
 
 **Safe next gate:** authorized physical DIMM inventory and compatible matched 2×32 GiB DDR5 UDIMM upgrade, memory stability tests, `>=60 GiB` OS-visible capacity and `>=8 GiB` available headroom, then an operator-approved isolated R9700 maintenance window. Review the source and full integrity evidence in [LMS issue #51](https://github.com/scottjoyner/lms/issues/51) and publisher-security boundaries in [Auto-Router PR #80](https://github.com/scottjoyner/auto-router/pull/80).
+
+## Bounded temporal observations — October 22, 2026, 09:54 EDT
+
+Single screenshots of kernel shared memory, cgroup charges and available
+RAM may change substantially over hours. This is especially important for
+Joyner, where available RAM and the 1236 lane's cgroup `shmem` charge had
+changed overnight without any model or swap intervention by this research.
+
+The diagnostic now supports **at most three immediate read-only samples**,
+with a **0–10 second interval** (default 3 seconds), and reports bounded
+first-to-last deltas without inventing causal attribution. The CLI does not
+schedule future checks, monitor in the background or require a daemon.
+
+Run only on Joyner, via the already established SSH channel:
+
+```bash
+cat scripts/r9700_memory_attribution.py |
+  ssh -o BatchMode=yes -o StrictHostKeyChecking=yes joyner \
+    python3 - --samples 2 --interval-seconds 3
+```
+
+The output includes a summary per sample, a last full snapshot and explicit
+first-to-last changes for `MemAvailable`, kernel `Shmem`, swap used,
+kernel PSI, unmatched *visible* top-level cgroup shmem and the single named
+`joyner-lane-1236.service` charge when available. Missing lane readings are
+**null**, not presumed zero. Host mismatch or incomplete samples fail closed.
+Test coverage increased from 15 to **31** without opening the GPU or issuing
+any inference request.
+
+**Actual two-sample physical result:**
+- At both observations, ~4.07 GiB available RAM, ~1,110.47 MiB kernel
+  shared memory, ~3.98 GiB swap used.
+- `joyner-lane-1236.service` shared-memory charge ~159.25 MiB.
+- Root shmem aggregate minus visible immediate top-level child charges
+  ~929.60 MiB, **not uniquely assigned to a process or service**.
+- PSI memory 60-second `some` average **0.0%**.
+- During this three-second period all these readings were nearly unchanged
+  (available RAM delta -0.001 GiB). That is a short observation, not
+  evidence of sustained stability or a causal explanation.
+
+**Important interpretation:** At the 07:24 observation, Joyner had ~2.95 GiB
+available and kernel Shmem ~2.18 GiB; by the later observation,
+available RAM was ~4.07 GiB and Shmem ~1.08 GiB. No intervention in this
+session caused that difference, but natural workload variation and kernel
+accounting could explain it. Do not assert a diagnosed leak, leaked GPU
+weights, service misbehavior or a validated memory-optimization benefit.
+
+All results retain `model_launch_allowed=false` and
+`production_admission=NO_GO`; the physical 64 GiB RAM installation and
+approved maintenance window remain prerequisite to IQ3_S testing.

@@ -12,6 +12,8 @@ import argparse
 import json
 import re
 import socket
+import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -232,12 +234,119 @@ def collect(
     }
 
 
+
+def _lane_shmem_mib(result: dict, name: str = "joyner-lane-1236.service") -> float | None:
+    group = result.get("cgroup_shared_memory", {})
+    matches = [
+        x["shmem_mib"] for x in group.get("top_consumers", [])
+        if x.get("cgroup", "").endswith("/" + name)
+    ]
+    return matches[0] if len(matches) == 1 else None
+
+
+def _sample_summary(result: dict) -> dict:
+    mem = result.get("observed_memory", {})
+    cg = result.get("cgroup_shared_memory", {})
+    return {
+        "time_utc": result.get("time_utc"),
+        "available_gib": mem.get("available_gib"),
+        "shmem_mib": mem.get("shmem_mib"),
+        "swap_used_gib": mem.get("swap_used_gib"),
+        "psi_some_avg60": mem.get("memory_psi", {}).get("some", {}).get("avg60"),
+        "visible_top_level_unattributed_mib": cg.get("top_level_unattributed_mib"),
+        "lane_1236_shmem_mib": _lane_shmem_mib(result),
+    }
+
+
+def _bounded_delta(before: dict, after: dict) -> dict:
+    deltas = {}
+    for field in (
+        "available_gib", "shmem_mib", "swap_used_gib",
+        "psi_some_avg60", "visible_top_level_unattributed_mib",
+        "lane_1236_shmem_mib",
+    ):
+        a, b = before.get(field), after.get(field)
+        deltas[field] = (
+            round(b - a, 3)
+            if type(a) in (int, float) and type(b) in (int, float)
+            else None
+        )
+    return deltas
+
+
+def collect_bounded_series(
+    *, proc_root: Path = Path("/proc"),
+    cgroup_root: Path = Path("/sys/fs/cgroup"),
+    target_host: str | None = None,
+    samples: int = 2,
+    interval_seconds: float = 3,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> dict:
+    """Observe at most three current snapshots; never infer cause or authorization."""
+    if type(samples) is not int or not 1 <= samples <= 3:
+        raise ValueError("sample count must be 1, 2, or 3")
+    if (type(interval_seconds) not in (int, float)
+            or not 0 <= interval_seconds <= 10):
+        raise ValueError("interval must be in 0..10 seconds")
+    observations = []
+    for i in range(samples):
+        if i:
+            sleeper(interval_seconds)
+        result = collect(
+            proc_root=proc_root, cgroup_root=cgroup_root, target_host=target_host,
+        )
+        if result.get("status") != "READ_ONLY_OBSERVATION":
+            return {
+                "schema": "r9700-readonly-memory-series.v1",
+                "status": "INCOMPLETE",
+                "samples_requested": samples,
+                "samples_taken": len(observations),
+                "cause_attribution": "NOT_PROVEN",
+                "production_admission": "NO_GO",
+                "model_launch_allowed": False,
+            }
+        observations.append(result)
+    first = _sample_summary(observations[0])
+    last = _sample_summary(observations[-1])
+    return {
+        "schema": "r9700-readonly-memory-series.v1",
+        "host_observed": "joyner",
+        "status": "READ_ONLY_OBSERVATION",
+        "samples_requested": samples,
+        "samples_taken": len(observations),
+        "interval_seconds": interval_seconds,
+        "samples": [_sample_summary(row) for row in observations],
+        "delta_first_to_last": _bounded_delta(first, last),
+        "last_full_snapshot": observations[-1],
+        "cause_attribution": "NOT_PROVEN",
+        "interpretation": (
+            "Bounded temporal change only; nested cgroup values overlap. "
+            "No memory ownership, leak, OOM or model performance is proven."
+        ),
+        "production_admission": "NO_GO",
+        "model_launch_allowed": False,
+    }
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--proc-root", type=Path, default=Path("/proc"))
     parser.add_argument("--cgroup-root", type=Path, default=Path("/sys/fs/cgroup"))
+    parser.add_argument(
+        "--samples", type=int, default=1, choices=(1, 2, 3),
+        help="Bounded 1–3 read-only snapshots (default one)",
+    )
+    parser.add_argument(
+        "--interval-seconds", type=float, default=3.0,
+        help="Seconds between snapshots; 0..10 inclusive",
+    )
     args = parser.parse_args(argv)
-    result = collect(proc_root=args.proc_root, cgroup_root=args.cgroup_root)
+    if args.samples == 1:
+        result = collect(proc_root=args.proc_root, cgroup_root=args.cgroup_root)
+    else:
+        result = collect_bounded_series(
+            proc_root=args.proc_root, cgroup_root=args.cgroup_root,
+            samples=args.samples, interval_seconds=args.interval_seconds,
+        )
     print(json.dumps(result, sort_keys=True, indent=2))
     return 0 if result["status"] == "READ_ONLY_OBSERVATION" else 2
 
