@@ -1,0 +1,5 @@
+service	kind	classification	preferred_target	stateful	stop_source_after_target_healthy	validation	rollback
+# Example rows below are templates only; replace with discovered local service names before execution.
+# assistx-api	docker	migratable	ryzen-395	false	true	http-health	start-source
+# nextcloud	docker	stateful-migrate	deathstar	true	true	http-health+storage-check	stop-target+start-source
+# neo4j	systemd	must-review	deathstar	true	false	bolt-query+db-count	manual

@@ -1,0 +1,7 @@
+candidate_id	model_id	intervention	scope	amount	calibration_set	quality_gate	status	notes
+baseline	*	none	all	0	coding-agent-mixed-v1	1.000	planned	unmodified reference
+cold-expert-2p5	*	expert-zero-mask	activation-ranked	0.025	coding-agent-mixed-v1	0.990	planned	reversible ablation first
+cold-expert-5	*	expert-zero-mask	activation-ranked	0.050	coding-agent-mixed-v1	0.990	planned	reversible ablation first
+cold-expert-10	*	expert-zero-mask	activation-ranked	0.100	coding-agent-mixed-v1	0.970	planned	research arm
+cold-expert-mixedquant	*	expert-mixed-quant	activation-ranked	adaptive	coding-agent-mixed-v1	0.990	planned	prefer aggressive quant before physical removal
+mlp-channel-5	*	mlp-channel-zero-mask	activation-ranked	0.050	coding-agent-mixed-v1	0.990	planned	architecture support required
