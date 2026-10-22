@@ -37,6 +37,18 @@ def reliability_report(loadout):
         "host_name": loadout["node_id"],
         "base_url": "http://127.0.0.1:8080/v1",
         "model_key": loadout["model"]["id"],
+        "tps_med": "42.500",
+        "tps_p10": "40.000",
+        "tps_p90": "45.000",
+        "ttft_med": "0.125",
+        "ttft_p90": "0.200",
+        "ok_rate": "1.000000",
+        "eval_ok_rate": "1.000000",
+        "eval_score_avg": "0.950000",
+        "sample_completeness": "1.000000",
+        "reliability_score": "0.990000",
+        "valid_trials": 3,
+        "trial_attempts": 3,
         "reliability_pass": True,
         "reliability_failures": [],
     }
@@ -90,7 +102,36 @@ def hermes_report(loadout, suite_id):
         "intelligence_qualified": True,
         "admission": {"admitted": False},
     }
-    aggregate = {"valid_trial_count": 3}
+    aggregate = {
+        "case_count": 1,
+        "attempted_trial_count": 3,
+        "valid_trial_count": 3,
+        "passed_trial_count": 3,
+        "overall_task_pass_rate": 1.0,
+        "effect_checkpoint_rate": 1.0,
+        "argument_validity_rate": 1.0,
+        "timeout_or_crash_rate": 0.0,
+        "successful_tasks_per_hour": 120.0,
+        "successful_effect_weight_per_minute": 2.0,
+        "tool_calls_per_minute": 4.0,
+        "completion_tokens_per_second_end_to_end": 12.5,
+        "total_wall_seconds": 90.0,
+        "cases": [
+            {
+                "case_key": "case-a",
+                "priority": "P0",
+                "task_family": "coding",
+                "recovery_case": False,
+                "attempted_trials": 3,
+                "valid_trials": 3,
+                "passed_trials": 3,
+                "trial_pass_rate": 1.0,
+                "reliability_complete": True,
+                "median_wall_seconds": 30.0,
+                "p95_wall_seconds": 32.0,
+            }
+        ],
+    }
     core = {
         "identity": identity,
         "suite_id": suite_id,
@@ -128,6 +169,14 @@ def test_combined_qualification_requires_one_exact_loadout():
     assert qualification["admission"]["admitted"] is False
     assert verified["identity"]["loadout_fingerprint"] == loadout["loadout_fingerprint"]
     assert all(qualification["gates"].values())
+    metrics = qualification["decision_metrics"]
+    assert metrics["performance"]["observed_tokens_per_second_median"] == 42.5
+    assert metrics["performance"]["time_to_first_token_seconds_median"] == 0.125
+    assert metrics["performance"]["prompt_processing_tokens_per_second"] is None
+    assert metrics["performance"]["peak_device_memory_bytes"] is None
+    assert metrics["capability"]["base_hermes"]["overall_task_pass_rate"] == 1.0
+    assert metrics["capability"]["base_hermes"]["cases"][0]["task_family"] == "coding"
+    assert verified["decision_metrics"] == metrics
 
 
 def test_throughput_binding_rejects_wrong_node_or_model():
@@ -211,3 +260,23 @@ def test_dry_run_hermes_evidence_is_rejected():
             base,
             hermes_report(loadout, CONTEXT_HERMES_SUITE_ID),
         )
+
+
+def test_decision_metrics_rejects_fabricated_unmeasured_memory():
+    loadout = example_loadout()
+    throughput = build_throughput_evidence(loadout, reliability_report(loadout))
+    qualification = build_qualification(
+        loadout,
+        throughput,
+        hermes_report(loadout, BASE_HERMES_SUITE_ID),
+        hermes_report(loadout, CONTEXT_HERMES_SUITE_ID),
+    )
+    qualification["decision_metrics"]["performance"]["peak_device_memory_bytes"] = 123
+    core = {
+        key: value
+        for key, value in qualification.items()
+        if key not in {"created_at_utc", "qualification_fingerprint"}
+    }
+    qualification["qualification_fingerprint"] = canonical_hash(core)
+    with pytest.raises(ValueError, match="peak_device_memory_bytes"):
+        verify_qualification(qualification)

@@ -257,7 +257,14 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
     monkeypatch.setattr(
         operator,
         "verify_qualification",
-        lambda report, loadout: {"fingerprint": report["qualification_fingerprint"]},
+        lambda report, loadout: {
+            "fingerprint": report["qualification_fingerprint"],
+            "decision_metrics": {
+                "schema_version": "loadout_decision_metrics.v1",
+                "performance": {"observed_tokens_per_second_median": 42.5},
+                "capability": {"base_hermes": {}, "context_pressure_hermes": {}},
+            },
+        },
     )
     assert operator.run_qualification(args_for(tmp_path, inputs)) == 0
     assert phases == [
@@ -275,6 +282,7 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
     assert state["success"] is True
     assert state["admission"]["admitted"] is False
     assert state["qualification_fingerprint"] == "sha256:" + "9" * 64
+    assert state["decision_metrics"]["performance"]["observed_tokens_per_second_median"] == 42.5
     assert not (
         tmp_path / "runs" / ".qualification-locks" / ".fleet-operator.lock"
     ).exists()
@@ -282,6 +290,7 @@ def test_full_sequence_is_ordered_locked_and_verifiable(tmp_path, monkeypatch):
     assert verified["valid"] is True
     assert verified["success"] is True
     assert verified["artifact_count"] > 5
+    assert verified["decision_metrics"] == state["decision_metrics"]
 
 
 def test_phase_failure_finalizes_manifest_and_releases_lock(tmp_path, monkeypatch):

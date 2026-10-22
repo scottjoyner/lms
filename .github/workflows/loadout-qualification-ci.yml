@@ -18,13 +18,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install package and test dependencies
         run: python -m pip install -e ".[test]"
-      - name: Compile qualification module
-        run: python -m py_compile src/lms_agent_bench/loadout_qualification.py
+      - name: Compile qualification modules
+        run: |
+          python -m py_compile src/lms_agent_bench/loadout_qualification.py
+          python -m py_compile src/lms_agent_bench/r9700_bonsai2_qualification.py
       - name: Run qualification tests
-        run: python -m pytest -q tests/test_loadout_qualification.py
+        run: |
+          python -m pytest -q tests/test_loadout_qualification.py
+          python -m pytest -q tests/test_r9700_bonsai2_qualification.py
       - name: Smoke-test qualification command
         run: |
           lms-loadout-qualify --help >/dev/null
           lms-loadout-qualify bind-throughput --help >/dev/null
           lms-loadout-qualify qualify --help >/dev/null
           lms-loadout-qualify verify --help >/dev/null
+          python -m lms_agent_bench.r9700_bonsai2_qualification --help >/dev/null
