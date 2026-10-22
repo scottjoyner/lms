@@ -313,10 +313,47 @@ def verify_created_ruleset_readback(fetched, identifier, payload):
                     f'Installed {typ}.{key} differs from pinned candidate; do not retry POST')
     return True
 
-def activate(api, confirmation):
+
+def verify_named_reviewer_permissions(api, reviewer_logins):
+    """Confirm two named, non-author write-capable accounts (GET only).
+
+    This cannot prove humanity, consent, independence of real-world custody,
+    willingness to review, or specific per-PR approval validity. The accountable
+    administrator must substantiate those independently before activation.
+    """
+    if not isinstance(reviewer_logins, (tuple, list)) or len(reviewer_logins) != 2:
+        raise ActivationError('Two explicitly nominated reviewer logins required before policy POST')
+    normalized = []
+    for login in reviewer_logins:
+        if (not isinstance(login, str) or not 1 <= len(login) <= 39 or
+                not login[0].isalnum() or not login[-1].isalnum() or
+                not all(c.isascii() and (c.isalnum() or c == '-') for c in login)):
+            raise ActivationError('Invalid named reviewer login; no policy write')
+        value = login.lower()
+        if value == REPO.split('/')[0].lower() or value.endswith('[bot]'):
+            raise ActivationError('PR author/bot cannot be counted as independent reviewer')
+        normalized.append(value)
+    if len(set(normalized)) != 2:
+        raise ActivationError('Two distinct reviewer logins required; no policy write')
+    for login in normalized:
+        response = api.call('GET', f'/collaborators/{quote(login, safe="")}/permission')
+        if (not isinstance(response, dict) or response.get('permission') not in ('admin', 'write')
+                or not isinstance(response.get('user'), dict)
+                or response['user'].get('login', '').lower() != login
+                or response['user'].get('type') != 'User'):
+            raise ActivationError(
+                'Named reviewer identity or write permission unverified; no policy write')
+    return tuple(normalized)
+
+def activate(api, confirmation, reviewer_logins=None, *, reviewer_consent_attested=False):
     if confirmation != CONFIRMATION:
         raise ActivationError('Exact administrator confirmation phrase is required')
+    if reviewer_consent_attested is not True:
+        raise ActivationError('Independent human reviewer consent/custody not attested; no write')
     payload = verify_local()
+    # Fail before any expensive branch/CI reads unless two *named* accessible
+    # non-author GitHub User accounts have the required write capability.
+    reviewers = verify_named_reviewer_permissions(api, reviewer_logins)
     branches = preflight_api(api)
     validated_heads = verify_current_required_checks(api, branches)
     # A multi-branch CI scan is long enough for a second administrator to add
@@ -336,6 +373,10 @@ def activate(api, confirmation):
                 or (current.get('commit') or {}).get('sha') != validated_head):
             raise ActivationError(
                 'Target branch head/protection changed before policy POST; no write')
+    # Reviewer rights can be revoked during a long CI scan. Recheck near POST,
+    # still without mistaking write permission for proof of human consent.
+    if verify_named_reviewer_permissions(api, reviewers) != reviewers:
+        raise ActivationError('Named reviewer permission roster changed; no policy write')
     # Exactly one write. If the response is uncertain do NOT retry the POST.
     created = api.call('POST', '/rulesets', payload)
     identifier = created.get('id') if isinstance(created,dict) else None
@@ -354,12 +395,16 @@ def main(argv=None):
     mode.add_argument('--live-preflight', action='store_true',
                       help='Read-only current-head CI and branch check; never activates anything')
     parser.add_argument('--confirm', default='', help='Exact accountable-administrator confirmation phrase')
+    parser.add_argument('--reviewer', action='append', default=[],
+                        help='Named consenting independent GitHub reviewer (exactly twice for activation)')
+    parser.add_argument('--reviewer-consent-attested', action='store_true',
+                        help='Administrator asserts separately verified human identity/consent and custody')
     args = parser.parse_args(argv)
     try:
         payload=verify_local()
         if args.live_preflight:
-            if args.confirm:
-                raise ActivationError('Read-only mode refuses administrator confirmation phrase')
+            if args.confirm or args.reviewer_consent_attested or args.reviewer:
+                raise ActivationError('Read-only mode refuses administrator confirmation/reviewer assertions')
             api=ReadOnlyGitHub()
             branches=preflight_api(api)
             verify_current_required_checks(api, branches)
@@ -371,6 +416,9 @@ def main(argv=None):
                 'scientific_status':'NO_GO_RESEARCH_ONLY'},indent=2))
             return 0
         if not args.activate:
+            if args.confirm or args.reviewer or args.reviewer_consent_attested:
+                raise ActivationError(
+                    'Offline dry run refuses activation-only confirmation/reviewer assertions')
             print(json.dumps({'status':'OFFLINE_DRY_RUN_VALID','repository':REPO,
                 'payload_sha256': SHA256, 'name':payload['name'],
                 'writes_performed':0, 'scientific_status':'NO_GO_RESEARCH_ONLY'}, indent=2))
@@ -378,7 +426,8 @@ def main(argv=None):
         if args.confirm != CONFIRMATION:
             raise ActivationError('Explicit --confirm phrase missing; no write attempted')
         token=os.environ.get('GITHUB_TOKEN','')
-        ident=activate(GitHub(token), args.confirm)
+        ident=activate(GitHub(token), args.confirm, args.reviewer,
+                       reviewer_consent_attested=args.reviewer_consent_attested)
         print(json.dumps({'status':'RULESET_CREATED_READBACK_PARTIAL','id':ident,
                           'remaining':'effective rules, actual merge rejection, reviewers, science custody',
                           'scientific_status':'NO_GO_RESEARCH_ONLY'},indent=2))
