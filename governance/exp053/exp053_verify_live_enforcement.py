@@ -226,6 +226,14 @@ class Audit:
                     f'{len(candidates)} active rulesets with exact candidate name')
         policy = candidates[0] if len(candidates) == 1 else None
         policy_id = policy.get('id') if policy else None
+        # The guarded creation preflight refuses *any* pre-existing
+        # repository/parent rulesets. An independently added ruleset can
+        # introduce a merge-blocking requirement while the pinned policy's
+        # own rule detail remains identical. Do not certify a mixed inventory.
+        inventory_exact = (len(summaries) == 1 and policy is not None
+                           and summaries[0].get('id') == policy_id)
+        self.record(inventory_exact, 'ruleset_inventory_exact',
+                    'Only the expected pinned repository ruleset is present')
         if policy:
             self.record(type(policy_id) is int and policy_id > 0 and policy.get('enforcement') == 'active' and policy.get('target') == 'branch',
                         'policy_identity', 'Pinned repository ruleset has a stable ID, active enforcement and branch target')
@@ -273,6 +281,13 @@ class Audit:
                      rule.get('ruleset_source') == REPO]
             self.record(bool(owned), 'effective_origin:'+name,
                         f'{len(owned)} rules trace to the exact pinned repository ruleset')
+            # A correctly configured pinned policy does not prevent *another*
+            # active policy (including inherited rules) from adding unexpected
+            # merge blockers. All effective rules must trace to this policy;
+            # missing/opaque origin metadata cannot establish that fact.
+            self.record(len(effective) == len(owned),
+                        'effective_exclusive_origin:'+name,
+                        'No additional repository or inherited effective rules')
             result = self.policy_matches(owned, candidate, 'effective:'+name)
             self.record(protected, 'protected:'+name, 'GitHub branch protected flag')
             self.branch_results.append({'branch': name, 'protected': protected,
@@ -298,6 +313,15 @@ class Audit:
                     'EXP-053 target branch inventory unchanged during read-only audit'
                     if names == end_names else
                     'EXP-053 target branch inventory changed during audit; rerun from scratch')
+        end_summaries = self.paginated('/rulesets?includes_parents=true')
+        # Normalize list order (not membership, identity, or fields) so
+        # harmless GitHub pagination ordering does not resemble policy drift.
+        def canonical_inventory(rows):
+            return json.dumps(sorted(rows, key=lambda r: str(r.get('id'))),
+                              sort_keys=True, separators=(',', ':'))
+        same_inventory = canonical_inventory(summaries) == canonical_inventory(end_summaries)
+        self.record(same_inventory, 'ruleset_inventory_stable',
+                    'No repository/parent ruleset appeared, disappeared, or changed during audit')
         status = 'POLICY_METADATA_VERIFIED' if all(item['ok'] for item in self.events) else 'NO_GO_GOVERNANCE'
         return {'repository': REPO, 'observed_at_utc': datetime.now(timezone.utc).isoformat(),
                 'governance_status': status, 'scientific_status': 'NO_GO_RESEARCH_ONLY',
