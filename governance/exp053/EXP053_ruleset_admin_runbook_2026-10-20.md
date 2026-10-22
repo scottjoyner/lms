@@ -58,3 +58,24 @@ On 2026-10-20, Fleet Commander x1-370 ran this command against all **12** observ
 This package is an implementation-ready **proposal**, not an enforced GitHub policy. No rulesets, draft statuses, approval pins, deployments, merges, or real operator/witness credentials were changed while preparing it.
 
 GitHub docs: [REST rulesets parameters](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28), [Available rules](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets).
+
+## V31 — two named reviewer permission gate
+
+**Additional required human decision, not an authorization to execute:** An
+accountable administrator must first verify and document two different real,
+consenting non-author GitHub users with sufficient permissions and independent
+review custody. The guarded activation CLI now requires exactly two
+`--reviewer <github-login>` options and explicit
+`--reviewer-consent-attested` *in addition* to the original separate
+administrator policy confirmation and authenticated administrative token.
+No default or pre-filled logins are provided, and no consent is presumed.
+
+Before any authorized POST, the script reads each named collaborator's
+effective GitHub base permission and account type (fail-closed on anything
+other than matching `User`, `write` or `admin`), then repeats both reads
+right before the possible single POST. These GETs **do not establish**
+independent real-world identity/consent; all externally witnessed
+administrative decisions, actual policy enforcement checks, and negative
+GitHub merge-denial tests remain mandatory. A failure must not trigger
+blind POST retry or collaborator invitations. Default execution remains
+an offline zero-write dry run.
