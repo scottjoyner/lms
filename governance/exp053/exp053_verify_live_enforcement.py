@@ -113,6 +113,16 @@ class Audit:
     def policy_matches(self, rules, candidate, prefix):
         """Verify one effective rules collection contains all critical controls."""
         found = self.ruletypes(rules)
+        # A second rule of the same type can add an unreviewed merge blocker
+        # while the first rule still satisfies a naive any() search. Require
+        # the entire approved rule-type set, including exact cardinality.
+        expected_types = {r['type'] for r in candidate['rules']}
+        shape_ok = (isinstance(rules, list) and
+                    len(rules) == len(expected_types) and
+                    set(found) == expected_types and
+                    all(len(found[typ]) == 1 for typ in expected_types))
+        self.record(shape_ok, prefix+'.types',
+                    'Exactly four approved rule types without additions or duplicates')
         pr_rules = found.get('pull_request', [])
         pr_ok = any(
             r.get('parameters', {}).get('required_approving_review_count', 0) >= 2
@@ -124,19 +134,26 @@ class Audit:
         self.record(pr_ok, prefix+'.reviews', 'Two approvals; stale, last-push and thread guards')
         expected = {r['context']: r['integration_id'] for r in candidate['rules'][1]['parameters']['required_status_checks']}
         contexts_ok = False
-        for r in found.get('required_status_checks', []):
+        for r in (found.get('required_status_checks', []) if shape_ok else []):
             params = r.get('parameters') or {}
             checks = params.get('required_status_checks') or []
             mapping = {c.get('context'): c.get('integration_id') for c in checks if isinstance(c, dict)}
+            # Exact identities and cardinality are authorization-critical. A
+            # *sixth* required job (or a duplicate) can deadlock legitimate
+            # merges even though the five pinned checks all still pass.
+            # Check order is not semantically meaningful after GitHub readback.
             distinct = len(mapping) == len(checks)
-            if distinct and params.get('strict_required_status_checks_policy') is True and all(
-                    mapping.get(k) == v for k,v in expected.items()):
+            if (distinct and len(checks) == len(expected) and
+                    params.get('strict_required_status_checks_policy') is True
+                    and mapping == expected):
                 contexts_ok = True
                 break
-        self.record(contexts_ok, prefix+'.checks', 'Five exact GitHub Actions contexts pinned to app 15368 and strict')
+        self.record(contexts_ok, prefix+'.checks',
+                    'Exactly five approved GitHub Actions contexts pinned to app 15368 and strict')
         for typ in ('non_fast_forward', 'deletion'):
             self.record(bool(found.get(typ)), prefix+'.'+typ, f'{typ} protection active')
-        return pr_ok and contexts_ok and all(found.get(t) for t in ('non_fast_forward', 'deletion'))
+        return shape_ok and pr_ok and contexts_ok and all(
+            found.get(t) for t in ('non_fast_forward', 'deletion'))
 
     def run(self):
         raw_candidate = CANDIDATE.read_bytes()
