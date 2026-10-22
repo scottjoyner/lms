@@ -68,6 +68,72 @@ class RequiredGovernanceStep(unittest.TestCase):
             'import unittest\nclass Test(unittest.TestCase):\n'
             '    def test_success(self):\n        self.assertTrue(True)\n')
 
+    def make_two_parent_pr_merge(self, *, initial_suite, change):
+        """Recreate the actual GitHub PR test-merge ancestry with the base as HEAD^.
+
+        Both commits and merge are confined to the disposable repo. No
+        protected branch, GitHub API, or repository-wide Git config is touched.
+        """
+        self.git('config', 'user.name', 'Synthetic Test')
+        self.git('config', 'user.email', 'synthetic@example.invalid')
+        self.git('checkout', '-q', '-b', 'protected-base')
+        (self.repo / 'base.txt').write_text('protected target branch\n')
+        if initial_suite:
+            self.add_suite()
+            if change == 'delete_one_test':
+                (self.repo / 'governance/exp053/test_exp053_second.py').write_text(
+                    'import unittest\nclass Extra(unittest.TestCase):\n'
+                    '    def test_extra(self):\n        self.assertTrue(True)\n')
+        self.commit('target snapshot before PR')
+        target_sha = self.git('rev-parse', 'HEAD').strip()
+        self.git('checkout', '-q', '-b', 'pr-feature')
+        if change == 'delete_one_test':
+            (self.repo / 'governance/exp053/test_exp053_second.py').unlink()
+        elif change == 'delete_suite':
+            shutil.rmtree(self.repo / 'governance/exp053')
+        elif change == 'add_suite':
+            self.add_suite()
+        elif change != 'keep_suite':
+            raise AssertionError('unknown synthetic change')
+        (self.repo / 'feature.txt').write_text('pull request change\n')
+        self.commit('feature HEAD')
+        feature_sha = self.git('rev-parse', 'HEAD').strip()
+        self.git('checkout', '-q', 'protected-base')
+        self.git('merge', '-q', '--no-ff', '--no-edit', 'pr-feature')
+        # GitHub's generated pull_request merge commit has two parents:
+        # HEAD^ is target/base and HEAD^2 is the proposed feature head.
+        self.assertEqual(self.git('rev-list', '--parents', '-n', '1', 'HEAD').split(),
+                         [self.git('rev-parse', 'HEAD').strip(), target_sha, feature_sha])
+        self.assertEqual(self.git('rev-parse', 'HEAD^').strip(), target_sha)
+        return self.run_required_step()
+
+    def test_github_style_merge_rejects_removal_of_one_adopted_test(self):
+        result = self.make_two_parent_pr_merge(
+            initial_suite=True, change='delete_one_test')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Refusing removal of adopted governance test', result.stderr)
+
+    def test_github_style_merge_rejects_removal_of_adopted_directory(self):
+        result = self.make_two_parent_pr_merge(
+            initial_suite=True, change='delete_suite')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Refusing removal of an already-adopted governance suite',
+                      result.stderr)
+
+    def test_github_style_merge_allows_initial_complete_adoption(self):
+        result = self.make_two_parent_pr_merge(
+            initial_suite=False, change='add_suite')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ADMIN_DRY_RUN_STUB_ZERO_WRITES', result.stdout)
+        self.assertIn('Ran 1 test', result.stderr)
+
+    def test_github_style_merge_continues_testing_after_adoption(self):
+        result = self.make_two_parent_pr_merge(
+            initial_suite=True, change='keep_suite')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ADMIN_DRY_RUN_STUB_ZERO_WRITES', result.stdout)
+        self.assertIn('Ran 1 test', result.stderr)
+
     def run_required_step(self):
         return subprocess.run(
             ['bash', '-euo', 'pipefail', '-c', workflow_script()],
