@@ -13,10 +13,10 @@ from urllib.parse import unquote
 from urllib.error import HTTPError
 
 EVIDENCE=json.loads(Path(BASELINE).read_text())
-REVIEWERS=('independent-human-one', 'independent-human-two')
+REVIEWERS=('synthetic-unneeded-reviewer-one', 'synthetic-unneeded-reviewer-two')
 
 
-def synthetic_activate(api, confirmation, reviewers=REVIEWERS, *, attested=True):
+def synthetic_activate(api, confirmation, reviewers=None, *, attested=False):
     return activate(api, confirmation, reviewers, reviewer_consent_attested=attested)
 
 
@@ -116,61 +116,26 @@ class Tests(unittest.TestCase):
         self.assertEqual(main(['--reviewer-consent-attested']), 2)
         self.assertEqual(main(['--confirm', CONFIRMATION]), 2)
 
-    def test_activation_refuses_missing_reviewers_before_api_read(self):
-        fake=FakeAdmin()
-        with self.assertRaisesRegex(ActivationError, 'Two explicitly nominated'):
-            activate(fake, CONFIRMATION, reviewer_consent_attested=True)
-        self.assertEqual(fake.calls, [])
-
-    def test_activation_refuses_unattested_human_consent_before_api_read(self):
-        fake=FakeAdmin()
-        with self.assertRaisesRegex(ActivationError, 'consent/custody'):
-            activate(fake, CONFIRMATION, REVIEWERS)
-        self.assertEqual(fake.calls, [])
-
-    def test_activation_refuses_author_and_duplicate_accounts_before_api_read(self):
-        for reviewers in [('scottjoyner', REVIEWERS[1]),
-                          (REVIEWERS[0], REVIEWERS[0].upper()),
-                          (REVIEWERS[0], '../unsafe'),
-                          ('', REVIEWERS[1])]:
-            with self.subTest(reviewers=reviewers):
-                fake=FakeAdmin()
-                with self.assertRaises(ActivationError):
-                    synthetic_activate(fake, CONFIRMATION, reviewers)
-                self.assertEqual(fake.calls, [])
-
-    def test_readonly_commenter_cannot_satisfy_write_review_requirement(self):
-        fake=FakeAdmin(reviewer_permission='read')
-        with self.assertRaisesRegex(ActivationError, 'write permission'):
-            synthetic_activate(fake, CONFIRMATION)
-        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
-        self.assertFalse(any('/branches?' in x for x in fake.calls))
-
-    def test_wrong_reviewer_identity_or_bot_is_not_accepted(self):
-        for opts in ({'reviewer_identity':'unrelated'},
-                     {'reviewer_type':'Bot'}):
-            with self.subTest(opts=opts):
-                fake=FakeAdmin(**opts)
-                with self.assertRaisesRegex(ActivationError, 'identity'):
-                    synthetic_activate(fake, CONFIRMATION)
-                self.assertFalse(any(x.startswith('POST') for x in fake.calls))
-
-    def test_reviewer_permission_revoked_during_ci_scan_blocks_post(self):
-        fake=FakeAdmin(reviewer_drift=True)
-        with self.assertRaisesRegex(ActivationError, 'write permission'):
-            synthetic_activate(fake, CONFIRMATION)
-        self.assertEqual(fake.reviewer_reads, {k:2 for k in REVIEWERS[:1]} | {REVIEWERS[1]:1})
-        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
-
-    def test_reviewer_eligibility_rechecked_on_synthetic_success(self):
+    def test_activation_with_zero_reviewers_can_proceed_after_confirm(self):
         fake=FakeAdmin()
         self.assertEqual(synthetic_activate(fake, CONFIRMATION),54)
-        self.assertEqual(fake.reviewer_reads, {k:2 for k in REVIEWERS})
+        self.assertEqual(fake.reviewer_reads,{})
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+        self.assertEqual(fake.created['rules'][0]['parameters']['required_approving_review_count'],0)
 
-    def test_cli_never_activates_with_only_reviewer_names(self):
+    def test_activation_rejects_obsolete_reviewer_requirements_before_get(self):
+        for reviewers,attested in ((REVIEWERS,False),(None,True),(REVIEWERS,True)):
+            with self.subTest(reviewers=reviewers,attested=attested):
+                fake=FakeAdmin()
+                with self.assertRaisesRegex(ActivationError,'Reviewer settings are not part'):
+                    synthetic_activate(fake, CONFIRMATION, reviewers=reviewers, attested=attested)
+                self.assertEqual(fake.calls,[])
+
+    def test_cli_rejects_old_reviewer_arguments(self):
         self.assertEqual(main(['--activate','--reviewer',REVIEWERS[0],
                                '--reviewer',REVIEWERS[1]]),2)
+        self.assertEqual(main(['--reviewer',REVIEWERS[0]]),2)
+        self.assertEqual(main(['--reviewer-consent-attested']),2)
 
     def test_default_offline_dryrun(self):
         self.assertEqual(main([]),0)
@@ -178,7 +143,12 @@ class Tests(unittest.TestCase):
         self.assertEqual(main(['--activate']),2)
     def test_candidate_sha_and_review_gate(self):
         r=verify_local()
-        self.assertEqual(r['rules'][0]['parameters']['required_approving_review_count'],2)
+        params=r['rules'][0]['parameters']
+        self.assertEqual(params['required_approving_review_count'],0)
+        self.assertFalse(params['require_last_push_approval'])
+        self.assertFalse(params['dismiss_stale_reviews_on_push'])
+        self.assertFalse(params['require_code_owner_review'])
+        self.assertTrue(params['required_review_thread_resolution'])
     def test_preflight_existing_ruleset_refuses_post(self):
         fake=FakeAdmin(existing=True)
         with self.assertRaises(ActivationError):synthetic_activate(fake, CONFIRMATION)
@@ -345,9 +315,9 @@ class Tests(unittest.TestCase):
             'missing_rules': lambda p:p.pop('rules'),
             'missing_force_push_protection': lambda p:p['rules'].__setitem__(2,{'type':'non_fast_forward_DISABLED'}),
             'duplicate_rule': lambda p:p['rules'].__setitem__(3,copy.deepcopy(p['rules'][0])),
-            'weakened_two_approvals': lambda p:p['rules'][0]['parameters'].update(required_approving_review_count=1),
-            'lost_stale_review_guard': lambda p:p['rules'][0]['parameters'].update(dismiss_stale_reviews_on_push=False),
-            'lost_last_push_guard': lambda p:p['rules'][0]['parameters'].update(require_last_push_approval=False),
+            'unapproved_reviewer_count': lambda p:p['rules'][0]['parameters'].update(required_approving_review_count=1),
+            'unapproved_stale_review_gate': lambda p:p['rules'][0]['parameters'].update(dismiss_stale_reviews_on_push=True),
+            'unapproved_last_push_gate': lambda p:p['rules'][0]['parameters'].update(require_last_push_approval=True),
             'lost_thread_guard': lambda p:p['rules'][0]['parameters'].update(required_review_thread_resolution=False),
             'lost_creation_exception': lambda p:p['rules'][1]['parameters'].update(do_not_enforce_on_create=False),
             'relaxed_ci_freshness': lambda p:p['rules'][1]['parameters'].update(strict_required_status_checks_policy=False),
