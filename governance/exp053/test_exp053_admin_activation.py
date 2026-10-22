@@ -15,7 +15,7 @@ from urllib.error import HTTPError
 EVIDENCE=json.loads(Path(BASELINE).read_text())
 
 class FakeAdmin:
-    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False, head_moves_prepost=False, protection_appears_prepost=False):
+    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False, head_moves_prepost=False, protection_appears_prepost=False, readback_mutator=None):
         self.existing=existing
         self.changed=changed
         self.calls=[]
@@ -33,6 +33,7 @@ class FakeAdmin:
         self.roster_changes_prepost=roster_changes_prepost
         self.head_moves_prepost=head_moves_prepost
         self.protection_appears_prepost=protection_appears_prepost
+        self.readback_mutator=readback_mutator
     def call(self,method,path,payload=None):
         self.calls.append(method+' '+path)
         if method=='GET' and path.startswith('/rulesets?'):
@@ -69,8 +70,14 @@ class FakeAdmin:
             self.created=copy.deepcopy(payload)
             return {'id': 54}
         if method=='GET' and path=='/rulesets/54':
-            return {**(self.created or {}), 'source_type':'Repository',
-                    'source':'someone-else/lms' if self.changed else REPO}
+            fetched={**(self.created or {}), 'id':54, 'source_type':'Repository',
+                     'source':'someone-else/lms' if self.changed else REPO}
+            if self.readback_mutator is not None:
+                # Allow compact in-place mutators; they return None.
+                changed=self.readback_mutator(fetched)
+                if changed is not None:
+                    fetched=changed
+            return fetched
         raise AssertionError('unexpected call '+method+' '+path)
 
 class Tests(unittest.TestCase):
@@ -241,6 +248,52 @@ class Tests(unittest.TestCase):
         with patch('exp053_admin_activation.ReadOnlyGitHub') as live:
             self.assertEqual(main(['--live-preflight','--confirm',CONFIRMATION]), 2)
             live.assert_not_called()
+
+    def test_created_ruleset_readback_critical_controls(self):
+        fake=FakeAdmin()
+        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+        self.assertEqual(sum(x=='GET /rulesets/54' for x in fake.calls),1)
+
+    def test_created_ruleset_readback_denies_missing_critical_controls(self):
+        scenarios = {
+            'wrong_identity': lambda p:p.update(id=999),
+            'inactive': lambda p:p.update(enforcement='evaluate'),
+            'wrong_branch_target': lambda p:p.update(target='tag'),
+            'expanded_scope': lambda p:p['conditions']['ref_name']['include'].append('refs/heads/other'),
+            'deleted_main_scope': lambda p:p['conditions']['ref_name']['include'].remove('refs/heads/main'),
+            'new_bypass': lambda p:p['bypass_actors'].append({'actor_id':1,'actor_type':'OrganizationAdmin','bypass_mode':'always'}),
+            'missing_rules': lambda p:p.pop('rules'),
+            'missing_force_push_protection': lambda p:p['rules'].__setitem__(2,{'type':'non_fast_forward_DISABLED'}),
+            'duplicate_rule': lambda p:p['rules'].__setitem__(3,copy.deepcopy(p['rules'][0])),
+            'weakened_two_approvals': lambda p:p['rules'][0]['parameters'].update(required_approving_review_count=1),
+            'lost_stale_review_guard': lambda p:p['rules'][0]['parameters'].update(dismiss_stale_reviews_on_push=False),
+            'lost_last_push_guard': lambda p:p['rules'][0]['parameters'].update(require_last_push_approval=False),
+            'lost_thread_guard': lambda p:p['rules'][0]['parameters'].update(required_review_thread_resolution=False),
+            'lost_creation_exception': lambda p:p['rules'][1]['parameters'].update(do_not_enforce_on_create=False),
+            'relaxed_ci_freshness': lambda p:p['rules'][1]['parameters'].update(strict_required_status_checks_policy=False),
+            'missing_ci_context': lambda p:p['rules'][1]['parameters']['required_status_checks'].pop(),
+            'extra_ci_context': lambda p:p['rules'][1]['parameters']['required_status_checks'].append({'context':'extra','integration_id':15368}),
+            'foreign_ci_app': lambda p:p['rules'][1]['parameters']['required_status_checks'][0].update(integration_id=42),
+            'weak_allowed_merges': lambda p:p['rules'][0]['parameters'].update(allowed_merge_methods=['merge']),
+            'missing_pull_parameters': lambda p:p['rules'][0].pop('parameters'),
+        }
+        for name, mutator in scenarios.items():
+            with self.subTest(name=name):
+                fake=FakeAdmin(readback_mutator=mutator)
+                with self.assertRaisesRegex(ActivationError, 'do not retry POST'):
+                    activate(fake,CONFIRMATION)
+                self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+                self.assertEqual(sum(x=='GET /rulesets/54' for x in fake.calls),1)
+
+    def test_readback_allows_additional_output_fields_and_reordered_checks(self):
+        def normalize(p):
+            p['node_id']='opaque_github_generated_id'
+            p['rules'][0]['parameters']['repository_added_field']=True
+            p['rules'][1]['parameters']['required_status_checks'].reverse()
+        fake=FakeAdmin(readback_mutator=normalize)
+        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
     def test_readback_wrong_origin_fails_closed_no_retry(self):
         fake=FakeAdmin(changed=True)
