@@ -238,6 +238,81 @@ def verify_current_required_checks(api, branches):
     return validated_heads
 
 
+
+def verify_created_ruleset_readback(fetched, identifier, payload):
+    """Reject any missing/changed critical protection after the single POST.
+
+    GitHub may include additional output-only rule parameters, so compare the
+    pinned candidate's parameters while demanding identical required checks.
+    This is STILL only metadata readback; effective branch protection and a
+    human witnessed negative merge test remain separate gates.
+    """
+    if (not isinstance(fetched, dict) or fetched.get('id') != identifier or
+            fetched.get('enforcement') != 'active' or
+            fetched.get('source_type') != 'Repository' or
+            fetched.get('source') != REPO or
+            fetched.get('name') != payload['name'] or
+            fetched.get('target') != 'branch' or
+            fetched.get('bypass_actors') != []):
+        raise ActivationError(
+            'Installed policy identity/enforcement read-back incomplete; '
+            'do not retry POST; inspect in GitHub')
+    if fetched.get('conditions') != payload['conditions']:
+        raise ActivationError(
+            'Installed policy branch scope differs from pinned candidate; '
+            'do not retry POST')
+    observed = fetched.get('rules')
+    expected_rules = payload['rules']
+    if (not isinstance(observed, list) or
+            len(observed) != len(expected_rules) or
+            not all(isinstance(rule, dict) and
+                    isinstance(rule.get('type'), str) for rule in observed)):
+        raise ActivationError(
+            'Installed policy rules missing or duplicated; do not retry POST')
+    observed_types = [rule['type'] for rule in observed]
+    required_types = [rule['type'] for rule in expected_rules]
+    if set(observed_types) != set(required_types) or len(set(observed_types)) != len(observed_types):
+        raise ActivationError(
+            'Installed policy rule types differ from candidate; do not retry POST')
+    by_type = {rule['type']: rule for rule in observed}
+    for expected in expected_rules:
+        typ = expected['type']
+        received = by_type[typ]
+        wanted_params = expected.get('parameters')
+        if wanted_params is None:
+            # Critical force-push/deletion prohibition needs only this rule type.
+            continue
+        found_params = received.get('parameters')
+        if not isinstance(found_params, dict):
+            raise ActivationError(
+                f'Installed {typ} parameters missing; do not retry POST')
+        for key, expected_value in wanted_params.items():
+            actual = found_params.get(key)
+            if typ == 'required_status_checks' and key == 'required_status_checks':
+                if (not isinstance(actual, list) or
+                        len(actual) != len(expected_value) or
+                        any(not isinstance(v, dict) for v in actual)):
+                    raise ActivationError(
+                        'Installed required CI check list incomplete; do not retry POST')
+                # Check order is not semantically relevant. Exact set, app IDs
+                # and cardinality are: duplicate/foreign checks are NO-GO.
+                expected_pairs = [(v['context'], v['integration_id']) for v in expected_value]
+                actual_pairs = [(v.get('context'), v.get('integration_id')) for v in actual]
+                if (len(set(expected_pairs)) != len(expected_pairs) or
+                        len(set(actual_pairs)) != len(actual_pairs) or
+                        set(actual_pairs) != set(expected_pairs)):
+                    raise ActivationError(
+                        'Installed required CI sources differ; do not retry POST')
+            elif typ == 'pull_request' and key == 'allowed_merge_methods':
+                if (not isinstance(actual, list) or len(actual) != len(expected_value) or
+                        set(actual) != set(expected_value)):
+                    raise ActivationError(
+                        'Installed allowed merge methods differ; do not retry POST')
+            elif type(actual) is not type(expected_value) or actual != expected_value:
+                raise ActivationError(
+                    f'Installed {typ}.{key} differs from pinned candidate; do not retry POST')
+    return True
+
 def activate(api, confirmation):
     if confirmation != CONFIRMATION:
         raise ActivationError('Exact administrator confirmation phrase is required')
@@ -268,10 +343,7 @@ def activate(api, confirmation):
         raise ActivationError('POST response uncertain; inspect GitHub before ANY retry')
     # Read-back does not automatically authorize merge/scientific execution.
     fetched = api.call('GET', f'/rulesets/{identifier}')
-    if not isinstance(fetched,dict) or fetched.get('enforcement') != 'active' or \
-            fetched.get('source_type') != 'Repository' or fetched.get('source') != REPO or \
-            fetched.get('name') != payload['name'] or fetched.get('bypass_actors') != []:
-        raise ActivationError('Installed policy read-back incomplete; do not retry POST; inspect in GitHub')
+    verify_created_ruleset_readback(fetched, identifier, payload)
     return identifier
 
 
