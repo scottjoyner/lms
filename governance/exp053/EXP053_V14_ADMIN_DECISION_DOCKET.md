@@ -147,6 +147,41 @@ administrative custody. Post-install independent live rules auditing and
 human witnessing remain mandatory. The authorized policy JSON and its pinned
 SHA-256 remain unchanged; no administrator approval is implied.
 
+## V31 — prevent two-review ruleset activation without named qualified reviewers
+
+The V29 reviewer audit found **zero qualified independent human reviewers
+attested** for the proposed two-approval policy. Before V31, the guarded
+ruleset installer would accept an operator's policy confirmation phrase
+without checking reviewer availability, risking a policy deadlock.
+
+V31 requires **two explicitly named, distinct, non-owner GitHub logins** and
+a separate `--reviewer-consent-attested` operator assertion before any
+repository settings POST. An administrator must verify each real-world human's
+identity, independence, consent, availability, and emergency-recovery custody
+**outside** this script. GitHub username syntax is validated; the installer
+uses **GET only** to read
+`/repos/scottjoyner/lms/collaborators/{login}/permission` and requires a
+matching GitHub `User` account with `write` or `admin` base permission.
+GitHub maps the maintain role to `write` in this REST response. This does
+not invite anyone, upgrade permissions, or treat commit-author labels/agents
+as reviewers. It repeats both permission reads immediately before the sole
+potential ruleset-creation POST, refusing a revoked or changed permission.
+
+Eight new synthetic negative/positive test methods prove refusal for absent
+reviewers, missing consent assertion, duplicate/author/invalid usernames,
+read-only permission, bot/identity mismatch, mid-preflight permission
+revocation, and verify two separate reads per named reviewer on simulated
+success. No live installation, roster nomination, or human consent is
+claimed by these tests. A claimed attestation is **only an operator assertion**,
+not proof a person has accepted a duty. The accountable administrator must
+record separately reviewed evidence of genuine human consent before using
+the tool, and independent effective-rule/merge-denial observations remain
+mandatory after any future separately authorized activation.
+
+The candidate JSON and pinned SHA-256 are unchanged, and the installer
+defaults to zero-write dry-run. Neither this code nor CI green authorizes
+policy creation, a source merge, licensed corpus analysis or model inference.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
