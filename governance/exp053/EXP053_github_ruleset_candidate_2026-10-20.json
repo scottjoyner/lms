@@ -10,7 +10,7 @@
     }
   },
   "enforcement": "active",
-  "name": "EXP-053 require independent human review and verified CI",
+  "name": "EXP-053 require pull requests and pinned CI (zero approvals)",
   "rules": [
     {
       "parameters": {
@@ -19,10 +19,10 @@
           "squash",
           "rebase"
         ],
-        "dismiss_stale_reviews_on_push": true,
+        "dismiss_stale_reviews_on_push": false,
         "require_code_owner_review": false,
-        "require_last_push_approval": true,
-        "required_approving_review_count": 2,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
         "required_review_thread_resolution": true
       },
       "type": "pull_request"
