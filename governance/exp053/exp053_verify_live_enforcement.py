@@ -68,6 +68,19 @@ class Audit:
                     raise ApiError('oversized GitHub API response')
                 return json.loads(payload)
         except HTTPError as exc:
+            # Anonymous GitHub quota exhaustion is *missing evidence*, not
+            # proof that governance reads require additional repository access.
+            # The API's diagnostic body could contain a requester IP or other
+            # sensitive details; never echo it or unvalidated header values.
+            headers = exc.headers
+            remaining = headers.get('X-RateLimit-Remaining') if headers else None
+            reset = headers.get('X-RateLimit-Reset') if headers else None
+            if exc.code == 429 or (exc.code == 403 and remaining == '0'):
+                reset = (reset if isinstance(reset, str) and reset.isdecimal()
+                         and len(reset) <= 12 else 'unknown')
+                raise ApiError(
+                    f'RATE_LIMITED_READ_ONLY: GitHub GET quota exhausted; '
+                    f'reset_epoch={reset}; no write attempted') from None
             raise ApiError(f'GET returned HTTP {exc.code}') from None
         except (URLError, TimeoutError, ValueError) as exc:
             raise ApiError(f'GET failed: {type(exc).__name__}') from None
