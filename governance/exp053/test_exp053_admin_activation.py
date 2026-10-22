@@ -13,9 +13,15 @@ from urllib.parse import unquote
 from urllib.error import HTTPError
 
 EVIDENCE=json.loads(Path(BASELINE).read_text())
+REVIEWERS=('independent-human-one', 'independent-human-two')
+
+
+def synthetic_activate(api, confirmation, reviewers=REVIEWERS, *, attested=True):
+    return activate(api, confirmation, reviewers, reviewer_consent_attested=attested)
+
 
 class FakeAdmin:
-    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False, head_moves_prepost=False, protection_appears_prepost=False, readback_mutator=None):
+    def __init__(self, existing=False, changed=False, missing_ci=False, wrong_app=False, moving_head=False, protected=False, duplicate_ci=False, changed_roster=False, ruleset_appears_late=False, roster_changes_prepost=False, head_moves_prepost=False, protection_appears_prepost=False, readback_mutator=None, reviewer_permission='write', reviewer_drift=False, reviewer_identity=None, reviewer_type='User'):
         self.existing=existing
         self.changed=changed
         self.calls=[]
@@ -34,8 +40,20 @@ class FakeAdmin:
         self.head_moves_prepost=head_moves_prepost
         self.protection_appears_prepost=protection_appears_prepost
         self.readback_mutator=readback_mutator
+        self.reviewer_permission=reviewer_permission
+        self.reviewer_drift=reviewer_drift
+        self.reviewer_identity=reviewer_identity
+        self.reviewer_type=reviewer_type
+        self.reviewer_reads={}
     def call(self,method,path,payload=None):
         self.calls.append(method+' '+path)
+        if method=='GET' and path.startswith('/collaborators/') and path.endswith('/permission'):
+            login=unquote(path.split('/')[2])
+            self.reviewer_reads[login]=self.reviewer_reads.get(login,0)+1
+            permission=('read' if self.reviewer_drift and self.reviewer_reads[login]>1
+                        else self.reviewer_permission)
+            return {'permission':permission,
+                    'user':{'login':self.reviewer_identity or login,'type':self.reviewer_type}}
         if method=='GET' and path.startswith('/rulesets?'):
             self.ruleset_reads+=1
             return [{'id':11}] if self.existing or (self.ruleset_appears_late and self.ruleset_reads>1) else []
@@ -90,8 +108,69 @@ class Tests(unittest.TestCase):
             fake = FakeAdmin()
             with patch('exp053_admin_activation.BASELINE', altered):
                 with self.assertRaisesRegex(ActivationError, 'Evidence SHA-256'):
-                    activate(fake, CONFIRMATION)
+                    synthetic_activate(fake, CONFIRMATION)
             self.assertEqual(fake.calls, [])
+
+    def test_default_dry_run_refuses_misleading_reviewer_arguments(self):
+        self.assertEqual(main(['--reviewer', REVIEWERS[0]]), 2)
+        self.assertEqual(main(['--reviewer-consent-attested']), 2)
+        self.assertEqual(main(['--confirm', CONFIRMATION]), 2)
+
+    def test_activation_refuses_missing_reviewers_before_api_read(self):
+        fake=FakeAdmin()
+        with self.assertRaisesRegex(ActivationError, 'Two explicitly nominated'):
+            activate(fake, CONFIRMATION, reviewer_consent_attested=True)
+        self.assertEqual(fake.calls, [])
+
+    def test_activation_refuses_unattested_human_consent_before_api_read(self):
+        fake=FakeAdmin()
+        with self.assertRaisesRegex(ActivationError, 'consent/custody'):
+            activate(fake, CONFIRMATION, REVIEWERS)
+        self.assertEqual(fake.calls, [])
+
+    def test_activation_refuses_author_and_duplicate_accounts_before_api_read(self):
+        for reviewers in [('scottjoyner', REVIEWERS[1]),
+                          (REVIEWERS[0], REVIEWERS[0].upper()),
+                          (REVIEWERS[0], '../unsafe'),
+                          ('', REVIEWERS[1])]:
+            with self.subTest(reviewers=reviewers):
+                fake=FakeAdmin()
+                with self.assertRaises(ActivationError):
+                    synthetic_activate(fake, CONFIRMATION, reviewers)
+                self.assertEqual(fake.calls, [])
+
+    def test_readonly_commenter_cannot_satisfy_write_review_requirement(self):
+        fake=FakeAdmin(reviewer_permission='read')
+        with self.assertRaisesRegex(ActivationError, 'write permission'):
+            synthetic_activate(fake, CONFIRMATION)
+        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+        self.assertFalse(any('/branches?' in x for x in fake.calls))
+
+    def test_wrong_reviewer_identity_or_bot_is_not_accepted(self):
+        for opts in ({'reviewer_identity':'unrelated'},
+                     {'reviewer_type':'Bot'}):
+            with self.subTest(opts=opts):
+                fake=FakeAdmin(**opts)
+                with self.assertRaisesRegex(ActivationError, 'identity'):
+                    synthetic_activate(fake, CONFIRMATION)
+                self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+
+    def test_reviewer_permission_revoked_during_ci_scan_blocks_post(self):
+        fake=FakeAdmin(reviewer_drift=True)
+        with self.assertRaisesRegex(ActivationError, 'write permission'):
+            synthetic_activate(fake, CONFIRMATION)
+        self.assertEqual(fake.reviewer_reads, {k:2 for k in REVIEWERS[:1]} | {REVIEWERS[1]:1})
+        self.assertFalse(any(x.startswith('POST') for x in fake.calls))
+
+    def test_reviewer_eligibility_rechecked_on_synthetic_success(self):
+        fake=FakeAdmin()
+        self.assertEqual(synthetic_activate(fake, CONFIRMATION),54)
+        self.assertEqual(fake.reviewer_reads, {k:2 for k in REVIEWERS})
+        self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
+
+    def test_cli_never_activates_with_only_reviewer_names(self):
+        self.assertEqual(main(['--activate','--reviewer',REVIEWERS[0],
+                               '--reviewer',REVIEWERS[1]]),2)
 
     def test_default_offline_dryrun(self):
         self.assertEqual(main([]),0)
@@ -102,91 +181,91 @@ class Tests(unittest.TestCase):
         self.assertEqual(r['rules'][0]['parameters']['required_approving_review_count'],2)
     def test_preflight_existing_ruleset_refuses_post(self):
         fake=FakeAdmin(existing=True)
-        with self.assertRaises(ActivationError):activate(fake, CONFIRMATION)
+        with self.assertRaises(ActivationError):synthetic_activate(fake, CONFIRMATION)
         self.assertFalse(any(x.startswith('POST') for x in fake.calls))
     def test_wrong_phrase_no_api_calls(self):
         fake=FakeAdmin()
-        with self.assertRaises(ActivationError):activate(fake,'wrong')
+        with self.assertRaises(ActivationError):synthetic_activate(fake,'wrong')
         self.assertEqual(fake.calls,[])
     def test_new_ruleset_during_ci_scan_prevents_post(self):
         fake=FakeAdmin(ruleset_appears_late=True)
         with self.assertRaisesRegex(ActivationError, 'Rulesets now exist'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertEqual(fake.ruleset_reads,2)
         self.assertFalse(any(x.startswith('POST') for x in fake.calls))
 
     def test_late_target_roster_change_prevents_post(self):
         fake=FakeAdmin(roster_changes_prepost=True)
         with self.assertRaisesRegex(ActivationError, 'roster changed before policy POST'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertEqual(fake.branch_listings,3)
         self.assertFalse(any(x.startswith('POST') for x in fake.calls))
 
     def test_late_branch_head_change_blocks_policy_creation(self):
         fake=FakeAdmin(head_moves_prepost=True)
         with self.assertRaisesRegex(ActivationError,'head/protection changed before policy POST'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertEqual(fake.ruleset_reads,2)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_late_branch_protection_change_blocks_policy_creation(self):
         fake=FakeAdmin(protection_appears_prepost=True)
         with self.assertRaisesRegex(ActivationError,'head/protection changed before policy POST'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_before_create_checks_every_target_head_three_times(self):
         fake=FakeAdmin()
-        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(synthetic_activate(fake,CONFIRMATION),54)
         self.assertEqual(len(fake.branch_reads),12)
         self.assertEqual(set(fake.branch_reads.values()),{3})
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
     def test_synthetic_success_rechecks_before_single_post(self):
         fake=FakeAdmin()
-        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(synthetic_activate(fake,CONFIRMATION),54)
         self.assertEqual(fake.ruleset_reads,2)
         self.assertEqual(fake.branch_listings,3)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
     def test_synthetic_optin_creates_exactly_once(self):
         fake=FakeAdmin()
-        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(synthetic_activate(fake,CONFIRMATION),54)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
     def test_missing_current_check_prevents_write(self):
         fake=FakeAdmin(missing_ci=True)
         with self.assertRaisesRegex(ActivationError,'Missing or ambiguous current'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_foreign_github_app_prevents_write(self):
         fake=FakeAdmin(wrong_app=True)
         with self.assertRaisesRegex(ActivationError,'source-bound'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_moving_branch_head_prevents_write(self):
         fake=FakeAdmin(moving_head=True)
         with self.assertRaisesRegex(ActivationError,'moved'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_existing_protection_needs_re_review(self):
         fake=FakeAdmin(protected=True)
         with self.assertRaisesRegex(ActivationError,'identity/protection/head'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_duplicate_check_name_prevents_write(self):
         fake=FakeAdmin(duplicate_ci=True)
         with self.assertRaisesRegex(ActivationError,'Missing or ambiguous'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_changed_target_roster_prevents_write(self):
         fake=FakeAdmin(changed_roster=True)
         with self.assertRaisesRegex(ActivationError,'roster changed'):
-            activate(fake,CONFIRMATION)
+            synthetic_activate(fake,CONFIRMATION)
         self.assertFalse(any(c.startswith('POST') for c in fake.calls))
 
     def test_anonymous_rate_limit_is_not_permission_denial(self):
@@ -251,7 +330,7 @@ class Tests(unittest.TestCase):
 
     def test_created_ruleset_readback_critical_controls(self):
         fake=FakeAdmin()
-        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(synthetic_activate(fake,CONFIRMATION),54)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
         self.assertEqual(sum(x=='GET /rulesets/54' for x in fake.calls),1)
 
@@ -282,7 +361,7 @@ class Tests(unittest.TestCase):
             with self.subTest(name=name):
                 fake=FakeAdmin(readback_mutator=mutator)
                 with self.assertRaisesRegex(ActivationError, 'do not retry POST'):
-                    activate(fake,CONFIRMATION)
+                    synthetic_activate(fake,CONFIRMATION)
                 self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
                 self.assertEqual(sum(x=='GET /rulesets/54' for x in fake.calls),1)
 
@@ -292,12 +371,12 @@ class Tests(unittest.TestCase):
             p['rules'][0]['parameters']['repository_added_field']=True
             p['rules'][1]['parameters']['required_status_checks'].reverse()
         fake=FakeAdmin(readback_mutator=normalize)
-        self.assertEqual(activate(fake,CONFIRMATION),54)
+        self.assertEqual(synthetic_activate(fake,CONFIRMATION),54)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
     def test_readback_wrong_origin_fails_closed_no_retry(self):
         fake=FakeAdmin(changed=True)
-        with self.assertRaises(ActivationError):activate(fake,CONFIRMATION)
+        with self.assertRaises(ActivationError):synthetic_activate(fake,CONFIRMATION)
         self.assertEqual(sum(x.startswith('POST') for x in fake.calls),1)
 
 if __name__=='__main__':
