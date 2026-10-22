@@ -1,5 +1,6 @@
 """Synthetic-only negative cases for EXP-053 audit; no network, no science data."""
 import copy
+import hashlib
 import json
 import unittest
 import tempfile
@@ -41,6 +42,10 @@ class FakeServer:
         self.branch_listings=0
         self.add_branch_on_refresh=False
         self.drop_branch_on_refresh=False
+        self.wrong_branch_identity=False
+        self.head_changes_on_second_read=False
+        self.protection_changes_on_second_read=False
+        self.branch_reads={}
 
     def __call__(self,path):
         path=path.split('?')[0]
@@ -91,7 +96,12 @@ class FakeServer:
             return [{'name':x} for x in snapshot]
         if path.startswith('/branches/'):
             name=unquote(path[len('/branches/'):])
-            return {'name':name,'protected':self.active}
+            self.branch_reads[name]=self.branch_reads.get(name, 0)+1
+            changed=self.branch_reads[name] >= 2
+            return {'name':'main' if self.wrong_branch_identity and name != 'main' else name,
+                    'protected':not self.protection_changes_on_second_read if changed else self.active,
+                    'commit':{'sha':'0'*40 if changed and self.head_changes_on_second_read
+                              else hashlib.sha1(name.encode()).hexdigest()}}
         if path.startswith('/rules/branches/'):
             name=unquote(path[len('/rules/branches/'):])
             if not (self.active and self.branch_rules):
@@ -178,6 +188,42 @@ class EnforcementTests(unittest.TestCase):
         server=FakeServer();server.rewrite_app=True
         report=Audit(server).run()
         self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+
+    def test_branch_response_identity_must_match_requested_ref(self):
+        server=FakeServer()
+        server.wrong_branch_identity=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events']
+                              if x['code']=='branch_identity:'+BRANCHES[1])['ok'])
+
+    def test_invalid_branch_head_object_is_no_go_not_unhandled_exception(self):
+        server=FakeServer()
+        def response(path):
+            row=server(path)
+            if path.startswith('/branches/') and path.endswith('/main'):
+                row['commit']='malformed-not-an-object'
+            return row
+        report=Audit(response).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events']
+                              if x['code']=='branch_head:main')['ok'])
+
+    def test_branch_head_change_during_audit_cannot_pass(self):
+        server=FakeServer()
+        server.head_changes_on_second_read=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events']
+                              if x['code']=='branch_snapshot_stable:main')['ok'])
+
+    def test_branch_protection_change_during_audit_cannot_pass(self):
+        server=FakeServer()
+        server.protection_changes_on_second_read=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(x for x in report['events']
+                              if x['code']=='branch_snapshot_stable:main')['ok'])
 
     def test_extra_installed_status_context_must_fail_exact_policy(self):
         server=FakeServer()
