@@ -272,6 +272,44 @@ a witnessed missing-approvals merge refusal. It neither installs policy
 nor changes the separate scientific execution embargo. Both
 `NO_GO_GOVERNANCE` and `NO_GO_RESEARCH_ONLY` remain in effect.
 
+## V37 — reject unapproved reviewer and CI-creation parameter changes
+
+A separate adversarial read-only audit of the V36 implementation used a
+synthetic installed/effective ruleset with the four approved rule types and
+five approved CI contexts, but altered **other review and merge requirements**.
+The auditor still reported `POLICY_METADATA_VERIFIED` for three approving
+humans instead of two, newly mandatory code-owner review, and a reduced
+set of allowed merge methods. All three can materially affect merge
+availability without changing the five required CI identities. A change
+to `do_not_enforce_on_create` also evaded prior comparison. None
+was part of the administrator-proposed pinned candidate.
+
+V37 adds explicit comparison of **every pinned pull-request parameter**,
+including exactly two required approvals, the three stale/last-push/thread
+safeguards, no code-owner requirement, and the exact allowed merge-method
+set (with harmless reordering accepted). The GET-only effective-policy
+auditor also checks the pinned required-check create-time exception as
+well as the exact five source-bound contexts and strict check freshness.
+
+Five distinct negative scenarios are exercised against both the
+installed ruleset and per-branch effective rule collections: three
+instead of two approvals, new code-owner review, missing merge methods,
+changed branch-creation exception, and missing pinned review field.
+They were confirmed to generate false positive `POLICY_METADATA_VERIFIED`
+results before the correction. A positive test confirms harmless
+merge-method reordering and extra output-only response properties do
+not spuriously fail. This tests **known pinned semantic fields**;
+additional future GitHub API parameters still require an administrator
+to independently inspect the raw policy for unfamiliar controls.
+
+This is an offline, source-only correction to the **GET-only** verifier.
+The pinned candidate JSON and SHA-256 remain unchanged. It does not
+prove actual effective GitHub policy unless the live auditor completes,
+and it cannot establish reviewer identity/custody or replace independently
+witnessed negative missing-approval merge refusal. No reviewer was
+invited, no real policy POST or merge occurred, and scientific execution
+remains disallowed.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
