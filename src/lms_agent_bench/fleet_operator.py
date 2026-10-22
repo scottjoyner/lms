@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import errno
 import hashlib
 import json
 import os
@@ -17,6 +18,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import time
@@ -647,44 +649,135 @@ def module_command(module: str, *args: str) -> List[str]:
 def _control_files(root: Path) -> List[Dict[str, Any]]:
     files: List[Dict[str, Any]] = []
     for path in sorted(root.rglob("*")):
-        if not path.is_file() or path.name == "operator-manifest.json":
+        relative = path.relative_to(root)
+        # Do not let the manifest builder read external symlink destinations
+        # or silently skip symlinked directories. The verifier rejects both.
+        if path.is_symlink():
+            raise ValueError(f"operator control file contains symlink: {relative}")
+        if path.is_dir():
             continue
-        if path.name.endswith(".tar.gz"):
+        if path.name == "operator-manifest.json" or path.name.endswith(".tar.gz"):
             continue
+        # Hash the same pinned, singly-linked file the verifier accepts.
+        # Manifest construction must not emit an unverifiable evidence set.
+        size, digest = _pinned_control_file_identity(root, relative)
         files.append(
             {
-                "path": path.relative_to(root).as_posix(),
-                "size_bytes": path.stat().st_size,
-                "sha256": file_sha256(path),
+                "path": relative.as_posix(),
+                "size_bytes": size,
+                "sha256": digest,
             }
         )
     return files
 
 
-def _archive_references(root: Path) -> List[Dict[str, Any]]:
+def _archive_references(
+    root: Path,
+    *,
+    require_results: bool = False,
+    expected_success_nodes: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     results_path = root / "observe" / "rollout_results.json"
-    if not results_path.is_file():
+    if not results_path.exists():
+        if require_results:
+            raise ValueError("rollout results file is missing for successful observe")
         return []
+    if not results_path.is_file():
+        raise ValueError("rollout results path is not a regular file")
     try:
         payload = json.loads(results_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError("rollout results JSON is unreadable or malformed") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("rollout results must be a JSON object")
+    if payload.get("schema_version") != "fleet_rollout.v1":
+        raise ValueError("rollout results schema version is invalid")
+    if payload.get("run_id") != root.name:
+        raise ValueError("rollout results run ID does not match run directory")
+    entries = payload.get("results")
+    if not isinstance(entries, list) or any(
+        not isinstance(item, Mapping) for item in entries
+    ):
+        raise ValueError("rollout results must contain a list of node objects")
+    # The execution gate is a separate process; validate successful rollout
+    # coverage again against the operator state before sealing a manifest.
+    # Failed runs deliberately preserve partial diagnostic node results.
+    if expected_success_nodes is not None:
+        expected = list(expected_success_nodes)
+        if not expected or any(
+            not isinstance(node, str) or not node.strip() for node in expected
+        ) or len(set(expected)) != len(expected):
+            raise ValueError("rollout results have invalid expected node identities")
+        received = [item.get("node_id") for item in entries]
+        if any(
+            not isinstance(node, str) or not node.strip() for node in received
+        ) or len(received) != len(set(received)):
+            raise ValueError("rollout results have duplicate or invalid node identities")
+        if len(received) != len(expected) or set(received) != set(expected):
+            raise ValueError("rollout results do not cover expected nodes exactly")
+        for item in entries:
+            if (
+                item.get("returncode") != 0
+                or item.get("scp_returncode") != 0
+                or item.get("timed_out") is True
+                or item.get("scp_timed_out") is True
+                or not item.get("collected_artifact")
+            ):
+                raise ValueError(
+                    "rollout results lack successful collected evidence "
+                    f"for node {item.get('node_id')!r}"
+                )
     references: List[Dict[str, Any]] = []
-    for item in payload.get("results", []):
-        if not isinstance(item, Mapping) or not item.get("collected_artifact"):
+    normalized_root = Path(root).expanduser().resolve()
+    for item in entries:
+        if not item.get("collected_artifact"):
             continue
+        archive_path = Path(str(item["collected_artifact"]))
+        if not archive_path.is_absolute():
+            raise ValueError(f"operator archive path must be absolute: {archive_path}")
+        try:
+            relative = archive_path.relative_to(normalized_root)
+        except ValueError as exc:
+            raise ValueError(
+                f"operator archive escapes run directory: {archive_path}"
+            ) from exc
+        if not relative.parts or ".." in relative.parts:
+            raise ValueError(f"operator archive path is unsafe: {archive_path}")
+        size, digest = _pinned_control_file_identity(
+            normalized_root, relative, label="archive"
+        )
+        try:
+            claimed_size = int(item.get("collected_artifact_size_bytes"))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"operator archive has invalid recorded size: {archive_path}"
+            ) from exc
+        if size != claimed_size:
+            raise ValueError(f"operator archive size mismatch: {archive_path}")
+        if digest != item.get("collected_artifact_sha256"):
+            raise ValueError(f"operator archive hash mismatch: {archive_path}")
         references.append(
             {
                 "node_id": item.get("node_id"),
-                "path": str(item.get("collected_artifact")),
-                "size_bytes": item.get("collected_artifact_size_bytes"),
-                "sha256": item.get("collected_artifact_sha256"),
+                "path": str(archive_path),
+                "size_bytes": size,
+                "sha256": digest,
             }
         )
     return references
 
 
 def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
+    # A local phase label is not authority to skip successful rollout checks.
+    # A phase marker, node roster, rollout status or observe directory indicates
+    # observed-run context; missing/edited labels must not bypass coverage.
+    observed_context = (
+        state.get("phase") == "observe"
+        or "node_ids" in state
+        or state.get("rollout") is not None
+        or (root / "observe").exists()
+    )
+    require_rollout_coverage = state.get("success") is True and observed_context
     core = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "run_id": state.get("run_id"),
@@ -692,7 +785,14 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
         "config_sha256": state.get("config_sha256"),
         "env_file_sha256": state.get("env_file_sha256"),
         "control_files": _control_files(root),
-        "archives": _archive_references(root),
+        "archives": _archive_references(
+            root,
+            require_results=require_rollout_coverage,
+            expected_success_nodes=(
+                list(state.get("node_ids") or [])
+                if require_rollout_coverage else None
+            ),
+        ),
         "admission": {"admitted": False},
     }
     manifest = {
@@ -704,9 +804,84 @@ def build_run_manifest(root: Path, state: Mapping[str, Any]) -> Dict[str, Any]:
     return manifest
 
 
-def verify_run_manifest(root: Path, *, require_success: bool = False) -> Dict[str, Any]:
+def _pinned_control_file_identity(
+    root: Path,
+    relative: Path,
+    *,
+    label: str = "control file",
+    capture: Optional[bytearray] = None,
+) -> Tuple[int, str]:
+    """Hash run-local regular evidence through one descriptor-anchored read.
+
+    O_NOFOLLOW applies to both parent directories and the final file. A
+    single-inode hard-link outside the run cannot be distinguished from a
+    run-owned hard link by path, so reject every multiply linked file.
+    """
+    directory = Path(root).expanduser().resolve()
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+    opened: List[int] = []
+    try:
+        base_fd = os.open(directory, flags | os.O_DIRECTORY)
+        opened.append(base_fd)
+        current_fd = base_fd
+        for component in relative.parts[:-1]:
+            current_fd = os.open(
+                component, flags | os.O_DIRECTORY, dir_fd=current_fd
+            )
+            opened.append(current_fd)
+        file_fd = os.open(
+            relative.parts[-1], flags | os.O_NONBLOCK, dir_fd=current_fd
+        )
+        opened.append(file_fd)
+        before = os.fstat(file_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError(f"operator {label} is not regular: {relative}")
+        if before.st_nlink != 1:
+            raise ValueError(f"operator {label} has multiple hard links: {relative}")
+        digest = hashlib.sha256()
+        size = 0
+        while True:
+            chunk = os.read(file_fd, 8 * 1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            digest.update(chunk)
+            if capture is not None:
+                if len(capture) + len(chunk) > 1024 * 1024:
+                    raise ValueError(f"operator {label} exceeds state-size limit: {relative}")
+                capture.extend(chunk)
+        after = os.fstat(file_fd)
+        if (
+            before.st_dev != after.st_dev
+            or before.st_ino != after.st_ino
+            or before.st_size != after.st_size
+            or before.st_mtime_ns != after.st_mtime_ns
+            or before.st_ctime_ns != after.st_ctime_ns
+            or after.st_nlink != 1
+            or size != after.st_size
+        ):
+            raise ValueError(f"operator {label} changed during read: {relative}")
+        return size, "sha256:" + digest.hexdigest()
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            raise ValueError(f"operator {label} is missing: {relative}") from exc
+        raise ValueError(
+            f"operator {label} contains symlink or unsafe path: {relative}"
+        ) from exc
+    finally:
+        for fd in reversed(opened):
+            os.close(fd)
+
+
+def verify_run_manifest(
+    root: Path, *, require_success: bool = False, manifest_bytes: Optional[bytes] = None
+) -> Dict[str, Any]:
     path = root / "operator-manifest.json"
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # The attestation verifier supplies the exact bytes authenticated by SSHSIG.
+    manifest = json.loads(
+        path.read_text(encoding="utf-8") if manifest_bytes is None
+        else manifest_bytes.decode("utf-8")
+    )
     if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise ValueError("unsupported operator manifest schema")
     core = {
@@ -716,24 +891,60 @@ def verify_run_manifest(root: Path, *, require_success: bool = False) -> Dict[st
     }
     if manifest.get("operator_manifest_fingerprint") != canonical_hash(core):
         raise ValueError("operator manifest fingerprint mismatch")
+    captured_state: Optional[bytearray] = None
     for entry in manifest.get("control_files", []):
         relative = Path(str(entry.get("path") or ""))
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError("unsafe control-file path in operator manifest")
-        file_path = root / relative
-        if not file_path.is_file():
-            raise ValueError(f"operator control file is missing: {relative}")
-        if file_path.stat().st_size != int(entry.get("size_bytes")):
+        capture = bytearray() if relative == Path("operator-state.json") else None
+        size, digest = _pinned_control_file_identity(
+            root, relative, capture=capture
+        )
+        if size != int(entry.get("size_bytes")):
             raise ValueError(f"operator control file size mismatch: {relative}")
-        if file_sha256(file_path) != entry.get("sha256"):
+        if digest != entry.get("sha256"):
             raise ValueError(f"operator control file hash mismatch: {relative}")
+        if capture is not None:
+            captured_state = capture
+    state_path = Path(root) / "operator-state.json"
+    if (state_path.exists() or state_path.is_symlink()) and captured_state is None:
+        raise ValueError("operator-state evidence is omitted from the manifest")
+    if captured_state is not None:
+        try:
+            persisted = json.loads(captured_state.decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError("operator state evidence is not valid JSON") from exc
+        if not isinstance(persisted, Mapping):
+            raise ValueError("operator state evidence must be a JSON object")
+        if persisted.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError("operator state schema is invalid")
+        if persisted.get("run_id") != manifest.get("run_id"):
+            raise ValueError("operator state run ID differs from signed manifest")
+        if (
+            not isinstance(persisted.get("success"), bool)
+            or persisted["success"] is not manifest.get("success")
+        ):
+            raise ValueError("operator state success differs from signed manifest")
+        admission = persisted.get("admission")
+        if not isinstance(admission, Mapping) or admission.get("admitted") is not False:
+            raise ValueError("operator state admission must remain denied")
+    normalized_root = Path(root).expanduser().resolve()
     for archive in manifest.get("archives", []):
         archive_path = Path(str(archive.get("path") or ""))
-        if not archive_path.is_file():
-            raise ValueError(f"collected archive is missing: {archive_path}")
-        if archive_path.stat().st_size != int(archive.get("size_bytes")):
+        if not archive_path.is_absolute():
+            raise ValueError(f"collected archive path must be absolute: {archive_path}")
+        try:
+            relative = archive_path.relative_to(normalized_root)
+        except ValueError as exc:
+            raise ValueError(f"collected archive escapes run directory: {archive_path}") from exc
+        if not relative.parts or ".." in relative.parts:
+            raise ValueError(f"collected archive has unsafe path: {archive_path}")
+        size, digest = _pinned_control_file_identity(
+            normalized_root, relative, label="archive"
+        )
+        if size != int(archive.get("size_bytes")):
             raise ValueError(f"collected archive size mismatch: {archive_path}")
-        if file_sha256(archive_path) != archive.get("sha256"):
+        if digest != archive.get("sha256"):
             raise ValueError(f"collected archive hash mismatch: {archive_path}")
     if require_success and manifest.get("success") is not True:
         raise ValueError("operator run did not complete successfully")

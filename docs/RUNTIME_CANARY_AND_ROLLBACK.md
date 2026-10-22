@@ -45,7 +45,11 @@ verify restored runtime health
 seal run state and manifest
 ```
 
-Any failure after candidate startup enters the recovery path immediately:
+Once the candidate-start stage is **attempted**, any failure (including a
+partially successful startup wrapper that times out or exits nonzero) enters
+the recovery path immediately. Cleanup and rollback wrappers must therefore
+be idempotent and safe even if no candidate actually started. A failed
+pre-start snapshot does not trigger candidate cleanup:
 
 ```text
 best-effort candidate stop -> rollback -> rollback health verification
@@ -53,7 +57,11 @@ best-effort candidate stop -> rollback -> rollback health verification
 
 The run remains failed even when rollback succeeds. The evidence distinguishes
 `success`, `rollback_attempted`, and `rollback_succeeded` so a failed experiment
-cannot be mistaken for a qualified candidate.
+cannot be mistaken for a qualified candidate. In recovery,
+`rollback_succeeded=true` requires **all three** successful stop, restore, and
+rollback-health commands; a healthy endpoint alone is insufficient. Any failed
+recovery stage sets `rollback_succeeded=false` and `rollback_failed`, and the
+manifest verifier refuses contradictory successful-rollback evidence.
 
 ## Plan safety
 
@@ -179,3 +187,114 @@ This command proves the candidate can be introduced and removed safely on one
 node under the reviewed lifecycle wrappers. It does not prove power-loss
 recovery, kernel/GPU reset, network partition behavior, or multi-node rollout.
 Those remain explicit physical failure-injection drills.
+
+Soak probes run in an isolated process group. On timeout, the controller
+sends SIGTERM to the group and then SIGKILL after a bounded parent wait,
+even when the parent has already exited. A SIGTERM-ignoring child holding
+stdout open must not survive the timeout or block recovery. The failed soak
+still triggers candidate rollback. This process-group boundary does **not**
+guarantee termination of independently daemonized descendants.
+
+## Evidence completeness (draft hardening)
+
+The manifest verifier requires the exact sealed inventory of artifacts, with
+no omitted or newly added run files. For any claimed successful run, it also
+checks the normalized plan fingerprint, full ordered lifecycle command reports
+and their captured stdout/stderr hashes, and recomputes the soak policy result
+from the raw JSONL samples. Missing samples, omitted commands, or forged
+summary values fail closed even if a local actor recalculates the manifest's
+self-hash. A **locally recomputable SHA-256 fingerprint is not a signature**:
+reviewed operator signing keys, independent allowed-signers custody, and an
+off-host rollback-resistant witness remain required for scientific or physical
+approval. Existing failed runs remain readable as failed evidence.
+
+## Approved-command receipt binding
+
+A successful canary manifest verifies that each recorded lifecycle invocation
+matches the normalized, plan-fingerprint-bound command specification. It
+compares the exact argument vector, resolved executable, executable SHA-256,
+and timeout value/type for each lifecycle command. Locally recalculated
+unsigned manifest hashes cannot conceal a different recorded invocation.
+This is structural cross-checking, **not cryptographic proof of what executed**.
+Independently controlled signing, allowed-signers custody, anti-rollback
+witnesses, and signed physical recovery are still required.
+
+
+## Required soak telemetry
+
+Every successful soak probe must provide finite, nonnegative latency and
+temperature (when temperature is gated), positive RSS, and positive measured
+tokens per second. A missing, zero, negative, nonnumeric, or nonfinite required
+measurement fails the soak qualification rather than silently bypassing the
+corresponding resource-growth or throughput-retention gate. At least two
+valid RSS and TPS observations are needed to assess growth and retention.
+This remains local evidence; it does not establish an independently signed
+physical run or stable model identity.
+
+## Probe execution-status consistency
+
+Successful raw soak records must be internally consistent: valid UTC
+timestamps, finite nonnegative durations, integer exit codes, boolean timeout
+flags, and parsed-status fields. A raw sample claiming \`ok=true\` while
+reporting a nonzero exit code, timeout, or parser error is rejected even
+when all unsigned local hashes have been recomputed. These are structural
+checks, not independently witnessed runtime execution.
+
+## Lock lifetime under evidence I/O failures
+
+Lock owner-record publication and final run evidence sealing are both
+fallible. The controller releases its own workspace lock if owner metadata
+cannot be written, and uses nested finalization to release the lock even
+when the final state write or manifest seal raises. These tests inject
+synthetic I/O errors without executing models. This protects availability
+after the process exits; it is **not** crash-proof cross-host fencing, an
+independent lease authority, or a substitute for operator-controlled
+recovery and external anti-rollback checks.
+
+## Bounded soak-probe output capture
+
+A soak probe's stdout and stderr are drained incrementally with a monotonic
+per-command deadline. Each stream is bounded to one MiB **during capture**,
+not only after subprocess completion. An extra sentinel byte triggers an
+immediate fail-closed error and process-group cleanup; controller memory
+cannot grow in proportion to malicious probe output. Timeout handling still
+kills the probe's process group even if the parent exited while a child
+retained its pipe. Independently daemonized descendants remain outside this
+process-group safety boundary. This is an offline controller test, not a
+physical runtime qualification or production admission.
+
+
+## Bounded lifecycle-command logs
+
+Lifecycle wrapper commands (including stop, rollback, and rollback-health) are
+captured incrementally into on-disk stdout/stderr files with a **four-MiB
+per-stream maximum**. Oversized output aborts the command and terminates its
+process group before it fills the controller filesystem. The truncated log
+remains available for investigation; a failed command cannot be reported as a
+successful lifecycle stage. The monotonic deadline and descendant cleanup
+continue to apply to both log pipes. This does not prevent all disk exhaustion
+outside these controller-owned log files, or descendants that explicitly
+escape the process group.
+
+## Producer-side soak evidence budgets
+
+The soak runner now enforces the verifier's hard ceilings **before writing**
+more than 100,000 samples or 32 MiB of JSONL evidence. The controller also
+rejects a plan whose required sample minimum exceeds that bound, and refuses
+to append to a nonempty prior soak evidence path. A fast or zero-interval
+probe cannot silently accumulate arbitrarily large in-memory sample arrays.
+Budget exhaustion fails the soak and enters the existing rollback sequence,
+rather than allowing a successful canary or an unbounded evidence collection.
+Independent signer custody, off-host monotonic checkpoints and physical
+recovery approval are still separate requirements.
+
+## Verified signer fingerprint provenance
+
+The attestation's signing-key fingerprint is informational metadata and its
+ordinary JSON hash is **not** a signature. After an OpenSSH \`-Y verify\` succeeds
+using the supplied allowed-signers policy, the verifier extracts the embedded
+public key from the SSHSIG envelope, computes its actual SHA-256 fingerprint,
+and requires it to match the attestation field. Rehashing local metadata to
+substitute another authorized key's fingerprint is rejected. This prevents
+false **key attribution**, but it does not establish independent custody of
+either key, allow-list freshness, physical execution, or anti-rollback.

@@ -309,6 +309,13 @@ lms-fleet-attest verify \
 The allowed-signers file should be controlled separately from the run evidence.
 Verification recomputes the operator manifest, attestation, manifest SHA,
 signature SHA, run identity, and OpenSSH signature before returning success.
+After OpenSSH verifies the signature under allowed-signers policy, the verifier
+derives the signer SHA-256 fingerprint from the embedded SSHSIG public key.
+The independently editable attestation JSON fingerprint must match that
+verified key; rehashing unsigned JSON to impersonate a different authorized
+signer fails closed. The same shared SSHSIG identity parser now backs runtime
+canary attestation. This is signer attribution **not** independent key custody,
+fresh allowed-signers policy, external anti-rollback proof or runtime admission.
 Signing and verification never grant runtime admission.
 
 ## No automatic resume
@@ -398,3 +405,135 @@ injections on a noncritical node:
 
 Results should be retained as negative evidence before any runtime admission is
 considered.
+
+### Pinned attestation verification bytes
+
+Both operator and runtime-canary verifiers now snapshot the manifest and
+detached SSH signature bytes exactly once. Hash comparisons, the OpenSSH
+signature check (through a private temporary signature file), and embedded
+signer fingerprint extraction all refer to that same byte pair. A mutation
+of the original on-disk signature between OpenSSH verification and fingerprint
+reporting cannot change the attributed signer. This narrows a same-host
+time-of-check/time-of-use gap; independent custody, trusted clock, immutable
+external witness, and filesystem-level isolation are still separate gates.
+
+### Signed-manifest structural consistency
+
+A locally valid manifest is not necessarily the manifest that was later signed
+and authenticated. After OpenSSH verification, operator and runtime-canary
+attestation verify the **exact authenticated manifest bytes** against the
+referenced control files, archives, canary artifacts and state. Reports from
+before and after cryptographic verification must agree. A pre-signed invalid
+manifest substituted between those operations is rejected even if its SSHSIG
+and unsigned attestation hash are internally consistent. This is local
+structural integrity, not a rollback-resistant or independently witnessed
+authority. Callers must separately control the evidence directory and key
+custody during physical qualification.
+
+### Signed control-file path containment
+
+An operator manifest may use only run-local control evidence. The verifier
+rejects any symbolic-link component in a control-file path, including parent
+directory symlinks, even when the lexical path is relative. It also checks
+that the real target remains below the resolved run directory before checking
+the recorded file size and digest. Both direct manifest verification and
+signed operator attestation use this fail-closed check. This is a local path
+containment check, not a filesystem snapshot, a defense against hard links or
+all concurrent file substitutions, or independent witness authority.
+
+### Descriptor-pinned run control evidence
+
+The control-file verifier opens the resolved run directory, each relative
+parent directory, and the final regular file through directory descriptors
+using \`O_NOFOLLOW\`. It calculates the declared size and SHA-256 from that
+single pinned descriptor, refusing hard-linked files (\`st_nlink != 1\`) and
+checking inode, size, modification time, and change time after reading.
+This prevents simple hard-link escape aliases and path replacement between
+a separate symlink check and a later path-based hash open. The restrictions
+apply to direct manifest and signed-attestation verification. They do not
+protect against every concurrent in-place mutation, malicious local kernel,
+or privileged access to this process. Off-host independently held evidence
+and signer custody remain mandatory for release authorization.
+
+### Collected archive descriptor containment
+
+Operator-collected archives use absolute paths inside their run root, emitted
+by the collector. Those references now follow the same descriptor-anchored,
+\`O_NOFOLLOW\`, single-link, single-read size/digest checks as control files.
+Absolute paths outside the run, dot-dot traversals, direct or parent symlinks,
+hard-linked aliases, and file replacement between path validation and digest
+verification fail closed. Ordinary local archive collection still works.
+This protects ordinary local filesystem evidence, not an adversarial kernel,
+root-controlled evidence mutation, or independent checkpoint custody.
+
+### Manifest builder / verifier evidence parity
+
+Building an operator manifest uses the same descriptor-pinned, no-follow,
+single-hard-link control-file reader used by its verifier. Symlinks to
+files or directories under the run root fail before a manifest is written,
+instead of letting manifest generation read external bytes or silently omit
+an aliased directory. Normal self-contained run evidence is unaffected.
+A privileged attacker able to mutate inodes concurrently or alter the
+operator process is outside this local evidence-custody guarantee. Preserve
+NO-GO until independent review and off-host rollback witness authority.
+
+### Archive reference generation matches verification
+
+When building a manifest, archive references copied from
+\`observe/rollout_results.json\` are validated **before a manifest is written**.
+Each collected artifact must be an absolute path contained in the run root;
+it must pass the descriptor-anchored no-symlink/single-hard-link reader, and
+the collector's size and SHA-256 claims must match the bytes just hashed.
+Valid collector metadata is retained, while outside-run paths, hard-linked
+aliases and stale metadata fail closed. This prevents creating a manifest
+that signed verification will necessarily reject, but does not establish
+independent evidence custody or tamper-resistant replay protection.
+
+### Malformed and missing rollout results
+
+Manifest generation never silently treats a **present but malformed** rollout
+results file as having no collected archives. The builder requires valid JSON,
+the expected \`fleet_rollout.v1\` schema, the current run identifier, and a
+list of node-result objects. Missing results are tolerated only when producing
+a failure or non-observe manifest; a successful observed run requires its
+rollout results. All invalid evidence stops manifest generation before a new
+manifest is written. This does not independently attest the completeness of
+the reported node list or authorization of the physical rollout.
+
+### Exact successful-node rollout coverage at manifest generation
+
+When the operator records a successful \`observe\` phase, its node roster
+\`operator-state.node_ids\` is now reconciled with \`rollout_results.json\`
+before emitting a manifest. The reported node IDs must match exactly:
+no missing, extra, blank, or duplicated node identities. Each reported node
+must have a zero remote and collection return code, no reported timeouts,
+and a collected artifact subsequently checked by the descriptor-pinned
+archive reader. Failed runs still retain partial rollout evidence for
+diagnostics and continue to generate a **failure** manifest. This local
+cross-check does not substitute for independently observed physical runtime,
+cryptographic custody, or a verified release-gate decision.
+
+### Successful-run coverage cannot depend on the phase label alone
+
+A successful operator run requires complete rollout evidence when *any* observe
+context exists: an observe phase marker, a node roster, rollout command status
+or the observe directory itself. The requirement does not disappear if an
+untrusted local state writer deletes or changes \`phase\`. Missing rollout
+results or an absent node roster in that context fail closed before emitting
+a success manifest. Standalone artifacts that have no rollout context may
+still emit manifests; they are not evidence of a physical fleet rollout.
+This prevents a local state-label bypass but does not grant authority to
+declare a genuine physical run successful or replace independent custody.
+
+### Persisted operator-state binding for signed manifests
+
+When \`operator-state.json\` is present in a run, the manifest must include
+it as a control-file entry. The verifier now captures that state from the
+**same descriptor** used for its size and SHA-256 validation, with a 1 MiB
+capture bound, and checks schema, run ID, boolean success, and denied
+admission against the signed manifest. It rejects signing a purported
+successful run whose persisted state is failed, or a manifest whose signed
+control-file set omits existing state. This is a **local semantic
+cross-check**, not independent approval or evidence that a model actually
+executed. Standalone manifest verification without operator state remains
+supported, but is not evidence of physical fleet qualification.
