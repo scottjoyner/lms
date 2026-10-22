@@ -268,9 +268,24 @@ class Audit:
             self.record(False, 'branch_inventory', 'Nested exp053 branches not covered by candidate glob')
         else:
             self.record(True, 'branch_inventory', f'{len(names)} matching existing branches inspected')
+        observed_branch_heads = {}
         for name in names:
             encoded = quote(name, safe='')
             info = self.get('/branches/' + encoded)
+            if not isinstance(info, dict):
+                raise ApiError('Unexpected branch detail response')
+            # Never attribute a cached, wrong-ref or stale branch response to
+            # the requested target solely because its protected flag is true.
+            identity_ok = info.get('name') == name
+            self.record(identity_ok, 'branch_identity:'+name,
+                        'Fetched branch identity matches requested target ref')
+            branch_commit = info.get('commit')
+            head = branch_commit.get('sha') if isinstance(branch_commit, dict) else None
+            head_ok = (isinstance(head, str) and len(head) == 40
+                       and all(ch in '0123456789abcdef' for ch in head))
+            self.record(head_ok, 'branch_head:'+name,
+                        'Exact target branch commit SHA is well formed')
+            observed_branch_heads[name] = head if head_ok else None
             effective = self.paginated('/rules/branches/' + encoded)
             protected = info.get('protected') is True
             # GitHub returns the origin of each effective rule. A union of rules
@@ -313,6 +328,20 @@ class Audit:
                     'EXP-053 target branch inventory unchanged during read-only audit'
                     if names == end_names else
                     'EXP-053 target branch inventory changed during audit; rerun from scratch')
+        # Branch names can remain in the inventory while a head or legacy
+        # protection state changes underneath the per-branch effective reads.
+        # A closing GET-only sweep rules out that observed TOCTOU window. The
+        # snapshot is not atomic; a separately witnessed live merge denial
+        # remains necessary even after every check here passes.
+        for name in names:
+            again = self.get('/branches/' + quote(name, safe=''))
+            stable = (isinstance(again, dict) and again.get('name') == name
+                      and again.get('protected') is True
+                      and isinstance(again.get('commit'), dict)
+                      and observed_branch_heads.get(name) is not None
+                      and again['commit'].get('sha') == observed_branch_heads[name])
+            self.record(stable, 'branch_snapshot_stable:'+name,
+                        'Target identity, protected flag, and commit HEAD unchanged through audit')
         end_summaries = self.paginated('/rulesets?includes_parents=true')
         # Normalize list order (not membership, identity, or fields) so
         # harmless GitHub pagination ordering does not resemble policy drift.
