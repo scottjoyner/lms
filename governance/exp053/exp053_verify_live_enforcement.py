@@ -124,20 +124,46 @@ class Audit:
         self.record(shape_ok, prefix+'.types',
                     'Exactly four approved rule types without additions or duplicates')
         pr_rules = found.get('pull_request', [])
-        pr_ok = any(
-            r.get('parameters', {}).get('required_approving_review_count', 0) >= 2
-            and all(r.get('parameters', {}).get(x) is True for x in (
-                'dismiss_stale_reviews_on_push', 'require_last_push_approval',
-                'required_review_thread_resolution'))
-            for r in pr_rules
-        )
-        self.record(pr_ok, prefix+'.reviews', 'Two approvals; stale, last-push and thread guards')
-        expected = {r['context']: r['integration_id'] for r in candidate['rules'][1]['parameters']['required_status_checks']}
+        pinned_review = next(r for r in candidate['rules']
+                             if r['type'] == 'pull_request')['parameters']
+
+        def pinned_review_matches(rule):
+            actual = rule.get('parameters')
+            if not isinstance(actual, dict):
+                return False
+            # A requirement for three rather than two approving reviewers,
+            # code-owner review, or narrowed merge methods may deadlock merges.
+            # Each pinned semantic parameter must have the *approved* value.
+            for key, wanted in pinned_review.items():
+                value = actual.get(key)
+                if key == 'allowed_merge_methods':
+                    if (not isinstance(value, list) or len(value) != len(wanted)
+                            or not all(isinstance(v, str) for v in value)
+                            or len(set(value)) != len(value) or
+                            set(value) != set(wanted)):
+                        return False
+                elif type(value) is not type(wanted) or value != wanted:
+                    return False
+            return True
+
+        pr_ok = (shape_ok and len(pr_rules) == 1
+                 and pinned_review_matches(pr_rules[0]))
+        self.record(pr_ok, prefix+'.reviews',
+                    'Exact pinned approval count, review safeguards and allowed merge methods')
+        pinned_checks = next(r for r in candidate['rules']
+                             if r['type'] == 'required_status_checks')['parameters']
+        expected = {r['context']: r['integration_id'] for r in
+                    pinned_checks['required_status_checks']}
         contexts_ok = False
         for r in (found.get('required_status_checks', []) if shape_ok else []):
-            params = r.get('parameters') or {}
-            checks = params.get('required_status_checks') or []
-            mapping = {c.get('context'): c.get('integration_id') for c in checks if isinstance(c, dict)}
+            params = r.get('parameters')
+            if not isinstance(params, dict):
+                continue
+            checks = params.get('required_status_checks')
+            if (not isinstance(checks, list) or
+                    not all(isinstance(c, dict) for c in checks)):
+                continue
+            mapping = {c.get('context'): c.get('integration_id') for c in checks}
             # Exact identities and cardinality are authorization-critical. A
             # *sixth* required job (or a duplicate) can deadlock legitimate
             # merges even though the five pinned checks all still pass.
@@ -145,11 +171,13 @@ class Audit:
             distinct = len(mapping) == len(checks)
             if (distinct and len(checks) == len(expected) and
                     params.get('strict_required_status_checks_policy') is True
-                    and mapping == expected):
+                    and params.get('do_not_enforce_on_create') is
+                    pinned_checks['do_not_enforce_on_create'] and
+                    mapping == expected):
                 contexts_ok = True
                 break
         self.record(contexts_ok, prefix+'.checks',
-                    'Exactly five approved GitHub Actions contexts pinned to app 15368 and strict')
+                    'Exact five source-pinned CI contexts, strict freshness and create-time exception')
         for typ in ('non_fast_forward', 'deletion'):
             self.record(bool(found.get(typ)), prefix+'.'+typ, f'{typ} protection active')
         return shape_ok and pr_ok and contexts_ok and all(
