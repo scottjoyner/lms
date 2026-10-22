@@ -238,6 +238,40 @@ authorization to change the ruleset. Any future policy installation still
 requires the independently approved human review and admin steps.
 `NO_GO_RESEARCH_ONLY` remains binding.
 
+## V36 — reject additional installed/effective CI requirements
+
+Read-only governance auditing previously used a **subset** test for the
+five pinned GitHub Actions contexts. A sixth, unreviewed required check
+(with another name and valid app ID 15368) was incorrectly classified as
+`POLICY_METADATA_VERIFIED`, even though it could block ordinary merges.
+An independently run synthetic adversarial probe physically reproduced
+this false positive on the V35 implementation.
+
+V36 modifies the GET-only effective-enforcement auditor to require the
+**exact approved five** status contexts and integration IDs, with matching
+cardinality, no duplicates, and strict fresh-check requirements. This
+comparison tolerates only harmless ordering changes. A related false
+positive accepted one correct required-status-check rule while silently
+ignoring a second rule requiring an extra job. V36 also demands exactly
+the four pinned branch rule types, each present exactly once, with no
+extra rules in the installed policy or per-branch effective rules traced
+to that policy.
+
+Five permanent synthetic regressions cover unexpected extra CI contexts
+in installed and effective rules, duplicate additional required-status
+rules in both places, and acceptance of harmless context reordering.
+The four negative regressions were observed to fail against the earlier
+implementation before the correction. The result is fail-closed: any
+extra CI requirements or rule types require renewed independent policy
+review rather than silently passing the original five-context claim.
+
+The proposed ruleset JSON and its pinned SHA-256 are unchanged. This
+auditor still makes **GET only** requests and cannot establish genuine
+reviewer custody, active GitHub enforcement without live readback, or
+a witnessed missing-approvals merge refusal. It neither installs policy
+nor changes the separate scientific execution embargo. Both
+`NO_GO_GOVERNANCE` and `NO_GO_RESEARCH_ONLY` remain in effect.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
