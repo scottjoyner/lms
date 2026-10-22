@@ -27,6 +27,8 @@ class FakeServer:
         self.extra_effective_context=False
         self.duplicate_installed_ci_rule=False
         self.duplicate_effective_ci_rule=False
+        self.installed_parameter_mutator=None
+        self.effective_parameter_mutator=None
         self.reorder_contexts=False
         self.foreign_effective=False
         self.wrong_effective_id=False
@@ -63,6 +65,8 @@ class FakeServer:
                                           {'context':'unapproved-extra-required-job','integration_id':15368}]}})
             if self.reorder_contexts:
                 data['rules'][1]['parameters']['required_status_checks'].reverse()
+            if self.installed_parameter_mutator:
+                self.installed_parameter_mutator(data['rules'])
             return data
         if path=='/branches':
             self.branch_listings += 1
@@ -94,6 +98,8 @@ class FakeServer:
                                    {'context':'unapproved-extra-required-job','integration_id':15368}]}})
             if self.reorder_contexts:
                 rules[1]['parameters']['required_status_checks'].reverse()
+            if self.effective_parameter_mutator:
+                self.effective_parameter_mutator(rules)
             if self.rewrite_app:
                 rules[1]['parameters']['required_status_checks'][0]['integration_id']=1
             for rule in rules:
@@ -180,6 +186,52 @@ class EnforcementTests(unittest.TestCase):
         self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
         self.assertFalse(next(e for e in report['events']
                               if e['code']=='effective:main.checks')['ok'])
+
+    @staticmethod
+    def modified_critical_params():
+        return (
+            ('three_instead_of_two_approvals', 'reviews',
+             lambda rules: rules[0]['parameters'].update(required_approving_review_count=3)),
+            ('added_code_owner_requirement', 'reviews',
+             lambda rules: rules[0]['parameters'].update(require_code_owner_review=True)),
+            ('restricted_merge_methods', 'reviews',
+             lambda rules: rules[0]['parameters'].update(allowed_merge_methods=['merge'])),
+            ('lost_creation_exception', 'checks',
+             lambda rules: rules[1]['parameters'].update(do_not_enforce_on_create=False)),
+            ('missing_pinned_review_parameter', 'reviews',
+             lambda rules: rules[0]['parameters'].pop('require_code_owner_review')),
+        )
+
+    def test_installed_policy_rejects_nonapproved_critical_review_parameters(self):
+        for name, event, mutator in self.modified_critical_params():
+            with self.subTest(name=name):
+                server=FakeServer()
+                server.installed_parameter_mutator=mutator
+                report=Audit(server).run()
+                self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+                self.assertFalse(next(x for x in report['events']
+                                      if x['code']=='installed_policy.'+event)['ok'])
+
+    def test_effective_policy_rejects_nonapproved_critical_review_parameters(self):
+        for name, event, mutator in self.modified_critical_params():
+            with self.subTest(name=name):
+                server=FakeServer()
+                server.effective_parameter_mutator=mutator
+                report=Audit(server).run()
+                self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+                self.assertFalse(next(x for x in report['events']
+                                      if x['code']=='effective:main.'+event)['ok'])
+
+    def test_harmless_merge_method_reordering_and_output_metadata_pass(self):
+        def reorder_and_add_metadata(rules):
+            rules[0]['parameters']['allowed_merge_methods'].reverse()
+            rules[0]['parameters']['server_output_only']=False
+            rules[1]['parameters']['server_output_only']=False
+        server=FakeServer()
+        server.installed_parameter_mutator=reorder_and_add_metadata
+        server.effective_parameter_mutator=reorder_and_add_metadata
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'POLICY_METADATA_VERIFIED')
 
     def test_harmless_reordering_of_five_contexts_does_not_fail(self):
         server=FakeServer()
