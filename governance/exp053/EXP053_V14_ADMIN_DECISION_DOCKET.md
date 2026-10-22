@@ -117,6 +117,36 @@ authorized reviewer approvals and effective live GitHub rules remain required.
 The candidate policy hash is unchanged; V26 grants no admin or research
 authorization and performs no GitHub settings write or merge.
 
+## V30 — fail-closed critical installed-ruleset readback after the single authorized POST
+
+Before V30, the guarded administrator helper's **post-creation** GET verified only
+the active status, source repository, name and empty bypass list. It did **not**
+verify the installed target branch scope, required 2-person approval safeguards,
+five source-pinned CI checks, branch-creation exception or destructive-update
+restrictions. A server-side downgrade or omitted rule could have produced the
+installer's nominal partial-success response.
+
+V30 adds `verify_created_ruleset_readback`: after the **one and only**
+authorized `POST /rulesets`, the read-only GET must confirm the exact created
+rule ID and repository origin, active branch target, precise main/research
+scope with zero exclusions/bypass actors, one instance of each four required
+rule types, two-person + stale/last-push/thread guards, merge-method list,
+the five exact app-15368 contexts and strict freshness, the explicitly proposed
+branch-creation exception, and non-fast-forward/deletion restrictions.
+GitHub-added output-only fields and harmless reordering of check contexts are
+tolerated. A missing or weakened critical field raises a **no-retry**
+administrator error: a potentially successful POST must NEVER be retried
+blindly even if readback is wrong or unavailable.
+
+Twenty synthetic downgrade/readback scenarios and positive normalization
+cases run against an in-memory fake admin transport and assert **exactly one
+simulated POST**. These tests do not access GitHub or change repository rules.
+The helper still cannot prove **effective** protection on each branch,
+non-draft negative merge denial, independent reviewer identity, or emergency
+administrative custody. Post-install independent live rules auditing and
+human witnessing remain mandatory. The authorized policy JSON and its pinned
+SHA-256 remain unchanged; no administrator approval is implied.
+
 ## Release/HOLD matrix
 
 | Gate | Current observation | Required evidence to change decision |
