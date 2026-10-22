@@ -30,6 +30,10 @@ class FakeServer:
         self.installed_parameter_mutator=None
         self.effective_parameter_mutator=None
         self.reorder_contexts=False
+        self.extra_active_ruleset=False
+        self.extra_effective_ruleset=None
+        self.add_ruleset_on_refresh=False
+        self.ruleset_listings=0
         self.foreign_effective=False
         self.wrong_effective_id=False
         self.mutate_policy_after=False
@@ -41,8 +45,17 @@ class FakeServer:
     def __call__(self,path):
         path=path.split('?')[0]
         if path=='/rulesets':
-            return [{'id': 42,'name':CANDIDATE['name'],'target':'branch',
-                     'enforcement':'active'}] if self.active else []
+            self.ruleset_listings += 1
+            observed=[{'id':42,'name':CANDIDATE['name'],'target':'branch',
+                       'enforcement':'active'}] if self.active else []
+            if self.extra_active_ruleset or (
+                    self.add_ruleset_on_refresh and self.ruleset_listings >= 2):
+                observed.append({'id':777,'name':'unreviewed-extra-policy',
+                                 'target':'branch','enforcement':'active'})
+            return observed
+        if path=='/rulesets/777':
+            return {'id':777,'name':'unreviewed-extra-policy',
+                    'target':'branch','enforcement':'active'}
         if path=='/rulesets/42':
             self.policy_reads += 1
             data=copy.deepcopy(CANDIDATE)
@@ -108,6 +121,17 @@ class FakeServer:
             if self.foreign_effective:
                 for rule in rules:
                     rule['ruleset_id']=99
+            if self.extra_effective_ruleset is not None:
+                # Another source can add restrictions even if the candidate's
+                # own four rules match exactly.
+                origin_type=('Organization' if self.extra_effective_ruleset=='inherited'
+                             else 'Repository')
+                rules.append({'type':'required_deployments',
+                              'parameters':{'required_deployment_environments':['blocked']},
+                              'ruleset_id':777,
+                              'ruleset_source':'outside-owner/other'
+                                  if origin_type=='Organization' else 'scottjoyner/lms',
+                              'ruleset_source_type':origin_type})
             return rules
         raise ApiError('unexpected fixture path '+path)
 
@@ -238,6 +262,38 @@ class EnforcementTests(unittest.TestCase):
         server.reorder_contexts=True
         report=Audit(server).run()
         self.assertEqual(report['governance_status'],'POLICY_METADATA_VERIFIED')
+
+    def test_additional_active_ruleset_cannot_pass_pinned_inventory(self):
+        server=FakeServer()
+        server.extra_active_ruleset=True
+        result=Audit(server).run()
+        self.assertEqual(result['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in result['events']
+                              if e['code']=='ruleset_inventory_exact')['ok'])
+
+    def test_extra_repository_effective_rule_blocks_policy_verification(self):
+        server=FakeServer()
+        server.extra_effective_ruleset='repository'
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='effective_exclusive_origin:main')['ok'])
+
+    def test_inherited_effective_rule_blocks_policy_verification(self):
+        server=FakeServer()
+        server.extra_effective_ruleset='inherited'
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='effective_exclusive_origin:main')['ok'])
+
+    def test_ruleset_added_mid_scan_fails_inventory_stability(self):
+        server=FakeServer()
+        server.add_ruleset_on_refresh=True
+        report=Audit(server).run()
+        self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
+        self.assertFalse(next(e for e in report['events']
+                              if e['code']=='ruleset_inventory_stable')['ok'])
 
     def test_nested_branch_not_covered_by_wildcard(self):
         server=FakeServer();server.names.append('research/exp053-nested/extra')
