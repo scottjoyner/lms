@@ -4,6 +4,7 @@ import json
 import unittest
 import tempfile
 from unittest.mock import patch
+from urllib.error import HTTPError
 from pathlib import Path
 from urllib.parse import unquote
 from exp053_verify_live_enforcement import Audit, ApiError, BASE
@@ -182,6 +183,44 @@ class EnforcementTests(unittest.TestCase):
         self.assertEqual(report['governance_status'],'NO_GO_GOVERNANCE')
         self.assertFalse(next(e for e in report['events']
                               if e['code']=='branch_inventory_stable')['ok'])
+
+    def test_anonymous_rate_limit_is_distinct_from_permission_denial(self):
+        failure = HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                            403, 'quota exceeded',
+                            {'X-RateLimit-Remaining':'0',
+                             'X-RateLimit-Reset':'1792688541'}, None)
+        with patch('exp053_verify_live_enforcement.urlopen', side_effect=failure) as network:
+            with self.assertRaisesRegex(
+                    ApiError, 'RATE_LIMITED_READ_ONLY.*reset_epoch=1792688541'):
+                Audit._fetch_https('/rulesets?includes_parents=true&per_page=100&page=1')
+            network.assert_called_once()
+
+    def test_403_with_remaining_quota_is_permission_failure(self):
+        failure = HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                            403, 'forbidden', {'X-RateLimit-Remaining':'19'}, None)
+        with patch('exp053_verify_live_enforcement.urlopen', side_effect=failure) as network:
+            with self.assertRaisesRegex(ApiError, '^GET returned HTTP 403$'):
+                Audit._fetch_https('/rulesets')
+            network.assert_called_once()
+
+    def test_429_without_rate_headers_is_explicit_limit(self):
+        failure = HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                            429, 'slow down', {}, None)
+        with patch('exp053_verify_live_enforcement.urlopen', side_effect=failure):
+            with self.assertRaisesRegex(
+                    ApiError, 'RATE_LIMITED_READ_ONLY.*reset_epoch=unknown'):
+                Audit._fetch_https('/rulesets')
+
+    def test_rate_limit_response_never_leaks_untrusted_diagnostic_header(self):
+        secret='SENSITIVE_REQUESTER_IP_OR_TOKEN'
+        failure = HTTPError('https://api.github.com/repos/scottjoyner/lms/rulesets',
+                            403, secret,
+                            {'X-RateLimit-Remaining':'0',
+                             'X-RateLimit-Reset':secret}, None)
+        with patch('exp053_verify_live_enforcement.urlopen', side_effect=failure):
+            with self.assertRaisesRegex(ApiError, 'reset_epoch=unknown') as caught:
+                Audit._fetch_https('/rulesets')
+            self.assertNotIn(secret, str(caught.exception))
 
     def test_api_errors_are_not_silenced(self):
         def fails(path): raise ApiError('simulated denied request')
