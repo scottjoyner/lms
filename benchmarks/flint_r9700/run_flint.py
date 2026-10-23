@@ -219,8 +219,13 @@ def parse_bench_jsonl(text: str) -> dict:
         score = obj.get("avg_ts", obj.get("tps"))
         pp = obj.get("n_prompt", obj.get("n_pp"))
         tg = obj.get("n_gen", obj.get("n_tg"))
-        if (type(score) not in (int, float) or not (0 < score < 1e6) or
-            type(pp) not in (int, float) or type(tg) not in (int, float)):
+        # llama-bench token counts are nonnegative INTEGERS. Reject NaN,
+        # Infinity, fractional/negative counts and implausibly large records
+        # rather than truncating numbers or raising during int(...) conversion.
+        if (type(score) not in (int, float) or not (0 < score < 1e6)
+                or type(pp) is not int or type(tg) is not int
+                or not (0 <= pp <= 1_000_000 and 0 <= tg <= 1_000_000)
+                or pp + tg == 0):
             continue
         observations.append({
             "n_prompt": int(pp), "n_gen": int(tg),

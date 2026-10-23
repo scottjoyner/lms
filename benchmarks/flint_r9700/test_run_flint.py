@@ -41,6 +41,21 @@ class FlintPhysicalBenchTests(unittest.TestCase):
         self.assertEqual(d["observations"][1]["n_prompt"], 128)
         self.assertEqual(d["observations"][1]["n_gen"], 0)
 
+    def test_adversarial_token_counts_do_not_crash_or_become_results(self):
+        malformed = [
+            {"n_prompt":float("nan"), "n_gen":16, "avg_ts":22.0},
+            {"n_prompt":16, "n_gen":float("inf"), "avg_ts":22.0},
+            {"n_prompt":-1, "n_gen":16, "avg_ts":22.0},
+            {"n_prompt":1.2, "n_gen":16, "avg_ts":22.0},
+            {"n_prompt":16, "n_gen":0, "avg_ts":float("nan")},
+            {"n_prompt":0, "n_gen":0, "avg_ts":22.0},
+            {"n_prompt":10**30, "n_gen":16, "avg_ts":22.0},
+        ]
+        data=flint.parse_bench_jsonl(
+            "".join(json.dumps(x, allow_nan=True)+"\n" for x in malformed))
+        self.assertEqual(data["valid_results"],0)
+        self.assertEqual(data["observations"],[])
+
     def test_noise_without_metrics_cannot_be_reported_as_tokens(self):
         data=flint.parse_bench_jsonl('warning x\n{}\n{"n_gen":64,"avg_ts":900}\n')
         self.assertEqual(data["valid_results"], 0)
