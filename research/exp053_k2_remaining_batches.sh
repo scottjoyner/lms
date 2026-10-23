@@ -9,11 +9,17 @@ export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 
 # Exact-start guard: prevents silently choosing easier source cases.
-python3 -B research/exp053_agent_k2_summary.py --count 32
-python3 -B research/exp053_k2_resource_gate.py
+python3 -B research/exp053_agent_k2_summary.py --count 32 --verify-existing
 
 for start in 32 40 48 56; do
   case_count=$((start+8))
+  printf -v summary_file "summary-000-%03d-k2-v1.json" "$((case_count - 1))"
+  summary_path="/media/scott/SSD_4TB/exp053-private-20261016/k2-machine-proxy-20261022-v1/$summary_file"
+  if [[ -e "$summary_path" || -L "$summary_path" ]]; then
+    python3 -B research/exp053_agent_k2_summary.py --count "$case_count" --verify-existing
+    echo "EXP053_K2_BATCH_RESUMED_EXISTING cumulative_cases=$case_count"
+    continue
+  fi
   python3 -B research/exp053_k2_resource_gate.py
   echo "EXP053_K2_BATCH_START index=$start count=8"
   research/exp053_k2_isolated.sh --start "$start" --count 8 --execute-source-backed

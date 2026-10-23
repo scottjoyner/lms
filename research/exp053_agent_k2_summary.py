@@ -65,11 +65,23 @@ def summarize(records, *, count):
             for key,v in scores.items()}
 
 
+
+def verify_existing_aggregate(path, expected_result):
+    if read_receipt(path) != expected_result:
+        fail("existing aggregate content or receipt provenance differs")
+    canonical=(json.dumps(expected_result,sort_keys=True,separators=(",",":"))+"\n").encode()
+    if path.read_bytes() != canonical:
+        fail("existing aggregate bytes differ from canonical source")
+    return hashlib.sha256(canonical).hexdigest()
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--count",type=int,required=True,help="contiguous prefix from 1 to 64")
     p.add_argument("--write-private",action="store_true",help="exclusive owner-private report")
+    p.add_argument("--verify-existing",action="store_true",help="compare full canonical private aggregate without rewriting")
     a=p.parse_args()
+    if a.write_private and a.verify_existing:
+        fail("cannot create and verify existing report simultaneously")
     if not 1 <= a.count <= 64:
         fail("count must be in 1..64")
     private_dir(RECEIPTS)
@@ -100,11 +112,17 @@ def main():
             "receipts":hashes,
             "descriptive_metrics":summarize(rows,count=a.count),
             "limitation":"Machine exam-key foil, no independently adjudicated plausible foil, no statistical inference or causal claims."}
+    name="summary-000-%03d-k2-v1.json"%(a.count-1)
+    if a.verify_existing:
+        digest=verify_existing_aggregate(RECEIPTS / name, result)
+        print("EXP053_K2_PRIVATE_SUMMARY_REUSED_VERIFIED cases=%d rows=%d sha256=%s" %
+              (a.count,6*a.count,digest),flush=True)
+        return
     if not a.write_private:
         print("EXP053_K2_PRIVATE_SUMMARY_PREFLIGHT_PASS cases=%d rows=%d output=none" %
               (a.count,6*a.count))
         return
-    checksum=create_immutable(RECEIPTS,"summary-000-%03d-k2-v1.json"%(a.count-1),result)
+    checksum=create_immutable(RECEIPTS,name,result)
     print("EXP053_K2_PRIVATE_SUMMARY_WRITTEN cases=%d rows=%d sha256=%s" %
           (a.count,6*a.count,checksum))
 
