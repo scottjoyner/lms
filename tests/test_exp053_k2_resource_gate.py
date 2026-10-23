@@ -59,5 +59,6 @@ def test_swap_counter_regression_holds():
 def test_entrypoint_checks_resources_per_batch():
     root=Path(__file__).resolve().parents[1]
     batch=(root/'research/exp053_k2_remaining_batches.sh').read_text()
-    assert batch.count('python3 -B research/exp053_k2_resource_gate.py')>=2
-    assert batch.index('exp053_k2_resource_gate.py') < batch.index('for start in')
+    assert batch.count('python3 -B research/exp053_k2_resource_gate.py')>=1
+    assert batch.index('for start in') < batch.index('exp053_k2_resource_gate.py')
+    assert batch.index('exp053_k2_resource_gate.py') < batch.index('research/exp053_k2_isolated.sh --start')

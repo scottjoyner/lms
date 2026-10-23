@@ -45,3 +45,36 @@ def test_missing_synthetic_cases_fail_closed():
         agg.summarize([row()],count=2)
     with pytest.raises(ValueError,match="HOLD"):
         agg.summarize([],count=0)
+
+
+def test_resume_verifies_same_immutable_json(tmp_path):
+    import os
+    os.chmod(tmp_path, 0o700)
+    expected={"schema":"synthetic-resume","case_count":2,
+              "human_adjudicated":False,"receipts":["opaque"]}
+    digest=agg.create_immutable(tmp_path,"summary.json",expected)
+    assert agg.verify_existing_aggregate(tmp_path/"summary.json",expected)==digest
+    with pytest.raises(ValueError,match="HOLD"):
+        agg.verify_existing_aggregate(tmp_path/"summary.json",{**expected,"case_count":3})
+
+
+def test_resume_rejects_ambiguous_json(tmp_path):
+    import os
+    os.chmod(tmp_path,0o700)
+    p=tmp_path/"summary.json"
+    p.write_text('{"case_count":2,"case_count":2}\n')
+    os.chmod(p,0o600)
+    with pytest.raises(ValueError,match="HOLD"):
+        agg.verify_existing_aggregate(p,{"case_count":2})
+
+
+def test_resume_rejects_symlink(tmp_path):
+    import os
+    os.chmod(tmp_path,0o700)
+    a=tmp_path/"real.json"
+    a.write_text('{"case_count":2}\n')
+    os.chmod(a,0o600)
+    link=tmp_path/"linked.json"
+    link.symlink_to(a)
+    with pytest.raises(RuntimeError,match="HOLD"):
+        agg.verify_existing_aggregate(link,{"case_count":2})
