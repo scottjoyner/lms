@@ -8,7 +8,8 @@ from run_flint import PIN, QUANTS
 def sample(q, speed):
     return {"host":PIN["host"], "hf_revision":PIN["hf_revision"],
             "runtime_source_sha":PIN["runtime_source_sha"], "profile":"smoke",
-            "runtime_argv_labels":{"gpu":PIN["device"],"threads":6,"n_gpu_layers":99},
+            "runtime_argv_labels":{"gpu":PIN["device"],"threads":6,
+                                   "n_gpu_layers":99,"flash_attention":"on"},
             "quant":QUANTS[q]["quant"],"model_sha256_pin":QUANTS[q]["sha256"],
             "model_file_expected_bytes":QUANTS[q]["bytes"],
             "status":"MEASURED_ISOLATED","benchmark_attempted":True,
@@ -28,6 +29,30 @@ class PairChecks(unittest.TestCase):
 
     def test_mismatched_revision_denied(self):
         b=sample("IQ3_XXS",42);b["hf_revision"]="f"*40
+        self.assertEqual(compare(sample("IQ2_XXS",30),b)["status"],"HOLD")
+
+    def test_malformed_profile_and_runtime_labels_fail_closed(self):
+        for profile in ([], {}, 42, True, "private"):
+            with self.subTest(profile=repr(profile)):
+                first=sample("IQ2_XXS",30)
+                second=sample("IQ3_XXS",42)
+                first["profile"]=profile
+                second["profile"]=profile
+                self.assertEqual(compare(first, second)["status"],"HOLD")
+        for key, value in (("threads", 99), ("flash_attention", "off"),
+                           ("secret", "unexpected")):
+            first=sample("IQ2_XXS",30);second=sample("IQ3_XXS",42)
+            first["runtime_argv_labels"][key]=value
+            second["runtime_argv_labels"][key]=value
+            self.assertEqual(compare(first,second)["status"],"HOLD")
+
+    def test_bool_metric_count_is_not_integer_evidence(self):
+        b=sample("IQ3_XXS",42)
+        b["bench"]["valid_results"]=True
+        self.assertEqual(compare(sample("IQ2_XXS",30),b)["status"],"HOLD")
+
+    def test_extreme_finite_ratio_is_invalid(self):
+        b=sample("IQ3_XXS",1e-320)
         self.assertEqual(compare(sample("IQ2_XXS",30),b)["status"],"HOLD")
 
     def test_same_quant_not_comparable(self):

@@ -17,9 +17,11 @@ def compare(a: dict, b: dict) -> dict:
             or a.get("host") != PIN["host"]
             or a.get("hf_revision") != PIN["hf_revision"]
             or a.get("runtime_source_sha") != PIN["runtime_source_sha"]
-            or a.get("profile") not in PROFILES
-            or not isinstance(a.get("runtime_argv_labels"), dict)
-            or a["runtime_argv_labels"].get("gpu") != PIN["device"]):
+            or not isinstance(a.get("profile"), str)
+            or a["profile"] not in PROFILES
+            or a.get("runtime_argv_labels") != {
+                "gpu": PIN["device"], "threads": 6, "n_gpu_layers": 99,
+                "flash_attention": "on"}):
         return {**base, "reason": "UNMATCHED_OR_UNPINNED_RUNTIME"}
     seen = set()
     maps = []
@@ -42,7 +44,8 @@ def compare(a: dict, b: dict) -> dict:
         if not isinstance(bench, dict) or not isinstance(bench.get("observations"), list):
             return {**base, "reason": "MALFORMED_METRICS"}
         obs = bench["observations"]
-        if not obs or bench.get("valid_results") != len(obs) or len(obs) > 32:
+        if (not obs or type(bench.get("valid_results")) is not int
+                or bench["valid_results"] != len(obs) or len(obs) > 32):
             return {**base, "reason": "MALFORMED_METRICS"}
         samples = {}
         for row in obs:
@@ -53,16 +56,21 @@ def compare(a: dict, b: dict) -> dict:
             if (type(pp) is not int or type(tg) is not int
                     or pp < 0 or tg < 0 or pp + tg == 0
                     or type(speed) not in (float, int)
-                    or not math.isfinite(speed) or speed <= 0
+                    or not math.isfinite(speed)
+                    or not 0.001 <= speed <= 1e6
                     or (pp, tg) in samples):
                 return {**base, "reason": "MALFORMED_METRICS"}
             samples[(pp, tg)] = float(speed)
         maps.append(samples)
     if set(maps[0]) != set(maps[1]):
         return {**base, "reason": "UNPAIRED_WORKLOADS"}
-    pairs = [{"n_prompt": pp, "n_gen": tg,
-              "ratio_second_to_first": round(maps[1][(pp,tg)] / maps[0][(pp,tg)], 4)}
-             for pp,tg in sorted(maps[0])]
+    pairs = []
+    for pp, tg in sorted(maps[0]):
+        ratio = maps[1][(pp, tg)] / maps[0][(pp, tg)]
+        if not math.isfinite(ratio) or ratio <= 0:
+            return {**base, "reason": "INVALID_BENCHMARK_RATIO"}
+        pairs.append({"n_prompt": pp, "n_gen": tg,
+                      "ratio_second_to_first": round(ratio, 4)})
     return {**base, "status": "LOCAL_RECEIPTS_STRUCTURALLY_COMPARABLE",
             "reason": "INDEPENDENT_EXECUTION_AND_QUALITY_STILL_UNVERIFIED",
             "first_quant": a["quant"], "second_quant": b["quant"], "pairs": pairs}
