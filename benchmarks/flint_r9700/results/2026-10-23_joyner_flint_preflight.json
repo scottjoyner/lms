@@ -1,0 +1,99 @@
+{
+  "attempts": [
+    {
+      "benchmark_attempted": false,
+      "elapsed_seconds": null,
+      "exit_code": null,
+      "host_available_gib_at_preflight": 3.976,
+      "host_full_memory_psi_10_percent_at_preflight": 0.0,
+      "host_swap_free_mib_at_preflight": 6.36,
+      "model_hash_verified": true,
+      "observed_utc": "2026-10-22T22:31:05.150232+00:00",
+      "profile": "smoke",
+      "quant": "UD-IQ3_XXS",
+      "r9700_total_vram_gib_at_preflight": 31.859,
+      "r9700_used_vram_gib_at_preflight": 0.056,
+      "raw_private_receipt_sha256": "22930831958089eb5de0fbb61d9e7664cbef4541a1f8190fedc6b46c34e5d3de",
+      "reasons": [
+        "RESOURCES_CHANGED_AFTER_SHA"
+      ],
+      "reported_decode_tokens_per_second": null,
+      "reported_prefill_tokens_per_second": null,
+      "runtime_source_sha": "970b51ce7c9ba5fff0726c5e9994f1c2f0e4eedc",
+      "status": "HOLD",
+      "stopped_reason": null,
+      "valid_benchmark_records": 0
+    },
+    {
+      "benchmark_attempted": true,
+      "elapsed_seconds": 4.025,
+      "exit_code": -15,
+      "host_available_gib_at_preflight": 3.986,
+      "host_full_memory_psi_10_percent_at_preflight": 0.0,
+      "host_swap_free_mib_at_preflight": 6.36,
+      "model_hash_verified": true,
+      "observed_utc": "2026-10-22T22:33:16.218391+00:00",
+      "profile": "smoke",
+      "quant": "UD-IQ3_XXS",
+      "r9700_total_vram_gib_at_preflight": 31.859,
+      "r9700_used_vram_gib_at_preflight": 0.056,
+      "raw_private_receipt_sha256": "3d17c9f74788ff73d636221992e33d6e9a92351acd9c13a6191d2b5007728b11",
+      "reasons": [
+        "BENCHMARK_EXIT_OR_TIMINGS_INVALID"
+      ],
+      "reported_decode_tokens_per_second": null,
+      "reported_prefill_tokens_per_second": null,
+      "runtime_source_sha": "970b51ce7c9ba5fff0726c5e9994f1c2f0e4eedc",
+      "status": "BLOCKED_OR_FAILED",
+      "stopped_reason": "HOST_MEMORY_SAFETY",
+      "valid_benchmark_records": 0
+    },
+    {
+      "benchmark_attempted": true,
+      "elapsed_seconds": 4.029,
+      "exit_code": -15,
+      "host_available_gib_at_preflight": 3.943,
+      "host_full_memory_psi_10_percent_at_preflight": 0.0,
+      "host_swap_free_mib_at_preflight": 0.8,
+      "model_hash_verified": true,
+      "observed_utc": "2026-10-23T07:16:38.223980+00:00",
+      "profile": "smoke",
+      "quant": "UD-IQ2_XXS",
+      "r9700_total_vram_gib_at_preflight": 31.859,
+      "r9700_used_vram_gib_at_preflight": 0.056,
+      "raw_private_receipt_sha256": "711910865406f1b272aac428d160f5662bbc9e22c5f7c56f76a931b7213ffd41",
+      "reasons": [
+        "BENCHMARK_EXIT_OR_TIMINGS_INVALID"
+      ],
+      "reported_decode_tokens_per_second": null,
+      "reported_prefill_tokens_per_second": null,
+      "runtime_source_sha": "970b51ce7c9ba5fff0726c5e9994f1c2f0e4eedc",
+      "status": "BLOCKED_OR_FAILED",
+      "stopped_reason": "HOST_MEMORY_SAFETY",
+      "valid_benchmark_records": 0
+    }
+  ],
+  "existing_llama_servers_stopped": false,
+  "flint_generation_demonstrated": false,
+  "hf_revision": "20468edfc38ab43d6914cc88b08cbecb05d0fc62",
+  "measured_flint_decode_tokens_per_second": null,
+  "model_repo": "unsloth/flint-GGUF",
+  "models": [
+    {
+      "bytes": 11855541696,
+      "quant": "IQ2_XXS",
+      "sha256": "c1fa4a6d5ec67fbeff460c68829984e4aa3eea95dc9d2067691f19e5406deeee"
+    },
+    {
+      "bytes": 14535427520,
+      "quant": "IQ3_XXS",
+      "sha256": "7a0a095dde1d931063a5d571e19497d997edbc783eb1ed6b86529bfab9d94804"
+    }
+  ],
+  "notes": "Physical attempts; zero successful llama-bench JSONL measurements. Memory/pressure watchdog halted startup. Private raw receipts retained on Joyner, not published.",
+  "production_admission": "NO_GO",
+  "runtime_binary_sha256": "4cde6f61b370d344b0617e611c775bc4876d74d59116240fa00fc71edc6e15c5",
+  "runtime_commit": "970b51ce7c9ba5fff0726c5e9994f1c2f0e4eedc",
+  "schema": "lms-flint-r9700-published-preflight.v1",
+  "target": "joyner AMD Radeon AI PRO R9700 (Vulkan1 gfx1201)"
+}
