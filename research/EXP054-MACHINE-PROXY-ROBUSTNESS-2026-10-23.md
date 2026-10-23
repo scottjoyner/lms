@@ -46,3 +46,13 @@ Qwen and MiniCPM recorded identical input-token counts on all 384 prompts, despi
 5. Maintain scientific claim limits: no human-blinded review, no causal grounding, no teacher lineage, no unrestricted model superiority or production deployment claims.
 
 The original human-adjudicated proposal is superseded and closed. No human GitHub PR code reviewers are needed for this agent-only research stream. No production changes were made.
+
+## EXP-054 alternative-foil precommit, before new model inference
+
+The source-only research follow-up is tracked at [EXP-054 issue #67](https://github.com/scottjoyner/lms/issues/67). A separate, owner-private machine-answer-key manifest has already been frozen for **all three alternative incorrect exam labels for every one of the 64 original article cases (192 alternatives)**. The selection is deterministic in fixed A/B/C/D order minus the sealed gold label, explicitly not selected or reranked by any model logit. Each original EXP-053 machine foil remains represented among the alternatives for comparability, with no re-adjudication claim.
+
+- New preflight: research/exp054_all_wrong_option_preflight.py, with eight synthetic fail-closed tests.
+- Owner-private immutable 0600 foil roster SHA-256: 63119e857f47d47c0ad21a20b50bcf9676448abf51e0f5741b2580b6b8abef2d.
+- Full EXP-053/054 source suite: **529 passed, 2 skipped, 276 subtests passed**.
+- New neural forwards: **zero**; no production routing, NAS/Neo4j, GPU/model changes, or licensed-source publication.
+- Further scoring must use newly frozen, independently hashed experimental prompts and create new private no-overwrite model receipts. The future length-matched decoy control is not yet implemented or accepted. No inference should be initiated solely on the basis of this precommit.
