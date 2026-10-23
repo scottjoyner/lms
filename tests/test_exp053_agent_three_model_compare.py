@@ -1,5 +1,4 @@
 """Synthetic-only three-model paired contrasts, without corpus or model inputs."""
-import math
 import sys
 from pathlib import Path
 import pytest
