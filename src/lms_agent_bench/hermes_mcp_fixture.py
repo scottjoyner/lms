@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import os
 import sys
 import time
@@ -160,6 +161,31 @@ def validate_arguments(tool: Mapping[str, Any], arguments: Any) -> tuple[bool, s
     return True, ""
 
 
+def owner_lookup_query_admissible(query: str, parameters: Mapping[str, Any] | None = None) -> tuple[bool, str]:
+    """Reject obvious fake/broad owner lookups before returning canned fixture data.
+
+    This is deliberately a conservative semantic screen, NOT a Cypher parser.
+    Full admission still requires a disposable real Neo4j query witness.
+    """
+    if not re.search(r"(?i)\bMATCH\s*\(", query) or not re.search(r"(?i)\bRETURN\b", query):
+        return False, "missing MATCH/RETURN Cypher clauses"
+    if re.search(r":\s*[A-Za-z_]\w*-[A-Za-z_]\w*", query):
+        return False, "hyphenated Cypher label is missing backticks"
+    if not re.search(r":(?:Service\b|`Service`)", query):
+        return False, "case-sensitive Service node label required"
+    if re.search(r"(?i)\b(?:DETACH|DELETE|CREATE|MERGE|SET|REMOVE|DROP)\b", query):
+        return False, "mutation verb in read-only Cypher"
+    values = parameters or {}
+    if not isinstance(values, Mapping):
+        return False, "parameters must be an object"
+    quoted = re.search(r"\bname\s*[:=]\s*['\"]router-api['\"]", query)
+    refs = re.findall(r"\bname\s*=\s*\$([A-Za-z_]\w*)", query)
+    bound = any(values.get(ref) == "router-api" for ref in refs)
+    if not (quoted or bound):
+        return False, "owner lookup must restrict service identity to router-api"
+    return True, "conservative shape only; not executed by Neo4j"
+
+
 class Fixture:
     def __init__(self, state_dir: Path, workspace: Path, scenario: str):
         self.state_dir = state_dir.resolve()
@@ -217,6 +243,9 @@ class Fixture:
         if self.scenario == "transient_query_recovery" and call_number == 1:
             return {"error": "Neo4j transient transaction error", "code": "Neo.TransientError.General.DatabaseUnavailable", "retryable": True}, True
         if self.scenario in {"service_owner_lookup", "tool_distractor_selection"}:
+            allowed, reason = owner_lookup_query_admissible(query, arguments.get("parameters"))
+            if not allowed:
+                return {"error": "invalid service owner Cypher: " + reason, "retryable": False}, True
             return {
                 "columns": ["service", "owner", "region", "status"],
                 "records": [
