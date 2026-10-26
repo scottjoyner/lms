@@ -254,13 +254,23 @@ def test_observe_runs_postflight_gate_and_verifiable_manifest(
         if "fleet_rollout_complete" in " ".join(command) and "run" in command:
             output = Path(command[command.index("--output-dir") + 1])
             output.mkdir(parents=True, exist_ok=True)
+            artifacts = output / "artifacts"
+            artifacts.mkdir(parents=True, exist_ok=True)
+            results = []
+            for node_id in ("node-a", "node-b"):
+                collected = artifacts / f"{node_id}.tar.gz"
+                collected.write_bytes(f"synthetic {node_id}".encode())
+                results.append({
+                    "node_id": node_id, "returncode": 0, "scp_returncode": 0,
+                    "timed_out": False, "scp_timed_out": False,
+                    "collected_artifact": str(collected),
+                    "collected_artifact_size_bytes": collected.stat().st_size,
+                    "collected_artifact_sha256": fleet_operator.file_sha256(collected),
+                })
             fleet_operator.write_json(
                 output / "rollout_results.json",
-                {
-                    "schema_version": "fleet_rollout.v1",
-                    "run_id": "test-run",
-                    "results": [],
-                },
+                {"schema_version": "fleet_rollout.v1",
+                 "run_id": "test-run", "results": results},
             )
         return command_result(command, log_path)
 
@@ -324,7 +334,12 @@ def test_postflight_failure_blocks_success_even_after_rollout(tmp_path, monkeypa
 def test_run_manifest_detects_control_file_tampering(tmp_path):
     root = tmp_path / "run"
     root.mkdir()
-    fleet_operator.write_json(root / "operator-state.json", {"success": True})
+    fleet_operator.write_json(
+        root / "operator-state.json",
+        {"schema_version": fleet_operator.SCHEMA_VERSION,
+         "run_id": "run", "success": True,
+         "admission": {"admitted": False}},
+    )
     fleet_operator.build_run_manifest(
         root,
         {
@@ -338,3 +353,259 @@ def test_run_manifest_detects_control_file_tampering(tmp_path):
     (root / "operator-state.json").write_text("tampered\n", encoding="utf-8")
     with pytest.raises(ValueError, match="mismatch"):
         fleet_operator.verify_run_manifest(root)
+@pytest.mark.parametrize("alias", ["file_symlink", "directory_symlink", "hard_link"])
+def test_manifest_builder_refuses_unsafe_control_evidence_before_writing(tmp_path, alias):
+    root = tmp_path / "run"
+    root.mkdir()
+    outside = tmp_path / "outside.json"
+    outside.write_bytes(b"outside-run evidence")
+    if alias == "file_symlink":
+        (root / "aliased.json").symlink_to(outside)
+    elif alias == "directory_symlink":
+        (root / "aliased-dir").symlink_to(tmp_path, target_is_directory=True)
+    else:
+        (root / "aliased.json").hardlink_to(outside)
+    with pytest.raises(ValueError, match="operator control file.*(symlink|hard links|unsafe)"):
+        fleet_operator.build_run_manifest(
+            root, {"run_id": "run", "success": True}
+        )
+    assert not (root / "operator-manifest.json").exists(), (
+        "builder emitted a self-inconsistent manifest over unsafe evidence"
+    )
+@pytest.mark.parametrize(
+    "attack", ["outside", "hardlink", "symlink", "wrong_size", "wrong_hash"]
+)
+def test_manifest_builder_rejects_unsafe_rollout_archive_references(tmp_path, attack):
+    root = tmp_path / "run"
+    root.mkdir()
+    observe = root / "observe"
+    observe.mkdir()
+    archive_dir = root / "archives"
+    archive_dir.mkdir()
+    outside = tmp_path / "outside.tar.gz"
+    outside.write_bytes(b"outside bytes")
+    claimed = archive_dir / "collected.tar.gz"
+    if attack == "hardlink":
+        claimed.hardlink_to(outside)
+    elif attack == "symlink":
+        claimed.symlink_to(outside)
+    else:
+        claimed.write_bytes(b"inside bytes")
+    candidate = outside if attack == "outside" else claimed
+    reported_size = candidate.stat().st_size
+    reported_hash = fleet_operator.file_sha256(candidate)
+    if attack == "wrong_size":
+        reported_size += 1
+    if attack == "wrong_hash":
+        reported_hash = "sha256:" + "0" * 64
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run",
+         "results": [{
+             "node_id": "synthetic-node", "returncode": 0,
+             "scp_returncode": 0, "collected_artifact": str(candidate),
+             "collected_artifact_size_bytes": reported_size,
+             "collected_artifact_sha256": reported_hash,
+         }]},
+    )
+    with pytest.raises(ValueError, match="archive"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": True,
+         "phase": "observe", "node_ids": ["synthetic-node"]})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_accepts_verified_run_local_archive(tmp_path):
+    root = tmp_path / "run"
+    root.mkdir()
+    observe = root / "observe"
+    observe.mkdir()
+    archive = root / "archives" / "collected.tar.gz"
+    archive.parent.mkdir()
+    archive.write_bytes(b"ordinary collected archive")
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run",
+         "results": [{
+             "node_id": "synthetic-node", "returncode": 0,
+             "scp_returncode": 0, "collected_artifact": str(archive),
+             "collected_artifact_size_bytes": archive.stat().st_size,
+             "collected_artifact_sha256": fleet_operator.file_sha256(archive),
+         }]},
+    )
+    manifest = fleet_operator.build_run_manifest(
+        root, {"run_id": "run", "success": True,
+         "phase": "observe", "node_ids": ["synthetic-node"]}
+    )
+    assert manifest["archives"][0]["path"] == str(archive)
+    report = fleet_operator.verify_run_manifest(root, require_success=True)
+    assert report["valid"] and report["archive_count"] == 1
+@pytest.mark.parametrize("failure", [
+    "invalid_json", "wrong_schema", "missing_results", "results_null",
+    "results_object", "nonmapping_entry", "run_id_mismatch",
+])
+def test_manifest_builder_rejects_malformed_present_rollout_results(tmp_path, failure):
+    root = tmp_path / "run"
+    observe = root / "observe"
+    observe.mkdir(parents=True)
+    path = observe / "rollout_results.json"
+    value = {"schema_version": "fleet_rollout.v1", "run_id": "run", "results": []}
+    if failure == "invalid_json":
+        path.write_text("{truncated", encoding="utf-8")
+    else:
+        if failure == "wrong_schema":
+            value["schema_version"] = "not-a-rollout"
+        elif failure == "missing_results":
+            del value["results"]
+        elif failure == "results_null":
+            value["results"] = None
+        elif failure == "results_object":
+            value["results"] = {"node-a": {}}
+        elif failure == "nonmapping_entry":
+            value["results"] = ["malformed-node-entry"]
+        elif failure == "run_id_mismatch":
+            value["run_id"] = "other-run"
+        fleet_operator.write_json(path, value)
+    with pytest.raises(ValueError, match="rollout results"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": False})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_requires_results_for_successful_observe(tmp_path):
+    root = tmp_path / "run"
+    (root / "observe").mkdir(parents=True)
+    with pytest.raises(ValueError, match="rollout results.*missing"):
+        fleet_operator.build_run_manifest(root, {"run_id": "run", "success": True})
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_manifest_builder_preserves_failure_manifest_without_rollout_results(tmp_path):
+    root = tmp_path / "run"
+    (root / "observe").mkdir(parents=True)
+    manifest = fleet_operator.build_run_manifest(
+        root, {"run_id": "run", "success": False}
+    )
+    assert manifest["success"] is False
+    assert manifest["archives"] == []
+    assert fleet_operator.verify_run_manifest(root)["valid"] is True
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "missing_node", "duplicate_node", "unexpected_node",
+        "empty_node_id", "missing_archive", "failed_remote",
+        "failed_transfer", "timed_out",
+    ],
+)
+def test_success_manifest_requires_complete_unique_collected_node_results(tmp_path, failure):
+    root = tmp_path / "run"
+    observe = root / "observe"
+    archive_dir = observe / "artifacts"
+    archive_dir.mkdir(parents=True)
+    items = []
+    for node_id in ("node-a", "node-b"):
+        archive = archive_dir / f"{node_id}.tar.gz"
+        archive.write_bytes(f"synthetic archive: {node_id}".encode())
+        items.append({
+            "node_id": node_id,
+            "returncode": 0,
+            "scp_returncode": 0,
+            "timed_out": False,
+            "scp_timed_out": False,
+            "collected_artifact": str(archive),
+            "collected_artifact_size_bytes": archive.stat().st_size,
+            "collected_artifact_sha256": fleet_operator.file_sha256(archive),
+        })
+    if failure == "missing_node":
+        items.pop()
+    elif failure == "duplicate_node":
+        items.append(dict(items[0]))
+    elif failure == "unexpected_node":
+        items[1]["node_id"] = "node-c"
+    elif failure == "empty_node_id":
+        items[0]["node_id"] = ""
+    elif failure == "missing_archive":
+        items[0]["collected_artifact"] = None
+    elif failure == "failed_remote":
+        items[0]["returncode"] = 1
+    elif failure == "failed_transfer":
+        items[0]["scp_returncode"] = 1
+    elif failure == "timed_out":
+        items[0]["timed_out"] = True
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run", "results": items},
+    )
+    state = {
+        "run_id": "run", "success": True, "phase": "observe",
+        "node_ids": ["node-a", "node-b"], "rollout": {"returncode": 0},
+    }
+    with pytest.raises(ValueError, match="rollout results"):
+        fleet_operator.build_run_manifest(root, state)
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_failure_manifest_keeps_partial_node_results(tmp_path):
+    root = tmp_path / "run"
+    observe = root / "observe"
+    observe.mkdir(parents=True)
+    fleet_operator.write_json(
+        observe / "rollout_results.json",
+        {"schema_version": "fleet_rollout.v1", "run_id": "run",
+         "results": [{"node_id": "node-a", "returncode": 1}]},
+    )
+    manifest = fleet_operator.build_run_manifest(
+        root, {
+            "run_id": "run", "success": False,
+            "node_ids": ["node-a", "node-b"], "phase": "observe",
+        },
+    )
+    assert manifest["success"] is False
+    assert manifest["archives"] == []
+    assert fleet_operator.verify_run_manifest(root)["valid"]
+@pytest.mark.parametrize(
+    "tamper",
+    ["phase_missing", "phase_changed", "results_missing_with_roster",
+     "observe_phase_without_roster"],
+)
+def test_successful_observed_rollout_cannot_bypass_coverage_via_state_fields(
+    tmp_path, tamper,
+):
+    root = tmp_path / "run"
+    root.mkdir()
+    state = {
+        "run_id": "run", "success": True,
+        "phase": "observe", "node_ids": ["node-a", "node-b"],
+        "rollout": {"returncode": 0},
+    }
+    if tamper in {"phase_missing", "phase_changed"}:
+        observe = root / "observe"
+        observe.mkdir()
+        fleet_operator.write_json(
+            observe / "rollout_results.json",
+            {"schema_version": "fleet_rollout.v1", "run_id": "run", "results": []},
+        )
+        if tamper == "phase_missing":
+            state.pop("phase")
+        else:
+            state["phase"] = "preflight"
+    elif tamper == "results_missing_with_roster":
+        state.pop("phase")
+        state.pop("rollout")
+    elif tamper == "observe_phase_without_roster":
+        state.pop("node_ids")
+        state.pop("rollout")
+    with pytest.raises(ValueError, match="rollout results"):
+        fleet_operator.build_run_manifest(root, state)
+    assert not (root / "operator-manifest.json").exists()
+
+
+def test_standalone_success_manifest_without_rollout_context_remains_supported(
+    tmp_path,
+):
+    root = tmp_path / "standalone"
+    root.mkdir()
+    manifest = fleet_operator.build_run_manifest(
+        root, {"run_id": "standalone", "success": True}
+    )
+    assert manifest["success"] is True
+    assert manifest["archives"] == []
+    assert fleet_operator.verify_run_manifest(root, require_success=True)["valid"]
