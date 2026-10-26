@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from lms_agent_bench import hermes_agent_bench
-from lms_agent_bench.hermes_agent_common import canonical_hash, validate_suite
+from lms_agent_bench.hermes_agent_common import canonical_hash, collect_usage, validate_suite
 from lms_agent_bench.hermes_agent_scoring import (
     aggregate_trials,
     evaluate_gate,
@@ -205,3 +205,61 @@ def test_report_fingerprint_binds_loadout_identity():
     first = canonical_hash(core)
     identity["loadout_fingerprint"] = "sha256:" + "2" * 64
     assert canonical_hash(core) != first
+
+
+def test_hermes_flat_usage_is_authoritative_and_not_double_counted():
+    """Observed Hermes AIAgent return shape: cumulative counters are at root."""
+    agent_result = {
+        "prompt_tokens": 6061,
+        "completion_tokens": 204,
+        "total_tokens": 6265,
+        "api_calls": 2,
+        "messages": [
+            {"usage": {"prompt_tokens": 3000, "completion_tokens": 105, "total_tokens": 3105}},
+            {"usage": {"prompt_tokens": 3061, "completion_tokens": 99, "total_tokens": 3160}},
+        ],
+    }
+    assert collect_usage(agent_result) == {
+        "prompt_tokens": 6061,
+        "completion_tokens": 204,
+        "total_tokens": 6265,
+    }
+
+
+def test_hermes_nested_summary_still_precedes_flat_counters():
+    result = {
+        "usage": {"prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14},
+        "prompt_tokens": 999,
+        "completion_tokens": 99,
+        "total_tokens": 1098,
+        "messages": [{"usage": {"prompt_tokens": 2, "completion_tokens": 2, "total_tokens": 4}}],
+    }
+    assert collect_usage(result) == {
+        "prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14,
+    }
+
+
+def test_hermes_nested_only_legacy_usage_is_still_aggregated():
+    result = {
+        "messages": [
+            {"usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}},
+            {"usage": {"prompt_tokens": 29, "completion_tokens": 3, "total_tokens": 32}},
+        ],
+    }
+    assert collect_usage(result) == {
+        "prompt_tokens": 40, "completion_tokens": 10, "total_tokens": 50,
+    }
+
+
+def test_hermes_zero_top_level_is_not_replaced_by_nested_usage():
+    assert collect_usage({
+        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+        "messages": [{"usage": {"prompt_tokens": 100, "completion_tokens": 5, "total_tokens": 105}}],
+    }) == {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+
+
+def test_hermes_malformed_flat_counters_do_not_become_authoritative():
+    assert collect_usage({
+        "prompt_tokens": -1, "completion_tokens": True, "total_tokens": "5",
+        "messages": [{"usage": {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12}}],
+    }) == {"prompt_tokens": 10, "completion_tokens": 2, "total_tokens": 12}

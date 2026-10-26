@@ -242,11 +242,33 @@ def extract_tool_calls(
 
 
 def collect_usage(value: Any) -> Dict[str, int]:
+    """Reconcile usage without double-counting authoritative Hermes totals.
+
+    Canonical Hermes AIAgent returns prompt_tokens, completion_tokens and
+    total_tokens at the top level rather than under nested usage. Those fields
+    represent cumulative calls, so they take priority over per-message usage.
+    The old nested-usage fallback is preserved for older API responses.
+    """
     totals = {
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "total_tokens": 0,
     }
+
+    if isinstance(value, Mapping):
+        nested = value.get("usage")
+        if isinstance(nested, Mapping):
+            return {
+                key: raw if isinstance((raw := nested.get(key)), int)
+                and not isinstance(raw, bool) and raw >= 0 else 0
+                for key in totals
+            }
+        flat = {key: value.get(key) for key in totals}
+        if all(
+            isinstance(raw, int) and not isinstance(raw, bool) and raw >= 0
+            for raw in flat.values()
+        ):
+            return flat
 
     def visit(item: Any) -> None:
         if isinstance(item, Mapping):
