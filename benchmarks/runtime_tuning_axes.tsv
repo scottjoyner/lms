@@ -1,0 +1,26 @@
+axis	case_id	flags_or_build	purpose	priority
+cpu-affinity	default	default	baseline	core
+cpu-affinity	strict-physical	--cpu-strict 1 --threads <physical> --threads-batch <physical>	reduce scheduler jitter	core
+cpu-affinity	pinned-range	--cpu-range <range> --cpu-strict 1	pin inference threads away from services	core
+numa	none	default	baseline	core
+numa	isolate	--numa isolate	keep memory local where helpful	research
+numa	numactl	--numa numactl	use explicit cpuset/memory policy	research
+polling	0	--poll 0 --poll-batch 0	lowest busy-wait power	secondary
+polling	50	--poll 50 --poll-batch 50	default-like balance	core
+polling	100	--poll 100 --poll-batch 1	latency-focused busy wait	research
+priority	normal	--prio 0 --prio-batch 0	baseline	core
+priority	high	--prio 2 --prio-batch 2	latency under host contention	secondary
+flash-attn	auto	-fa auto	backend-selected baseline	core
+flash-attn	on	-fa on	force optimized path	core
+flash-attn	off	-fa off	negative control	secondary
+hip-graphs	on	GGML_HIP_GRAPHS=ON	graph-enabled build	core
+hip-graphs	off	GGML_HIP_GRAPHS=OFF	graph-disabled control	secondary
+rocwmma	on	GGML_HIP_ROCWMMA_FATTN=ON	optimized AMD FA kernels	core
+rocwmma	off	GGML_HIP_ROCWMMA_FATTN=OFF	kernel-path control	secondary
+load-mode	mmap	--mmap	page-cache/mmap baseline	core
+load-mode	no-mmap	--no-mmap	allocation/pageout control	secondary
+load-mode	dio	--direct-io	direct-I/O loading control	secondary
+mlock	off	default	baseline	core
+mlock	on	--mlock	prevent model pages from swapping	research
+swa-cache	default	default	model-native SWA behavior	core
+swa-cache	full	--swa-full	full SWA cache tradeoff	research
