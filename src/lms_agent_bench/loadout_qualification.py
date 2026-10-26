@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 from urllib.parse import urlparse
@@ -20,6 +21,7 @@ from lms_agent_bench.model_loadout import validate_manifest
 
 THROUGHPUT_SCHEMA_VERSION = "loadout_throughput_evidence.v1"
 QUALIFICATION_SCHEMA_VERSION = "loadout_qualification.v1"
+DECISION_METRICS_SCHEMA_VERSION = "loadout_decision_metrics.v1"
 BASE_HERMES_SUITE_ID = "hermes_agent_intelligence.v1"
 CONTEXT_HERMES_SUITE_ID = "hermes_agent_context_pressure.v1"
 
@@ -74,6 +76,347 @@ def _identity(loadout: Mapping[str, Any]) -> Dict[str, Any]:
         "architecture_kind": loadout["architecture"]["kind"],
         "configured_context_tokens": loadout["context"]["configured_tokens"],
         "parallel_slots": loadout["concurrency"]["parallel_slots"],
+    }
+
+
+def _optional_float(
+    value: Any,
+    label: str,
+    *,
+    minimum: Optional[float] = None,
+    maximum: Optional[float] = None,
+) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be numeric")
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be numeric") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{label} must be finite")
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{label} is below minimum")
+    if maximum is not None and number > maximum:
+        raise ValueError(f"{label} exceeds maximum")
+    return number
+
+
+def _optional_int(
+    value: Any, label: str, *, minimum: Optional[int] = None
+) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{label} must be an integer")
+    try:
+        number = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be an integer") from exc
+    if minimum is not None and number < minimum:
+        raise ValueError(f"{label} is below minimum")
+    return number
+
+
+def _normalized_case_metrics(aggregate: Mapping[str, Any], label: str) -> list[Dict[str, Any]]:
+    raw_cases = aggregate.get("cases")
+    if raw_cases in (None, []):
+        return []
+    if not isinstance(raw_cases, list):
+        raise ValueError(f"{label}.cases must be a list")
+    cases: list[Dict[str, Any]] = []
+    for index, raw in enumerate(raw_cases):
+        case = _mapping(raw, f"{label}.cases[{index}]")
+        cases.append(
+            {
+                "case_key": str(case.get("case_key") or ""),
+                "task_family": str(case.get("task_family") or ""),
+                "priority": case.get("priority"),
+                "recovery_case": bool(case.get("recovery_case")),
+                "attempted_trials": _optional_int(
+                    case.get("attempted_trials"),
+                    f"{label}.cases[{index}].attempted_trials",
+                    minimum=0,
+                ),
+                "valid_trials": _optional_int(
+                    case.get("valid_trials"),
+                    f"{label}.cases[{index}].valid_trials",
+                    minimum=0,
+                ),
+                "passed_trials": _optional_int(
+                    case.get("passed_trials"),
+                    f"{label}.cases[{index}].passed_trials",
+                    minimum=0,
+                ),
+                "trial_pass_rate": _optional_float(
+                    case.get("trial_pass_rate"),
+                    f"{label}.cases[{index}].trial_pass_rate",
+                    minimum=0.0,
+                    maximum=1.0,
+                ),
+                "median_wall_seconds": _optional_float(
+                    case.get("median_wall_seconds"),
+                    f"{label}.cases[{index}].median_wall_seconds",
+                    minimum=0.0,
+                ),
+                "p95_wall_seconds": _optional_float(
+                    case.get("p95_wall_seconds"),
+                    f"{label}.cases[{index}].p95_wall_seconds",
+                    minimum=0.0,
+                ),
+            }
+        )
+    return cases
+
+
+def _normalized_hermes_metrics(
+    aggregate: Mapping[str, Any], label: str
+) -> Dict[str, Any]:
+    return {
+        "case_count": _optional_int(
+            aggregate.get("case_count"), f"{label}.case_count", minimum=0
+        ),
+        "attempted_trial_count": _optional_int(
+            aggregate.get("attempted_trial_count"),
+            f"{label}.attempted_trial_count",
+            minimum=0,
+        ),
+        "valid_trial_count": _optional_int(
+            aggregate.get("valid_trial_count"),
+            f"{label}.valid_trial_count",
+            minimum=0,
+        ),
+        "passed_trial_count": _optional_int(
+            aggregate.get("passed_trial_count"),
+            f"{label}.passed_trial_count",
+            minimum=0,
+        ),
+        "overall_task_pass_rate": _optional_float(
+            aggregate.get("overall_task_pass_rate"),
+            f"{label}.overall_task_pass_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "effect_checkpoint_rate": _optional_float(
+            aggregate.get("effect_checkpoint_rate"),
+            f"{label}.effect_checkpoint_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "argument_validity_rate": _optional_float(
+            aggregate.get("argument_validity_rate"),
+            f"{label}.argument_validity_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "timeout_or_crash_rate": _optional_float(
+            aggregate.get("timeout_or_crash_rate"),
+            f"{label}.timeout_or_crash_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "successful_tasks_per_hour": _optional_float(
+            aggregate.get("successful_tasks_per_hour"),
+            f"{label}.successful_tasks_per_hour",
+            minimum=0.0,
+        ),
+        "successful_effect_weight_per_minute": _optional_float(
+            aggregate.get("successful_effect_weight_per_minute"),
+            f"{label}.successful_effect_weight_per_minute",
+            minimum=0.0,
+        ),
+        "tool_calls_per_minute": _optional_float(
+            aggregate.get("tool_calls_per_minute"),
+            f"{label}.tool_calls_per_minute",
+            minimum=0.0,
+        ),
+        "completion_tokens_per_second_end_to_end": _optional_float(
+            aggregate.get("completion_tokens_per_second_end_to_end"),
+            f"{label}.completion_tokens_per_second_end_to_end",
+            minimum=0.0,
+        ),
+        "total_wall_seconds": _optional_float(
+            aggregate.get("total_wall_seconds"),
+            f"{label}.total_wall_seconds",
+            minimum=0.0,
+        ),
+        "cases": _normalized_case_metrics(aggregate, label),
+    }
+
+
+def build_decision_metrics(
+    reliability_summary: Mapping[str, Any],
+    base_aggregate: Mapping[str, Any],
+    context_aggregate: Mapping[str, Any],
+) -> Dict[str, Any]:
+    performance = {
+        "observed_tokens_per_second_median": _optional_float(
+            reliability_summary.get("tps_med"),
+            "reliability_summary.tps_med",
+            minimum=0.0,
+        ),
+        "observed_tokens_per_second_p10": _optional_float(
+            reliability_summary.get("tps_p10"),
+            "reliability_summary.tps_p10",
+            minimum=0.0,
+        ),
+        "observed_tokens_per_second_p90": _optional_float(
+            reliability_summary.get("tps_p90"),
+            "reliability_summary.tps_p90",
+            minimum=0.0,
+        ),
+        "time_to_first_token_seconds_median": _optional_float(
+            reliability_summary.get("ttft_med"),
+            "reliability_summary.ttft_med",
+            minimum=0.0,
+        ),
+        "time_to_first_token_seconds_p90": _optional_float(
+            reliability_summary.get("ttft_p90"),
+            "reliability_summary.ttft_p90",
+            minimum=0.0,
+        ),
+        "request_success_rate": _optional_float(
+            reliability_summary.get("ok_rate"),
+            "reliability_summary.ok_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "evaluation_success_rate": _optional_float(
+            reliability_summary.get("eval_ok_rate"),
+            "reliability_summary.eval_ok_rate",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "evaluation_score_average": _optional_float(
+            reliability_summary.get("eval_score_avg"),
+            "reliability_summary.eval_score_avg",
+        ),
+        "sample_completeness": _optional_float(
+            reliability_summary.get("sample_completeness"),
+            "reliability_summary.sample_completeness",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "reliability_score": _optional_float(
+            reliability_summary.get("reliability_score"),
+            "reliability_summary.reliability_score",
+            minimum=0.0,
+            maximum=1.0,
+        ),
+        "valid_trials": _optional_int(
+            reliability_summary.get("valid_trials"),
+            "reliability_summary.valid_trials",
+            minimum=0,
+        ),
+        "trial_attempts": _optional_int(
+            reliability_summary.get("trial_attempts"),
+            "reliability_summary.trial_attempts",
+            minimum=0,
+        ),
+        # These are deliberately null in v1. reliable_benchmark.v1 does not
+        # expose native prompt-eval timing or process/device peak memory.
+        "prompt_processing_tokens_per_second": None,
+        "peak_device_memory_bytes": None,
+        "peak_host_rss_bytes": None,
+        "metric_semantics": {
+            "observed_tokens_per_second": (
+                "copied from reliable_benchmark.v1 summary tps_* fields; "
+                "this is not prompt-processing throughput"
+            ),
+            "time_to_first_token_seconds": (
+                "copied from reliable_benchmark.v1 summary ttft_* fields"
+            ),
+        },
+        "unavailable_metrics": {
+            "prompt_processing_tokens_per_second": (
+                "reliable_benchmark.v1 does not record native prompt-eval timing"
+            ),
+            "peak_device_memory_bytes": (
+                "reliable_benchmark.v1 does not collect peak device memory"
+            ),
+            "peak_host_rss_bytes": (
+                "reliable_benchmark.v1 does not collect peak process RSS"
+            ),
+        },
+    }
+    return {
+        "schema_version": DECISION_METRICS_SCHEMA_VERSION,
+        "performance": performance,
+        "capability": {
+            "base_hermes": _normalized_hermes_metrics(
+                base_aggregate, "decision_metrics.capability.base_hermes"
+            ),
+            "context_pressure_hermes": _normalized_hermes_metrics(
+                context_aggregate,
+                "decision_metrics.capability.context_pressure_hermes",
+            ),
+        },
+    }
+
+
+def verify_decision_metrics(value: Any) -> Dict[str, Any]:
+    metrics = _mapping(value, "decision_metrics")
+    if metrics.get("schema_version") != DECISION_METRICS_SCHEMA_VERSION:
+        raise ValueError("unsupported decision metrics schema")
+    performance = _mapping(metrics.get("performance"), "decision_metrics.performance")
+    capability = _mapping(metrics.get("capability"), "decision_metrics.capability")
+    for field in (
+        "prompt_processing_tokens_per_second",
+        "peak_device_memory_bytes",
+        "peak_host_rss_bytes",
+    ):
+        if performance.get(field) is not None:
+            raise ValueError(
+                f"decision_metrics.performance.{field} must remain null until measured"
+            )
+    for field in (
+        "request_success_rate",
+        "evaluation_success_rate",
+        "sample_completeness",
+        "reliability_score",
+    ):
+        _optional_float(
+            performance.get(field),
+            f"decision_metrics.performance.{field}",
+            minimum=0.0,
+            maximum=1.0,
+        )
+    for field in (
+        "observed_tokens_per_second_median",
+        "observed_tokens_per_second_p10",
+        "observed_tokens_per_second_p90",
+        "time_to_first_token_seconds_median",
+        "time_to_first_token_seconds_p90",
+    ):
+        _optional_float(
+            performance.get(field),
+            f"decision_metrics.performance.{field}",
+            minimum=0.0,
+        )
+    for field in ("valid_trials", "trial_attempts"):
+        _optional_int(
+            performance.get(field),
+            f"decision_metrics.performance.{field}",
+            minimum=0,
+        )
+    normalized_capability = {
+        "base_hermes": _normalized_hermes_metrics(
+            _mapping(capability.get("base_hermes"), "decision_metrics.capability.base_hermes"),
+            "decision_metrics.capability.base_hermes",
+        ),
+        "context_pressure_hermes": _normalized_hermes_metrics(
+            _mapping(
+                capability.get("context_pressure_hermes"),
+                "decision_metrics.capability.context_pressure_hermes",
+            ),
+            "decision_metrics.capability.context_pressure_hermes",
+        ),
+    }
+    return {
+        "schema_version": DECISION_METRICS_SCHEMA_VERSION,
+        "performance": performance,
+        "capability": normalized_capability,
     }
 
 
@@ -192,11 +535,19 @@ def verify_throughput_evidence(
         )
         if loadout["loadout_fingerprint"] != expected["loadout_fingerprint"]:
             raise ValueError("throughput evidence belongs to a different loadout")
+    summary = _mapping(evidence.get("reliability_summary"), "throughput reliability summary")
+    if summary.get("reliability_pass") is not True:
+        raise ValueError("throughput reliability summary did not pass")
+    if str(summary.get("host_name") or "") != str(loadout["node_id"]):
+        raise ValueError("throughput reliability summary node mismatch")
+    if str(summary.get("model_key") or "") != str(loadout["model"]["id"]):
+        raise ValueError("throughput reliability summary model mismatch")
     return {
         "fingerprint": fingerprint,
         "loadout": loadout,
         "identity": identity,
         "reliability_fingerprint": evidence["reliability_fingerprint"],
+        "summary": summary,
     }
 
 
@@ -296,6 +647,10 @@ def build_qualification(
     def normalized_optional(value: Optional[str]) -> Optional[str]:
         return normalize_sha256(value) if value else None
 
+    decision_metrics = build_decision_metrics(
+        throughput["summary"], base["aggregate"], context["aggregate"]
+    )
+
     core = {
         "schema_version": QUALIFICATION_SCHEMA_VERSION,
         "artifact_type": "exact_loadout_qualification",
@@ -329,6 +684,7 @@ def build_qualification(
             "loopback_only": True,
             "non_admitted": True,
         },
+        "decision_metrics": decision_metrics,
         "qualified": True,
         "admission": {"admitted": False},
     }
@@ -387,6 +743,9 @@ def verify_qualification(
         raise ValueError("qualification base Hermes suite mismatch")
     if context.get("suite_id") != CONTEXT_HERMES_SUITE_ID:
         raise ValueError("qualification context Hermes suite mismatch")
+    decision_metrics = None
+    if report.get("decision_metrics") is not None:
+        decision_metrics = verify_decision_metrics(report.get("decision_metrics"))
     if expected_loadout is not None:
         expected = validate_manifest(
             expected_loadout,
@@ -400,6 +759,7 @@ def verify_qualification(
         "loadout": loadout,
         "evidence": evidence,
         "gates": gates,
+        "decision_metrics": decision_metrics,
     }
 
 

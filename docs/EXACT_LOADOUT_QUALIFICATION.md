@@ -85,6 +85,27 @@ Every gate is explicit, and the artifact always contains:
 }
 ```
 
+## Normalized decision metrics
+
+Newly built `loadout_qualification.v1` artifacts also embed
+`decision_metrics.schema_version=loadout_decision_metrics.v1`. This is a
+consumer-facing summary of already-verified evidence, not a new benchmark:
+
+- reliable-benchmark observed throughput median/p10/p90;
+- TTFT median/p90, request/evaluation success, completeness, and reliability;
+- base Hermes task/effect/tool validity and per-case pass/latency metrics;
+- context-pressure Hermes metrics in the same shape.
+
+The summary deliberately does **not** reinterpret observed completion throughput
+as prompt-processing throughput. The current reliable runner also does not
+collect peak GPU memory or peak process RSS. Those fields remain explicit
+`null` values with reasons in `unavailable_metrics`; verification rejects a
+v1 artifact that fabricates values for them.
+
+This makes the qualification directly usable for comparison/shadow-routing
+analysis while preserving measurement semantics. Native PP and memory telemetry
+require a later collector/schema revision.
+
 ## Remaining physical boundary
 
 This command can validate only evidence that exists. It does not execute a
