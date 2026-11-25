@@ -334,3 +334,25 @@ Central `EXPERIMENT-032E-COUNTERFACTUAL-JUDGE.md`, SHA256
 Central `EXPERIMENT-032D-E-RECONCILIATION.md` consolidates the safety
 interpretation. Regressions: `tests/test_k2_qwen_counterfactual.py`
 and `tests/test_k2_qwen_candidate_guard.py`. No production effects.
+
+## EXP032F disjoint human QA fixture — resource HOLD
+
+`research/k2_disjoint_squad_fixture.py` mechanically selected 16
+different article topics, each with a one-word human-annotated answerable
+question and a paired human-unanswerable SQuAD2 dev question. Exactly
+32 questions are frozen under receipt
+`1382fc12d772628b8dfd2cf250dc36c8f35b9215d774db89dba05bc912e5ee65`.
+`research/k2_qwen_disjoint_holdout.py` uses unchanged frozen K2/Qwen
+versions and the exact EXP032D answer-candidate and YES/NO verifier rules.
+
+Two execution attempts were **resource-denied**: first after the complete
+K2 stage but before Qwen admission, second before K2 admission.
+Neither yielded an accepted human-gold score report. A prospectively
+committed operational amendment retains 36GiB pre-K2, permits 34GiB
+pre-Qwen and preserves 22GiB per-batch stop and a 420-second cap.
+Do not infer EXP032F performance from incomplete runs.
+Canonical Markdown: `EXPERIMENT-032F-ARTICLE-DISJOINT-PROTOCOL.md`
+and `EXPERIMENT-032F-RESOURCE-HOLD.md` in central `~/knowledge`.
+Focused tests: `tests/test_k2_qwen_disjoint_holdout.py`.
+The public SQuAD dev topics are disjoint **only from our prior eight
+articles**, not necessarily from model pretraining.
