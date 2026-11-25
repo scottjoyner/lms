@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/fleet_loadout.v1.schema.json",
+  "title": "LMS Fleet Loadout Artifact",
+  "type": "object",
+  "required": ["schema_version", "artifact_type"],
+  "properties": {
+    "schema_version": {"const": "fleet_loadout.v1"},
+    "artifact_type": {
+      "enum": ["machine_observation", "benchmark_plan", "selected_loadout", "tailscale_inventory"]
+    },
+    "observation_fingerprint": {"type": "string", "pattern": "^sha256:"},
+    "plan_fingerprint": {"type": "string", "pattern": "^sha256:"},
+    "selection_fingerprint": {"type": "string", "pattern": "^sha256:"},
+    "candidates": {"type": "array", "items": {"$ref": "#/$defs/candidate"}},
+    "selected": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "object", "required": ["candidate_id", "eligible", "candidate", "metrics"]}
+      ]
+    },
+    "admission": {
+      "type": "object",
+      "properties": {"admitted": {"const": false}},
+      "required": ["admitted"]
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": ["candidate_id", "engine", "backend", "model", "context_tokens", "parallel_slots", "launch"],
+      "properties": {
+        "candidate_id": {"type": "string", "minLength": 8},
+        "engine": {"enum": ["llama.cpp", "npu-inference-server", "lmstudio", "custom"]},
+        "backend": {"enum": ["cpu", "cuda", "rocm", "vulkan", "metal", "npu_xdna2"]},
+        "context_tokens": {"type": "integer", "minimum": 1},
+        "parallel_slots": {"type": "integer", "minimum": 1},
+        "model": {"type": "object", "required": ["id"]},
+        "launch": {
+          "type": "object",
+          "properties": {"bind_host": {"const": "127.0.0.1"}},
+          "required": ["bind_host"]
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
