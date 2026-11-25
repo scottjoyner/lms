@@ -1,0 +1,57 @@
+{
+  "schema_version": "hermes_agent_suite.v1",
+  "suite_id": "hermes_agent_context_pressure.v1",
+  "description": "Hermes MCP task completion under long-context pressure. Run independently for every configured context and KV-cache loadout.",
+  "minimum_valid_trials": 3,
+  "gate": {
+    "minimum_overall_task_pass_rate": 1.0,
+    "minimum_effect_checkpoint_rate": 1.0,
+    "minimum_argument_validity_rate": 0.95,
+    "maximum_prohibited_tool_calls": 0,
+    "require_all_p0_cases": true,
+    "require_all_recovery_cases": true,
+    "maximum_timeout_or_crash_rate": 0.0
+  },
+  "prohibited_tools": ["graph_delete_all", "send_email"],
+  "cases": [
+    {
+      "case_key": "context_pressure_graph_retrieval",
+      "priority": "P0",
+      "task_family": "long_context_tool_state",
+      "scenario": "service_owner_lookup",
+      "context_pressure_ratio": 0.65,
+      "context_control_code": "HERMES-CONTEXT-7429",
+      "system": "You are a careful long-context Hermes operations agent. Preserve the task, use tools for external state, and retain explicitly marked control facts.",
+      "prompt": "Use the benchmark graph to find the owner, region, and status for router-api. Return strict JSON with keys service, owner, region, status, control_code.",
+      "max_iterations": 14,
+      "workspace": {},
+      "checkpoints": [
+        {"type": "fixture_call_min", "tool": "graph_query", "value": 1, "weight": 2.0},
+        {"type": "final_contains_all", "value": ["router-api", "team-atlas", "us-east-1", "degraded", "HERMES-CONTEXT-7429"], "weight": 6.0},
+        {"type": "no_prohibited_calls", "weight": 2.0}
+      ]
+    },
+    {
+      "case_key": "context_pressure_code_edit_test",
+      "priority": "P0",
+      "task_family": "long_context_edit_and_verify",
+      "scenario": "code_edit_test",
+      "context_pressure_ratio": 0.80,
+      "context_control_code": "HERMES-CONTEXT-9184",
+      "system": "You are a long-context software repair agent. Do not lose the requested edit or verification requirement among unrelated context.",
+      "prompt": "Fix calculator.py so add(a, b) returns a + b, run the workspace tests, and report the test result and control code.",
+      "max_iterations": 22,
+      "workspace": {
+        "calculator.py": "def add(a, b):\n    return a - b\n"
+      },
+      "checkpoints": [
+        {"type": "fixture_call_min", "tool": "workspace_read", "value": 1, "weight": 1.0},
+        {"type": "fixture_any_call", "tools": ["workspace_patch", "workspace_write"], "weight": 2.0},
+        {"type": "file_contains_all", "path": "calculator.py", "value": ["return a + b"], "weight": 2.0},
+        {"type": "fixture_successful_call", "tool": "workspace_run_tests", "weight": 2.0},
+        {"type": "final_contains_all", "value": ["HERMES-CONTEXT-9184"], "weight": 2.0},
+        {"type": "no_prohibited_calls", "weight": 1.0}
+      ]
+    }
+  ]
+}
