@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/fleet_release_gate.v1.schema.json",
+  "title": "LMS Fleet Release Gate",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "created_at_utc",
+    "mode",
+    "required_node_ids",
+    "passed",
+    "nodes",
+    "admission",
+    "gate_fingerprint"
+  ],
+  "properties": {
+    "schema_version": {"const": "fleet_release_gate.v1"},
+    "artifact_type": {"const": "fleet_release_gate"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "mode": {"enum": ["observe", "sweep"]},
+    "rollout_run_id": {"type": ["string", "null"]},
+    "required_node_ids": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "passed": {"type": "boolean"},
+    "next_stage": {
+      "type": ["string", "null"],
+      "enum": ["candidate_review", "profile_import_review", null]
+    },
+    "error": {"type": "string"},
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "passed", "errors", "archive"],
+        "properties": {
+          "node_id": {"type": "string", "minLength": 1},
+          "passed": {"type": "boolean"},
+          "errors": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "archive": {"type": ["object", "null"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "admission": {
+      "type": "object",
+      "required": ["admitted"],
+      "properties": {"admitted": {"const": false}},
+      "additionalProperties": false
+    },
+    "gate_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": true
+}
