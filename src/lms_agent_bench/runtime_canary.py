@@ -512,6 +512,7 @@ def _state_payload(run_id: str, plan: Mapping[str, Any]) -> Dict[str, Any]:
         "stage": "validated",
         "success": False,
         "candidate_started": False,
+        "candidate_start_attempted": False,
         "rollback_attempted": False,
         "rollback_succeeded": False,
         "commands": [],
@@ -625,7 +626,7 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         raise ValueError(f"runtime canary run already exists: {run_dir}")
     lock: Optional[Path] = None
     state = _state_payload(run_id, plan)
-    candidate_started = False
+    candidate_start_attempted = False
     env = _environment(plan["environment_names"])
     try:
         lock = acquire_lock(workspace, run_id, recover_stale_lock)
@@ -639,11 +640,15 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
 
         for name in ("snapshot", "start_candidate", "candidate_health", "qualification"):
             state["stage"] = name
+            if name == "start_candidate":
+                # A failing start wrapper may have already spawned the model.
+                # Arm cleanup BEFORE launching it, not only on exit zero.
+                candidate_start_attempted = True
+                state["candidate_start_attempted"] = True
             _write_state(state_path, state)
             result = run_command(name, plan["commands"][name], cwd=cwd, env=env, logs=logs)
             state["commands"].append(result)
             if name == "start_candidate":
-                candidate_started = True
                 state["candidate_started"] = True
             _write_state(state_path, state)
 
@@ -672,7 +677,7 @@ def execute(plan_path: Path, workspace_path: Path, run_id_value: Optional[str], 
         state["stage"] = "complete"
     except BaseException as exc:
         state["failure"] = {"type": type(exc).__name__, "message": str(exc), "stage": state.get("stage")}
-        if candidate_started:
+        if candidate_start_attempted:
             for name in ("stop_candidate", "rollback", "rollback_health"):
                 if name == "rollback":
                     state["rollback_attempted"] = True
