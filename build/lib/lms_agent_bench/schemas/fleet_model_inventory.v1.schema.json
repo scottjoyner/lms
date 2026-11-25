@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/scottjoyner/lms/schemas/fleet_model_inventory.v1.schema.json",
+  "title": "Fleet model inventory",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "artifact_type",
+    "created_at_utc",
+    "roots",
+    "hash_mode",
+    "models",
+    "inventory_fingerprint",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": {"const": "fleet_model_inventory.v1"},
+    "artifact_type": {"const": "model_inventory"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "updated_at_utc": {"type": "string", "format": "date-time"},
+    "roots": {"type": "array", "items": {"type": "string"}},
+    "hash_mode": {"enum": ["none", "quick", "full", "mixed"]},
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "format",
+          "size_bytes",
+          "mtime_ns",
+          "quantization",
+          "max_context",
+          "fingerprint_mode"
+        ],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "format": {"type": "string"},
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "mtime_ns": {"type": "integer", "minimum": 0},
+          "quantization": {"type": "string"},
+          "parameter_billions": {"type": ["number", "null"], "minimum": 0},
+          "max_context": {"type": "integer", "minimum": 1},
+          "fingerprint_mode": {"enum": ["none", "quick", "full"]},
+          "quick_fingerprint": {"type": "string", "pattern": "^sha256:"},
+          "artifact_fingerprint": {"type": "string", "pattern": "^sha256:"},
+          "content_sha256": {"type": "string", "pattern": "^sha256:"}
+        },
+        "additionalProperties": true
+      }
+    },
+    "inventory_fingerprint": {"type": "string", "pattern": "^sha256:"},
+    "authority": {"type": "object"}
+  },
+  "additionalProperties": true
+}
