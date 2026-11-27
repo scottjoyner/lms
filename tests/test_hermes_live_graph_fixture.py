@@ -85,3 +85,12 @@ def test_graph_schema_remains_visible(fixture):
     result, err = fixture.call("graph_schema", {})
     assert err is False and result["read_only"] is True
     assert "OWNED_BY" in result["relationships"]
+
+
+def test_live_tool_advertisement_is_restricted(fixture):
+    tools = fixture.tools
+    assert {tool["name"] for tool in tools} == {"graph_schema", "graph_query"}
+    query = next(tool for tool in tools if tool["name"] == "graph_query")
+    assert query["inputSchema"]["required"] == ["query", "read_only"]
+    assert "parameters" not in query["inputSchema"]["properties"]
+    assert query["inputSchema"]["properties"]["read_only"]["const"] is True

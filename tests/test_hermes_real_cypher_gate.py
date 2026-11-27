@@ -335,7 +335,7 @@ def test_harness_cli_exit_code_does_not_promote_failed_model(monkeypatch, tmp_pa
     assert entry.main() == 3
 
 
-def test_harness_cli_zero_only_if_all_trials_pass(monkeypatch, tmp_path):
+def test_harness_cli_never_promotes_archived_replay(monkeypatch, tmp_path):
     import sys
     from lms_agent_bench import hermes_scratch_replay as entry
     monkeypatch.setattr(sys, "argv", ["hermes-scratch", "--confirm-research-only",
@@ -345,4 +345,46 @@ def test_harness_cli_zero_only_if_all_trials_pass(monkeypatch, tmp_path):
         "real_end_to_end_pass_count": 3, "trial_count": 3,
         "case_gate_passed": True,
     })
-    assert entry.main() == 0
+    assert entry.main() == 3
+
+
+def test_teardown_of_stopped_owned_container_uses_exact_id():
+    from lms_agent_bench.hermes_scratch_replay import ScratchHermesArchive
+    class Stopped(FakeResearchLifecycle):
+        def __call__(self, args, *, timeout):
+            if args[1] == "inspect" and "{{json .}}" in args and self.exists:
+                self.ops.append(args)
+                receipt = container_receipt()
+                receipt["State"]["Status"] = "exited"
+                return subprocess.CompletedProcess(args, 0, json.dumps(receipt), "")
+            return super().__call__(args, timeout=timeout)
+    fake = Stopped(initially_exists=True)
+    scratch = ScratchHermesArchive(runner=fake)
+    scratch.container_id = CONTAINER_ID
+    scratch.close()
+    assert scratch.destroyed and not fake.exists
+    assert [x for x in fake.ops if x[1] == "rm"] == [["docker", "rm", "-f", CONTAINER_ID]]
+
+
+def test_teardown_rejects_wrong_container_identity():
+    from lms_agent_bench.hermes_scratch_replay import ScratchHermesArchive
+    fake = FakeResearchLifecycle(initially_exists=True)
+    scratch = ScratchHermesArchive(runner=fake)
+    scratch.container_id = "f" * 64
+    with pytest.raises(WitnessDenied, match="identity changed"):
+        scratch.close()
+    assert fake.exists and not fake.destroyed
+    assert not any(x[1] == "rm" for x in fake.ops)
+
+
+def test_archived_replay_never_qualifies_even_three_matching_answers(tmp_path):
+    from lms_agent_bench.hermes_real_cypher_audit import score_archived_case
+    for i in (1, 2, 3):
+        _write_archived_trial(tmp_path / f"trial-{i:02d}")
+    gate = ScratchCypherGate(expected_container_id=CONTAINER_ID, command_runner=FakeDocker())
+    result = score_archived_case(tmp_path, gate)
+    assert result["real_end_to_end_pass_count"] == 3
+    assert result["archived_replay_all_passed"] is True
+    assert result["case_gate_passed"] is False
+    assert result["native_end_to_end_verified"] is False
+    assert all(t["archived_replay_only"] for t in result["trials"])
